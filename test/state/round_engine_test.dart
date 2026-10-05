@@ -130,9 +130,9 @@ void main() {
         await flush();
         expect(sent, isEmpty);
 
-        location.emit(fix(52.6));
-        await flush();
         now = at(20);
+        location.emit(fix(52.6)); // stream delivers every few seconds
+        await flush();
         await engine.tick();
         await flush();
         expect(sent.single.id, 'regular_1');
@@ -325,6 +325,79 @@ void main() {
       await engine.tick();
       await flush();
       expect(engine.status.value.lastPingAt, at(20));
+    });
+  });
+
+  group('silent GPS stream (field test 2026-10-05, Android 10)', () {
+    test('stream silent for 30 s → position fetched directly', () async {
+      location.position = const GeoPoint(52.7, 13.7);
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      await engine.tick(); // nothing from the stream yet
+      expect(location.currentCalls, 1);
+      expect(engine.position.value!.point.lat, 52.7);
+
+      now = now.add(const Duration(seconds: 10));
+      await engine.tick();
+      expect(location.currentCalls, 1); // not more often than every 30 s
+
+      now = now.add(const Duration(seconds: 25));
+      await engine.tick();
+      expect(location.currentCalls, 2);
+    });
+
+    test('working stream → no direct requests', () async {
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      for (var i = 0; i < 6; i++) {
+        location.emit(fix(52.5));
+        await flush();
+        await engine.tick();
+        now = now.add(const Duration(seconds: 10));
+      }
+      expect(location.currentCalls, 0);
+    });
+
+    test('hunter position is refreshed and uploaded without stream', () async {
+      location.position = const GeoPoint(52.3, 13.3);
+      engine = await engineFor('h');
+      engine.update(game: game(), me: hunter, speedhuntsOnMe: []);
+      await engine.tick();
+      await flush();
+      final locs = await rounds.watchHunterLocations(hunterSession).first;
+      expect(locs['h']!.point.lat, 52.3);
+    });
+
+    test('log explains why tracking stopped', () async {
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      engine.update(
+        game: game(),
+        me: player.copyWith(caught: true),
+        speedhuntsOnMe: [],
+      );
+      expect(engine.log.value.last, endsWith('tracking: stop (caught)'));
+    });
+
+    test('log never reveals a speedhunt on the player (R-SPEED-04)', () async {
+      location.position = const GeoPoint(52.1, 13.1);
+      final sh = Speedhunt.fromSettings(
+        targetId: 'kim',
+        startedAt: at(25),
+        settings: const GameSettings(),
+      );
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: [sh]);
+      for (final m in [25, 30, 35]) {
+        now = at(m);
+        location.emit(fix(52.5));
+        await flush();
+        await engine.tick();
+        await flush();
+      }
+      final text = engine.log.value.join('\n');
+      expect(text, isNot(contains('speedhunt')));
+      expect(text, isNot(contains('ping')));
     });
   });
 

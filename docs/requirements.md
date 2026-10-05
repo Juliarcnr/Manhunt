@@ -76,6 +76,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | ID | Anforderung |
 |---|---|
 | R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. Die Kopfzeile zeigt nur Phase und Countdown (z.B. „DIE JAGD LÄUFT 1:23:45“), damit möglichst viel Karte sichtbar bleibt; darunter nur kleine Hinweise (nächster Ping, GPS-Status, Speedhunt). |
+| R-MAP-02 | Die Karte ist immer nach Norden ausgerichtet: zoomen und verschieben ja, drehen nein (alle Karten). |
 
 ### Hunter-View
 
@@ -87,6 +88,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
+| R-HUNT-07 | *(Phase 6)* Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert, und lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
 
 ### Spieler-View
 

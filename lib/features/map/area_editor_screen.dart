@@ -107,6 +107,7 @@ class _AreaEditorScreenState extends ConsumerState<AreaEditorScreen> {
             key: _mapKey,
             controller: _mapController,
             options: MapOptions(
+              interactionOptions: northUp,
               initialCenter: fallbackCenter,
               initialZoom: 6,
               initialCameraFit: initialFit,

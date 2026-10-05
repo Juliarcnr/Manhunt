@@ -64,6 +64,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonRetry => 'Erneut versuchen';
 
   @override
+  String get commonClose => 'Schließen';
+
+  @override
+  String get debugLogTitle => 'Tracking-Protokoll';
+
+  @override
   String commonError(String details) {
     return 'Etwas ist schiefgelaufen: $details';
   }
@@ -392,14 +398,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get trackingWaiting => 'Warte auf GPS-Signal …';
-
-  @override
-  String get trackingOk => 'GPS ok';
-
-  @override
-  String trackingOkLastPing(String time) {
-    return 'GPS ok · letzter Ping $time';
-  }
 
   @override
   String get trackingNoPermission =>

@@ -137,17 +137,36 @@ class RoundEngine {
       if (s.kind == PingKind.regular) s,
   ];
 
-  bool get _shouldTrack {
+  bool get _shouldTrack => _notTrackingReason == null;
+
+  /// Why tracking is off right now, or null if it should run (for the log).
+  String? get _notTrackingReason {
     final game = _game;
     final me = _me;
     final clock = _clock;
-    if (game == null || me == null || clock == null) return false;
-    if (game.status != GameStatus.running) return false;
+    if (game == null) return 'no game';
+    if (me == null) return 'own member unknown';
+    if (clock == null) return 'no start time yet';
+    if (game.status != GameStatus.running) return 'round not running';
     final phase = clock.phaseAt(_now());
     if (phase != GamePhase.headStart && phase != GamePhase.hunting) {
-      return false;
+      return 'phase ${phase.name}';
     }
-    return me.isHunter || (me.isPlayer && !me.caught);
+    if (me.isHunter || (me.isPlayer && !me.caught)) return null;
+    return me.caught ? 'caught' : 'role ${me.role.name}';
+  }
+
+  /// Recent engine events, newest last – shown in the game screen's debug
+  /// view (long-press on the header) to analyse problems in the field.
+  final log = ValueNotifier<List<String>>(const []);
+
+  void _log(String message) {
+    final t = _now().toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final line = '${two(t.hour)}:${two(t.minute)}:${two(t.second)} $message';
+    if (kDebugMode) debugPrint('[manhunt] $line');
+    final lines = [...log.value, line];
+    log.value = lines.length > 80 ? lines.sublist(lines.length - 80) : lines;
   }
 
   void update({
@@ -182,21 +201,21 @@ class RoundEngine {
         state: _lastFix == null ? TrackingState.waiting : TrackingState.ok,
       ),
     );
+    _log('tracking: start');
     _tracking = location
         .track(notice)
         .listen(
           (fix) {
-            _lastFix = fix;
-            position.value = fix;
-            _setStatus(
-              (s) => s.copyWith(state: TrackingState.ok, lastFixAt: fix.at),
-            );
+            if (_lastStreamFixAt == null) _log('tracking: first position');
+            _lastStreamFixAt = _now();
+            _acceptFix(fix);
             // Hunters upload right away when they have no position online yet.
             if (_lastUpload == null) unawaited(tick());
           },
           onError: (Object e) {
             // Never lose tracking silently: show it and restart on the next
             // tick – except for a missing permission, which needs the user.
+            _log('tracking: error $e');
             _tracking = null;
             if (e is LocationPermissionMissing) {
               _permissionMissing = true;
@@ -207,12 +226,27 @@ class RoundEngine {
               );
             }
           },
-          onDone: () => _tracking = null,
+          onDone: () {
+            _log('tracking: stream ended');
+            _tracking = null;
+          },
           cancelOnError: true,
         );
   }
 
+  DateTime? _lastStreamFixAt;
+  DateTime? _lastDirectFixAt;
+
+  void _acceptFix(LocationFix fix) {
+    _lastFix = fix;
+    position.value = fix;
+    _setStatus((s) => s.copyWith(state: TrackingState.ok, lastFixAt: fix.at));
+  }
+
   void _stop() {
+    if (_tracking != null || _timer != null) {
+      _log('tracking: stop (${_notTrackingReason ?? 'disposed'})');
+    }
     unawaited(_tracking?.cancel());
     _tracking = null;
     _timer?.cancel();
@@ -236,6 +270,7 @@ class RoundEngine {
     if (_busy || !_shouldTrack || me == null) return;
     _busy = true;
     try {
+      await _refreshIfStreamSilent();
       if (me.isPlayer) {
         await _sendDuePings();
         await _answerJokerRequests();
@@ -248,22 +283,43 @@ class RoundEngine {
     }
   }
 
+  /// Some Android devices deliver no or only sporadic stream updates (field
+  /// test 2026-10-05). If the stream was silent for [streamSilence], fetch a
+  /// position directly – at most that often – so the own dot, the hunters'
+  /// live position and joker answers stay current.
+  static const streamSilence = Duration(seconds: 30);
+
+  Future<void> _refreshIfStreamSilent() async {
+    final now = _now();
+    bool silent(DateTime? t) => t == null || now.difference(t) >= streamSilence;
+    if (!silent(_lastStreamFixAt) || !silent(_lastDirectFixAt)) return;
+    _lastDirectFixAt = now;
+    _log('stream silent → direct GPS request');
+    await _fetchDirect();
+  }
+
   /// Latest tracked position, or – if there is none or it is stale (phone
   /// lying still, GPS stream stalled) – one fetched directly from the GPS.
   Future<LocationFix?> _fixForPing() async {
     final fix = _lastFix;
     if (_isFresh(fix)) return fix;
+    return _fetchDirect(log: false);
+  }
+
+  /// [log] is false for pings: a log line at a speedhunt ping time would
+  /// reveal the target (R-SPEED-04).
+  Future<LocationFix?> _fetchDirect({bool log = true}) async {
     try {
       final point = await location.currentPosition();
-      if (point == null) return null;
+      if (point == null) {
+        if (log) _log('direct GPS: no position');
+        return null;
+      }
       final fresh = LocationFix(point: point, at: _now().toUtc());
-      _lastFix = fresh;
-      position.value = fresh;
-      _setStatus(
-        (s) => s.copyWith(state: TrackingState.ok, lastFixAt: fresh.at),
-      );
+      _acceptFix(fresh);
       return fresh;
     } on Exception catch (e) {
+      if (log) _log('direct GPS: error $e');
       _setStatus(
         (s) => s.copyWith(state: TrackingState.error, lastError: '$e'),
       );
@@ -297,6 +353,9 @@ class RoundEngine {
       // A speedhunt ping must not reveal the target to the player (R-SPEED-04):
       // no notification, no "last ping" update for it.
       if (slot.kind == PingKind.regular) {
+        // Only regular pings are logged: the log is visible to the player and
+        // a speedhunt ping (even its time) would reveal the target.
+        _log('ping sent');
         _setStatus((s) => s.copyWith(lastPingAt: _now(), clearError: true));
         _pingsSent.add(slot);
       } else {
@@ -347,6 +406,7 @@ class RoundEngine {
     _stop();
     await _pingsSent.close();
     position.dispose();
+    log.dispose();
     status.dispose();
   }
 }

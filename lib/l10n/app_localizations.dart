@@ -200,6 +200,18 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get commonRetry;
 
+  /// No description provided for @commonClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get commonClose;
+
+  /// No description provided for @debugLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking log'**
+  String get debugLogTitle;
+
   /// No description provided for @commonError.
   ///
   /// In en, this message translates to:
@@ -781,18 +793,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for GPS signal …'**
   String get trackingWaiting;
-
-  /// No description provided for @trackingOk.
-  ///
-  /// In en, this message translates to:
-  /// **'GPS ok'**
-  String get trackingOk;
-
-  /// No description provided for @trackingOkLastPing.
-  ///
-  /// In en, this message translates to:
-  /// **'GPS ok · last ping {time}'**
-  String trackingOkLastPing(String time);
 
   /// No description provided for @trackingNoPermission.
   ///

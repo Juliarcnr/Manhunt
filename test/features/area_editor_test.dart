@@ -77,6 +77,8 @@ void main() {
     final result = await open(tester);
     expect(tester.widget<Text>(status()).data, 'Mindestens 3 Eckpunkte setzen');
     expect(saveEnabled(tester), isFalse);
+    final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    expect(map.options.interactionOptions.flags & InteractiveFlag.rotate, 0);
 
     await tapMap(tester, const Offset(-60, -60));
     await tapMap(tester, const Offset(60, -60));

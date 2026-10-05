@@ -25,6 +25,11 @@ extension LatLngGeoPoint on LatLng {
   GeoPoint toGeoPoint() => GeoPoint(latitude, longitude);
 }
 
+/// North always up: zoom and pan, but no rotation (field test feedback).
+const northUp = InteractionOptions(
+  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+);
+
 /// Center of Germany, used when nothing better is known.
 const fallbackCenter = LatLng(51.1657, 10.4515);
 

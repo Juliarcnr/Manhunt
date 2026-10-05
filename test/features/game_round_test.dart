@@ -1,5 +1,6 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/core/history/round_summary.dart';
@@ -341,7 +342,29 @@ void main() {
         LocationFix(point: const GeoPoint(52.505, 13.405), at: now),
       );
       await settle(tester);
-      expect(find.text('GPS ok'), findsOneWidget);
+      // Once GPS works, the line disappears (only problems are shown).
+      expect(find.byKey(const Key('trackingStatus')), findsNothing);
+    });
+
+    testWidgets('"my location" jumps to the own position', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      location.emit(
+        LocationFix(point: const GeoPoint(48.137, 11.575), at: now),
+      );
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('myLocationButton')));
+      await tester.pumpAndSettle();
+      final camera = MapCamera.of(
+        tester.element(find.byType(MarkerLayer).first),
+      );
+      expect(camera.center.latitude, closeTo(48.137, 1e-6));
+      expect(camera.center.longitude, closeTo(11.575, 1e-6));
+
+      await tester.tap(find.byKey(const Key('fitAreaButton')));
+      await tester.pumpAndSettle();
+      final back = MapCamera.of(tester.element(find.byType(MarkerLayer).first));
+      expect(back.center.latitude, closeTo(52.505, 0.01));
     });
 
     testWidgets('missing location access is shown with a retry button', (
@@ -368,6 +391,13 @@ void main() {
       // History is for the lobby; during the game there is the overview.
       expect(find.byKey(const Key('historyButton')), findsNothing);
       expect(find.byKey(const Key('overviewButton')), findsOneWidget);
+      // North always up: no rotation gesture (R-MAP-02).
+      final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(map.options.interactionOptions.flags & InteractiveFlag.rotate, 0);
+      expect(
+        map.options.interactionOptions.flags & InteractiveFlag.pinchZoom,
+        isNot(0),
+      );
     });
 
     testWidgets('overview lists hunters and players, caught struck through '

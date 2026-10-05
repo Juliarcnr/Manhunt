@@ -51,6 +51,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   var _ending = false;
   RoundEngine? _engine;
   final _notices = NoticeTracker();
+  final _map = MapController();
   final _subscriptions = <ProviderSubscription<Object?>>[];
   StreamSubscription<PingSlot>? _pingsSentSub;
   var _lifecycle = AppLifecycleState.resumed;
@@ -87,6 +88,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       now: widget.now,
     );
     _engine = engine;
+    engine.log.value = ['screen opened'];
     _pingsSentSub = engine.pingsSent.listen(
       (slot) => _notify(PingSentNotice(slot.kind)),
     );
@@ -118,6 +120,59 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _feedEngine();
   }
 
+  void _showLog() {
+    final engine = _engine;
+    if (engine == null) return;
+    final l10n = AppLocalizations.of(context);
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.debugLogTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ValueListenableBuilder(
+              valueListenable: engine.log,
+              builder: (_, lines, _) => SingleChildScrollView(
+                reverse: true,
+                child: SelectableText(
+                  lines.isEmpty ? '–' : lines.join('\n'),
+                  key: const Key('debugLog'),
+                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.commonClose),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Like Google Maps: jump to the own position (the map starts on the play
+  /// area, which may be elsewhere – field test feedback).
+  Future<void> _showMe() async {
+    final l10n = AppLocalizations.of(context);
+    var point = _engine?.position.value?.point;
+    point ??= await ref.read(locationServiceProvider).currentPosition();
+    if (!mounted) return;
+    if (point == null) {
+      _snack(l10n.areaLocationUnavailable);
+      return;
+    }
+    _map.move(point.toLatLng(), 16);
+  }
+
+  void _showArea() {
+    final fit = fitArea(widget.game.settings.area);
+    if (fit != null) _map.fitCamera(fit);
+  }
+
   Future<void> _requestPermissions() async {
     await ref.read(locationServiceProvider).ensurePermission();
     await ref.read(notificationServiceProvider).init();
@@ -143,6 +198,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _map.dispose();
     _bannerTimer?.cancel();
     for (final s in _subscriptions) {
       s.close();
@@ -543,34 +599,39 @@ class _GameScreenState extends ConsumerState<GameScreen>
         titleSpacing: 16,
         // Phase + countdown instead of the app name (field test feedback):
         // the map needs the space.
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                title.toUpperCase(),
-                key: const Key('gamePhase'),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
+        // Long-press: engine log for analysing problems in the field.
+        title: GestureDetector(
+          key: const Key('debugLogTrigger'),
+          onLongPress: _showLog,
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  title.toUpperCase(),
+                  key: const Key('gamePhase'),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
               ),
-            ),
-            if (until != null) ...[
-              const SizedBox(width: 10),
-              Text(
-                _formatCountdown(until.difference(now)),
-                key: const Key('gameCountdown'),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  fontFeatures: [FontFeature.tabularFigures()],
+              if (until != null) ...[
+                const SizedBox(width: 10),
+                Text(
+                  _formatCountdown(until.difference(now)),
+                  key: const Key('gameCountdown'),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
           IconButton(
@@ -596,7 +657,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
       body: Stack(
         children: [
           BaseMap(
+            controller: _map,
             options: MapOptions(
+              interactionOptions: northUp,
               initialCenter: fallbackCenter,
               initialZoom: 6,
               initialCameraFit: fitArea(widget.game.settings.area),
@@ -666,10 +729,36 @@ class _GameScreenState extends ConsumerState<GameScreen>
               ],
             ),
           ),
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.small(
+                  key: const Key('fitAreaButton'),
+                  heroTag: 'fitArea',
+                  tooltip: l10n.settingsArea,
+                  backgroundColor: AppColors.surface,
+                  onPressed: _showArea,
+                  child: const Icon(Icons.crop_free),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton.small(
+                  key: const Key('myLocationButton'),
+                  heroTag: 'myLocation',
+                  tooltip: l10n.areaMyLocation,
+                  backgroundColor: AppColors.surface,
+                  onPressed: _showMe,
+                  child: const Icon(Icons.my_location),
+                ),
+              ],
+            ),
+          ),
           if (_banner case final banner?)
             Positioned(
               left: 12,
-              right: 12,
+              right: 68, // leave room for the map buttons
               bottom: 12,
               child: _NoticeBanner(title: banner.title, body: banner.body),
             ),
@@ -865,8 +954,6 @@ class _TrackingStatusLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
-    final lastPing = status.lastPingAt;
     final (icon, color, text) = switch (status.state) {
       TrackingState.off => (null, null, null),
       TrackingState.waiting => (
@@ -874,13 +961,8 @@ class _TrackingStatusLine extends StatelessWidget {
         AppColors.speedhunt,
         l10n.trackingWaiting,
       ),
-      TrackingState.ok => (
-        Icons.gps_fixed,
-        AppColors.player,
-        isPlayer && lastPing != null
-            ? l10n.trackingOkLastPing(timeFmt.format(lastPing.toLocal()))
-            : l10n.trackingOk,
-      ),
+      // Only problems are shown – "GPS ok" just took space (field test).
+      TrackingState.ok => (null, null, null),
       TrackingState.noPermission => (
         Icons.location_disabled,
         Colors.redAccent,

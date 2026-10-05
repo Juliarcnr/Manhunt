@@ -111,12 +111,12 @@ void main() {
       final request = (await rounds.watchJokerRequests(sam).first).single;
       expect(request.id, requestId);
       expect(request.requesterId, 'kim');
-      await rounds.answerJokerRequest(sam, request, fix(52.7));
+      await rounds.answerJokerRequest(sam, request, fix(52.7123456));
 
       final answers = await rounds.watchJokerAnswers(kim, requestId).first;
-      expect(answers['sam']!.point.lat, 52.7);
+      expect(answers['sam']!.point.lat, 52.7123456);
       expect(await rounds.watchJokerAnswers(sam, requestId).first, isEmpty);
-      expect(db.dump(), isNot(contains('52.7')));
+      expect(db.dump(), isNot(contains('52.7123456')));
     });
 
     test('round end deletes requests/answers and resets the joker', () async {

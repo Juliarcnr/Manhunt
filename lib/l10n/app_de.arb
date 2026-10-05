@@ -18,6 +18,8 @@
   "commonCancel": "Abbrechen",
   "commonSave": "Speichern",
   "commonRetry": "Erneut versuchen",
+  "commonClose": "Schließen",
+  "debugLogTitle": "Tracking-Protokoll",
   "commonError": "Etwas ist schiefgelaufen: {details}",
 
   "yourName": "Dein Name",
@@ -123,8 +125,6 @@
   "trackingTitle": "Manhunt läuft",
   "trackingText": "Dein Standort wird für das Spiel mit deiner Gruppe geteilt.",
   "trackingWaiting": "Warte auf GPS-Signal …",
-  "trackingOk": "GPS ok",
-  "trackingOkLastPing": "GPS ok · letzter Ping {time}",
   "trackingNoPermission": "Kein Standortzugriff – bitte in den Einstellungen erlauben (genauer Standort), dann erneut versuchen.",
   "trackingError": "GPS-Problem – wird automatisch neu gestartet …",
 
