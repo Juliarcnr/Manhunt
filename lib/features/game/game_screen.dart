@@ -18,7 +18,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../state/round_engine.dart';
 import '../../theme/app_theme.dart';
-import '../history/history_button.dart';
+import 'overview_sheet.dart';
 import '../map/base_map.dart';
 import 'catch_dialog.dart';
 import 'joker_sheet.dart';
@@ -177,12 +177,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.noticeSpeedhunt,
         l10n.noticeSpeedhuntBody(speedhunt.pings, speedhunt.interval.inMinutes),
       ),
-      PingSentNotice(:final kind) => (
-        kind == PingKind.speedhunt
-            ? l10n.noticeSpeedhuntPingSent
-            : l10n.noticePingSent,
-        null,
-      ),
+      PingSentNotice() => (l10n.noticePingSent, null),
     };
     if (_lifecycle == AppLifecycleState.resumed) {
       unawaited(HapticFeedback.vibrate());
@@ -490,6 +485,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
             byPlayer: pingsByPlayer(pings),
             names: names,
             caught: caught,
+            colors: playerColors([
+              for (final m in members)
+                if (m.isPlayer) m.id,
+            ]),
           ),
         )
         ..add(
@@ -506,7 +505,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ref.watch(myPingsProvider).value ?? const [],
       )[widget.session.userId];
       if (mine != null) {
-        layers.add(historyLayer(mine, color: AppColors.player));
+        // Own speedhunt pings stay hidden (R-SPEED-04).
+        final regular = [
+          for (final p in mine)
+            if (p.kind == PingKind.regular) p,
+        ];
+        layers.add(historyLayer(regular, color: AppColors.player));
       }
       final reveal = _jokerReveal;
       if (reveal != null) {
@@ -528,7 +532,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
     final engine = _engine;
     final nextSlot = isPlayer && !(me?.caught ?? false) && engine != null
-        ? nextPing(engine.mySlots, now)
+        ? nextPing(engine.visibleSlots, now)
         : null;
     final speedhuntsLeft =
         widget.game.settings.speedhuntCount - speedhunts.length;
@@ -536,9 +540,50 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.appTitle),
+        titleSpacing: 16,
+        // Phase + countdown instead of the app name (field test feedback):
+        // the map needs the space.
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                title.toUpperCase(),
+                key: const Key('gamePhase'),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            if (until != null) ...[
+              const SizedBox(width: 10),
+              Text(
+                _formatCountdown(until.difference(now)),
+                key: const Key('gameCountdown'),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
-          const HistoryButton(),
+          IconButton(
+            key: const Key('overviewButton'),
+            tooltip: l10n.overviewTitle,
+            icon: const Icon(Icons.groups_outlined),
+            onPressed: () => showOverviewSheet(
+              context,
+              members: members,
+              myId: widget.session.userId,
+              speedhuntRunning: running != null,
+            ),
+          ),
           if (_isAdmin)
             IconButton(
               key: const Key('endRoundButton'),
@@ -573,21 +618,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _StatusCard(
-                  title: title,
-                  color: color,
-                  countdown: until == null
-                      ? null
-                      : _formatCountdown(until.difference(now)),
-                  lines: [
-                    if (phase == GamePhase.ended) l10n.gameTimeUpHint,
-                    if (me?.caught ?? false) l10n.gameCaughtSelf,
-                    if (nextSlot != null)
-                      l10n.gameNextPing(
-                        _formatCountdown(nextSlot.at.difference(now)),
-                      ),
-                  ],
-                ),
+                for (final line in [
+                  if (nextSlot != null)
+                    l10n.gameNextPing(
+                      _formatCountdown(nextSlot.at.difference(now)),
+                    ),
+                  if (me?.caught ?? false) l10n.gameCaughtSelf,
+                  if (phase == GamePhase.ended) l10n.gameTimeUpHint,
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: _InfoChip(icon: Icons.schedule, text: line),
+                  ),
                 if (engine != null)
                   ValueListenableBuilder(
                     valueListenable: engine.status,
@@ -701,66 +743,6 @@ String _formatCountdown(Duration d) {
   final m = two(d.inMinutes % 60);
   final s = two(d.inSeconds % 60);
   return h > 0 ? '$h:$m:$s' : '$m:$s';
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.title,
-    required this.color,
-    required this.countdown,
-    required this.lines,
-  });
-
-  final String title;
-  final Color color;
-  final String? countdown;
-  final List<String> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title.toUpperCase(),
-                  key: const Key('gamePhase'),
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              if (countdown case final countdown?)
-                Text(
-                  countdown,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-            ],
-          ),
-          for (final line in lines) ...[
-            const SizedBox(height: 4),
-            Text(line, style: const TextStyle(color: AppColors.textMuted)),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 /// Visible to everyone while a speedhunt runs (R-SPEED-05).

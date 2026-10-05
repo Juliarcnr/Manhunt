@@ -68,14 +68,14 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SPEED-03 | Während des Speedhunts sendet der betroffene Spieler die eingestellte Anzahl zusätzlicher Pings im eingestellten Abstand (Standard: 3 Pings, alle 5 min). Der erste Ping kommt sofort beim Auslösen. |
 | R-SPEED-06 | Es läuft höchstens ein Speedhunt gleichzeitig; Ziel kann nur ein nicht gefangener Spieler sein. |
 | R-SPEED-07 | Der erste Speedhunt ist frühestens nach der eingestellten Zeit ab Spielstart möglich (R-SET-11). |
-| R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft. |
+| R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der eigenen Historie. |
 | R-SPEED-05 | Im Haupt-View (Karte) ist für alle (Hunter und Spieler) sichtbar, ob gerade ein Speedhunt läuft. |
 
 ## 6. Haupt-View: Karte
 
 | ID | Anforderung |
 |---|---|
-| R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. |
+| R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. Die Kopfzeile zeigt nur Phase und Countdown (z.B. „DIE JAGD LÄUFT 1:23:45“), damit möglichst viel Karte sichtbar bleibt; darunter nur kleine Hinweise (nächster Ping, GPS-Status, Speedhunt). |
 
 ### Hunter-View
 
@@ -83,7 +83,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-HUNT-01 | Filter-Buttons (Chips) auf der Karte, mehrere gleichzeitig aktivierbar. |
 | R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter. |
-| R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber. |
+| R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**; Speedhunt-Pings mit Blitz-Symbol. |
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
@@ -102,7 +102,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-NOTIF-01 | In-App-Benachrichtigungen (Banner), das Handy vibriert dabei. |
 | R-NOTIF-02 | Benachrichtigung an alle, wenn jemand gefangen wurde. |
-| R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort an die Hunter gesendet wurde. |
+| R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort bei einem regulären Ping an die Hunter gesendet wurde (nicht bei Speedhunt-Pings, siehe R-SPEED-04). |
 | R-NOTIF-04 | Benachrichtigung, wenn ein Speedhunt gestartet wurde (ohne das Ziel an Spieler zu verraten). |
 
 ## 8. Catch
@@ -125,7 +125,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 
 | ID | Anforderung |
 |---|---|
-| R-OVER-01 | Für alle gibt es einen Übersichtsbereich. |
+| R-OVER-01 | Für alle gibt es einen Übersichtsbereich, im Spiel über das Gruppen-Symbol oben rechts erreichbar (statt der Historie, die nur in der Lobby angeboten wird). |
 | R-OVER-02 | Liste aller Teilnehmenden, unterteilt in Hunter und Spieler; gefangene Spieler durchgestrichen. |
 | R-OVER-03 | Anzeige, ob aktuell ein Speedhunt läuft. |
 

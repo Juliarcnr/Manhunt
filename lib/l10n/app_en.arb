@@ -11,6 +11,10 @@
   "rolePlayers": "Players",
   "roleUnassigned": "Not assigned yet",
   "speedhuntActive": "Speedhunt active",
+  "overviewTitle": "Overview",
+  "overviewNoSpeedhunt": "No speedhunt running",
+  "overviewStillFree": "{free} of {total} free",
+  "@overviewStillFree": {"placeholders": {"free": {"type": "int"}, "total": {"type": "int"}}},
 
   "commonCancel": "Cancel",
   "commonSave": "Save",
@@ -173,7 +177,6 @@
   "noticeSpeedhuntBody": "A player will be located {pings}× every {minutes} min.",
   "@noticeSpeedhuntBody": {"placeholders": {"pings": {"type": "int"}, "minutes": {"type": "int"}}},
   "noticePingSent": "Your location was sent to the hunters",
-  "noticeSpeedhuntPingSent": "Speedhunt: your location was sent to the hunters",
 
   "catchTitle": "Report catch",
   "catchWho": "Who was caught?",

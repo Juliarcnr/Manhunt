@@ -172,23 +172,36 @@ void main() {
       },
     );
 
-    test('speedhunt on me adds pings', () async {
-      final sh = Speedhunt.fromSettings(
-        targetId: 'kim',
-        startedAt: at(25),
-        settings: const GameSettings(),
-      );
-      engine.update(game: game(), me: player, speedhuntsOnMe: [sh]);
-      location.emit(fix(52.5));
-      await flush();
-      for (final m in [25, 30, 35]) {
-        now = at(m);
-        await engine.tick();
+    test(
+      'speedhunt on me adds pings, silently (R-SPEED-03, R-SPEED-04)',
+      () async {
+        final sh = Speedhunt.fromSettings(
+          targetId: 'kim',
+          startedAt: at(25),
+          settings: const GameSettings(),
+        );
+        engine.update(game: game(), me: player, speedhuntsOnMe: [sh]);
+        location.emit(fix(52.5));
         await flush();
-      }
-      expect(sent.map((s) => s.kind), everyElement(PingKind.speedhunt));
-      expect(sent, hasLength(3));
-    });
+        for (final m in [25, 30, 35]) {
+          now = at(m);
+          await engine.tick();
+          await flush();
+        }
+        // Sent to the hunters …
+        final pings = await rounds.watchAllPings(hunterSession).first;
+        expect(pings.map((p) => p.kind), everyElement(PingKind.speedhunt));
+        expect(pings, hasLength(3));
+        // … but the player is not told – that would reveal the target
+        // (R-SPEED-04).
+        expect(sent, isEmpty);
+        expect(engine.status.value.lastPingAt, isNull);
+        expect(engine.visibleSlots.map((s) => s.kind), [
+          PingKind.regular,
+          PingKind.regular,
+        ]);
+      },
+    );
 
     test('next pings are exposed for the countdown', () {
       expect(engine.mySlots.map((s) => s.at), [at(20), at(40)]);

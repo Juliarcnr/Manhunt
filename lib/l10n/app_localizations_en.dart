@@ -44,6 +44,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get speedhuntActive => 'Speedhunt active';
 
   @override
+  String get overviewTitle => 'Overview';
+
+  @override
+  String get overviewNoSpeedhunt => 'No speedhunt running';
+
+  @override
+  String overviewStillFree(int free, int total) {
+    return '$free of $total free';
+  }
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -495,10 +506,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noticePingSent => 'Your location was sent to the hunters';
-
-  @override
-  String get noticeSpeedhuntPingSent =>
-      'Speedhunt: your location was sent to the hunters';
 
   @override
   String get catchTitle => 'Report catch';

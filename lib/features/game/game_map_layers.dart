@@ -7,10 +7,20 @@ import '../map/base_map.dart';
 
 /// Last ping of every player as a location pin with the name above
 /// (R-HUNT-03). Caught players are greyed out.
+/// Colour per player, stable for the round: by join order (R-HUNT-03).
+Map<String, Color> playerColors(List<String> playerIds) => {
+  for (final (i, id) in playerIds.indexed)
+    id: AppColors.playerPalette[i % AppColors.playerPalette.length],
+};
+
+/// Last ping of every player as a location pin with the name above, in the
+/// player's own colour (R-HUNT-03). A speedhunt ping gets a bolt badge;
+/// caught players are greyed out.
 MarkerLayer lastPingsLayer({
   required Map<String, List<PingRecord>> byPlayer,
   required Map<String, String> names,
   required Set<String> caught,
+  required Map<String, Color> colors,
 }) => MarkerLayer(
   markers: [
     for (final entry in byPlayer.entries)
@@ -25,10 +35,9 @@ MarkerLayer lastPingsLayer({
             name: names[entry.key] ?? '?',
             color: caught.contains(entry.key)
                 ? AppColors.textMuted
-                : entry.value.last.kind == PingKind.speedhunt
-                ? AppColors.speedhunt
-                : AppColors.player,
+                : colors[entry.key] ?? AppColors.player,
             icon: Icons.location_on,
+            speedhunt: entry.value.last.kind == PingKind.speedhunt,
           ),
         ),
   ],
@@ -112,11 +121,13 @@ class _NamedPin extends StatelessWidget {
     required this.name,
     required this.color,
     required this.icon,
+    this.speedhunt = false,
   });
 
   final String name;
   final Color color;
   final IconData icon;
+  final bool speedhunt;
 
   @override
   Widget build(BuildContext context) {
@@ -128,13 +139,25 @@ class _NamedPin extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color),
+            border: Border.all(color: color, width: 1.5),
           ),
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (speedhunt)
+                const Icon(Icons.bolt, size: 13, color: AppColors.speedhunt),
+              Flexible(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Icon(

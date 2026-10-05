@@ -11,6 +11,9 @@
   "rolePlayers": "Spieler",
   "roleUnassigned": "Noch nicht eingeteilt",
   "speedhuntActive": "Speedhunt aktiv",
+  "overviewTitle": "Übersicht",
+  "overviewNoSpeedhunt": "Kein Speedhunt aktiv",
+  "overviewStillFree": "{free} von {total} frei",
 
   "commonCancel": "Abbrechen",
   "commonSave": "Speichern",
@@ -155,7 +158,6 @@
   "noticeSpeedhunt": "Speedhunt gestartet!",
   "noticeSpeedhuntBody": "Ein Spieler wird {pings}× im Abstand von {minutes} min geortet.",
   "noticePingSent": "Dein Standort wurde an die Hunter gesendet",
-  "noticeSpeedhuntPingSent": "Speedhunt: Dein Standort wurde an die Hunter gesendet",
 
   "catchTitle": "Catch melden",
   "catchWho": "Wer wurde gefangen?",

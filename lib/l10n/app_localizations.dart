@@ -164,6 +164,24 @@ abstract class AppLocalizations {
   /// **'Speedhunt active'**
   String get speedhuntActive;
 
+  /// No description provided for @overviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get overviewTitle;
+
+  /// No description provided for @overviewNoSpeedhunt.
+  ///
+  /// In en, this message translates to:
+  /// **'No speedhunt running'**
+  String get overviewNoSpeedhunt;
+
+  /// No description provided for @overviewStillFree.
+  ///
+  /// In en, this message translates to:
+  /// **'{free} of {total} free'**
+  String overviewStillFree(int free, int total);
+
   /// No description provided for @commonCancel.
   ///
   /// In en, this message translates to:
@@ -955,12 +973,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your location was sent to the hunters'**
   String get noticePingSent;
-
-  /// No description provided for @noticeSpeedhuntPingSent.
-  ///
-  /// In en, this message translates to:
-  /// **'Speedhunt: your location was sent to the hunters'**
-  String get noticeSpeedhuntPingSent;
 
   /// No description provided for @catchTitle.
   ///

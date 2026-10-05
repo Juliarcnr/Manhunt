@@ -2,6 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
@@ -173,6 +174,39 @@ void main() {
       expect(members!.firstWhere((m) => m.id == 'sam').caught, isTrue);
     });
 
+    testWidgets('each player has an own pin colour (R-HUNT-03)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await tester.runAsync(() async {
+        final rounds = FirestoreRoundRepository(db);
+        for (final (id, lat) in [('kim', 52.505), ('sam', 52.506)]) {
+          await rounds.sendPing(
+            await testSession(code, id),
+            PingSlot(
+              id: 'regular_1',
+              kind: PingKind.regular,
+              at: start.add(const Duration(minutes: 20)),
+            ),
+            LocationFix(
+              point: GeoPoint(lat, 13.405),
+              at: start.add(const Duration(minutes: 20)),
+            ),
+          );
+        }
+      });
+      await pumpAs(tester, 'alex');
+      Color pinColor(String id) => tester
+          .widget<Icon>(
+            find.descendant(
+              of: find.byKey(Key('lastPing_$id')),
+              matching: find.byIcon(Icons.location_on),
+            ),
+          )
+          .color!;
+      expect(pinColor('kim'), isNot(pinColor('sam')));
+    });
+
     testWidgets('sees the last ping of each player with name (R-HUNT-03)', (
       tester,
     ) async {
@@ -321,6 +355,52 @@ void main() {
       await tester.tap(find.byKey(const Key('trackingRetry')));
       await settle(tester);
       expect(find.text('Waiting for GPS signal …'), findsOneWidget);
+    });
+
+    testWidgets('header shows phase + countdown, not the app name', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim'); // minute 30 of 3 h
+      expect(find.text('HUNT IS ON'), findsOneWidget);
+      expect(find.text('2:30:00'), findsOneWidget);
+      expect(find.text('Manhunt'), findsNothing);
+      // History is for the lobby; during the game there is the overview.
+      expect(find.byKey(const Key('historyButton')), findsNothing);
+      expect(find.byKey(const Key('overviewButton')), findsOneWidget);
+    });
+
+    testWidgets('overview lists hunters and players, caught struck through '
+        '(R-OVER-01 … 03)', (tester) async {
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(playerId: 'sam', at: now),
+        ),
+      );
+      await pumpAs(tester, 'kim');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Overview'), findsOneWidget);
+      expect(find.textContaining('HUNTERS · 1'), findsOneWidget);
+      expect(find.textContaining('1 OF 2 FREE'), findsOneWidget);
+      expect(find.text('No speedhunt running'), findsOneWidget);
+      final sam = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('overview_sam')),
+          matching: find.text('Sam'),
+        ),
+      );
+      expect(sam.style!.decoration, TextDecoration.lineThrough);
+      final kim = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('overview_kim')),
+          matching: find.text('Kim (You)'),
+        ),
+      );
+      expect(kim.style!.decoration, isNull);
     });
 
     testWidgets('self catch stops sharing the location (R-CATCH-01)', (

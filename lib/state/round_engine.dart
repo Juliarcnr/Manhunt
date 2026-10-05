@@ -110,7 +110,8 @@ class RoundEngine {
   List<JokerRequest> _jokerRequests = const [];
   final _pingsSent = StreamController<PingSlot>.broadcast();
 
-  /// Emits after each successfully sent own ping (R-NOTIF-03).
+  /// Emits after each successfully sent own *regular* ping (R-NOTIF-03).
+  /// Speedhunt pings are not announced to the player (R-SPEED-04).
   Stream<PingSlot> get pingsSent => _pingsSent.stream;
 
   bool get isTracking => _tracking != null;
@@ -122,12 +123,19 @@ class RoundEngine {
     return GameClock(startAt: startAt, settings: game.settings);
   }
 
-  /// This player's ping plan; empty for hunters.
+  /// This player's ping plan incl. speedhunts; empty for hunters. For display
+  /// use [visibleSlots] – speedhunt slots would reveal the target.
   List<PingSlot> get mySlots {
     final clock = _clock;
     if (clock == null || !(_me?.isPlayer ?? false)) return const [];
     return playerPingSlots(clock: clock, speedhuntsOnMe: _speedhuntsOnMe);
   }
+
+  /// Regular pings only – what the player may see (R-SPEED-04).
+  List<PingSlot> get visibleSlots => [
+    for (final s in mySlots)
+      if (s.kind == PingKind.regular) s,
+  ];
 
   bool get _shouldTrack {
     final game = _game;
@@ -276,9 +284,7 @@ class RoundEngine {
           // Usually: already sent before an app restart (no overwriting).
           // Shown anyway, so a real rules problem cannot hide.
           _sent.add(slot.id);
-          _setStatus(
-            (s) => s.copyWith(lastError: 'Ping ${slot.id}: ${e.code}'),
-          );
+          _setStatus((s) => s.copyWith(lastError: 'Ping: ${e.code}'));
           continue;
         }
         _setStatus((s) => s.copyWith(lastError: 'Ping: ${e.code}'));
@@ -288,8 +294,14 @@ class RoundEngine {
         return;
       }
       _sent.add(slot.id);
-      _setStatus((s) => s.copyWith(lastPingAt: _now(), clearError: true));
-      _pingsSent.add(slot);
+      // A speedhunt ping must not reveal the target to the player (R-SPEED-04):
+      // no notification, no "last ping" update for it.
+      if (slot.kind == PingKind.regular) {
+        _setStatus((s) => s.copyWith(lastPingAt: _now(), clearError: true));
+        _pingsSent.add(slot);
+      } else {
+        _setStatus((s) => s.copyWith(clearError: true));
+      }
     }
   }
 
