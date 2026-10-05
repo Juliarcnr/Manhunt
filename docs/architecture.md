@@ -106,6 +106,12 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Spieler-Joker: Anfrage (`requestPlayerPositions`) → `RoundEngine.updateJokerRequests` auf den anderen
   Spieler-Handys beantwortet frische Anfragen (< 2 min) mit dem aktuellen Standort (`jokerAnswers`).
 
+## App-Icon (R-UI-04)
+- Quellen: `assets/icon/*.svg` (1024×1024), daraus gerenderte PNGs. Plattform-Icons erzeugen mit
+  `dart run flutter_launcher_icons` (Config in `pubspec.yaml`).
+- Danach `ios/Runner.xcodeproj/project.pbxproj` prüfen: das Tool setzt fälschlich
+  `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = AppIcon` → zurücksetzen.
+
 ## Bekannte Grenzen / offene Punkte
 - **App nicht wegwischen**: Android-Foreground-Service bzw. iOS-Hintergrundmodus halten die App am Leben, aber
   „Beenden erzwingen“/Wegwischen stoppt Pings. Herstellerspezifisches Akku-Sparen (Samsung, Xiaomi …) kann ebenfalls

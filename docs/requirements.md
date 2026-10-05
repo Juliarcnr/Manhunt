@@ -138,6 +138,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-UI-01 | Moderne, „coole“ Optik. |
 | R-UI-02 | Dark Mode als Standard für die App-Oberfläche. |
 | R-UI-03 | Die Karte selbst bleibt eine normale (helle) OpenStreetMap. |
+| R-UI-04 | App-Icon: stylisches „M“ (Verlauf Gelb→Hunter-Orange→Rot) auf dunklem Grund, türkiser Punkt als versteckter Spieler in der Kerbe. Android adaptiv inkl. Monochrom (Themed Icons). |
 
 ## 11. Datenschutz
 
