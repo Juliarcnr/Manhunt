@@ -128,3 +128,6 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Feldtest 2026-10-05: Android sendete keine Pings. Ursachen behoben: gleichzeitige Berechtigungsdialoge (Android
   bricht den zweiten ab) → jetzt nacheinander; Tracking-Fehler wurden verschluckt → Statuszeile + Neustart;
   `distanceFilter` 5 m lieferte im Stillstand keine Updates → 0 m + GPS-Direktabfrage bei veralteter Position.
+- Feldtest 2026-10-05 (2): Tracking startete auf Android gar nicht (Protokoll nur „screen opened“). Ursache: Die
+  Engine prüfte nur bei Ereignissen, ob sie tracken soll; lag z.B. der Server-Start ein paar Sekunden vor der
+  Handy-Uhr („notStarted“), wurde nie neu geprüft. Jetzt: Timer läuft immer, Prüfung alle 5 s, Grund im Protokoll.

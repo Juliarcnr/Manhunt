@@ -97,8 +97,20 @@ class _GameScreenState extends ConsumerState<GameScreen>
     unawaited(_requestPermissions());
 
     _subscriptions
-      ..add(ref.listenManual(membersProvider, (_, _) => _feedEngine()))
-      ..add(ref.listenManual(speedhuntsOnMeProvider, (_, _) => _feedEngine()))
+      ..add(
+        ref.listenManual(
+          membersProvider,
+          (_, _) => _feedEngine(),
+          fireImmediately: true,
+        ),
+      )
+      ..add(
+        ref.listenManual(
+          speedhuntsOnMeProvider,
+          (_, _) => _feedEngine(),
+          fireImmediately: true,
+        ),
+      )
       ..add(
         ref.listenManual<AsyncValue<List<CatchRecord>>>(catchesProvider, (
           _,

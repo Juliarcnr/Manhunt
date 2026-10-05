@@ -328,6 +328,32 @@ void main() {
     });
   });
 
+  group('tracking starts by itself (field test: only "screen opened")', () {
+    test('phone clock a few seconds behind the server start time', () async {
+      // The start time is server time; this phone's clock is 3 s behind, so
+      // the round "has not started yet" when the screen opens. Tracking must
+      // start on its own a moment later – without any further update.
+      now = start.subtract(const Duration(seconds: 3));
+      final e = RoundEngine(
+        session: await testSession('ABCDE-FGHJK', 'kim'),
+        rounds: rounds,
+        location: location,
+        notice: const TrackingNotice(title: 't', text: 'x'),
+        now: () => now,
+        tickInterval: const Duration(milliseconds: 10),
+      );
+      addTearDown(e.dispose);
+      e.update(game: game(), me: player, speedhuntsOnMe: []);
+      expect(location.isTracking, isFalse);
+      expect(e.log.value.last, endsWith('not tracking: phase notStarted'));
+
+      now = start.add(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(location.isTracking, isTrue);
+      expect(e.log.value, contains(endsWith('tracking: start')));
+    });
+  });
+
   group('silent GPS stream (field test 2026-10-05, Android 10)', () {
     test('stream silent for 30 s → position fetched directly', () async {
       location.position = const GeoPoint(52.7, 13.7);

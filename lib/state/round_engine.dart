@@ -189,12 +189,23 @@ class RoundEngine {
   void _setStatus(EngineStatus Function(EngineStatus s) change) =>
       status.value = change(status.value);
 
+  String? _loggedReason = '(start)';
+
   void _sync() {
-    if (!_shouldTrack) {
+    // The timer runs as long as the engine exists: whether to track is
+    // re-checked every tick, not only on events. Otherwise a round where the
+    // own member data arrived a moment late never started tracking (field
+    // test 2026-10-05: "only 'screen opened' in the log").
+    _timer ??= Timer.periodic(tickInterval, (_) => unawaited(tick()));
+    final reason = _notTrackingReason;
+    if (reason != _loggedReason) {
+      _loggedReason = reason;
+      if (reason != null) _log('not tracking: $reason');
+    }
+    if (reason != null) {
       _stop();
       return;
     }
-    _timer ??= Timer.periodic(tickInterval, (_) => unawaited(tick()));
     if (_tracking != null || _permissionMissing) return;
     _setStatus(
       (s) => s.copyWith(
@@ -244,13 +255,11 @@ class RoundEngine {
   }
 
   void _stop() {
-    if (_tracking != null || _timer != null) {
+    if (_tracking != null) {
       _log('tracking: stop (${_notTrackingReason ?? 'disposed'})');
     }
     unawaited(_tracking?.cancel());
     _tracking = null;
-    _timer?.cancel();
-    _timer = null;
     _lastFix = null;
     position.value = null;
     if (status.value.state != TrackingState.off) {
@@ -403,6 +412,8 @@ class RoundEngine {
   }
 
   Future<void> dispose() async {
+    _timer?.cancel();
+    _timer = null;
     _stop();
     await _pingsSent.close();
     position.dispose();
