@@ -47,23 +47,68 @@ MarkerLayer lastPingsLayer({
 MarkerLayer huntersLayer({
   required Map<String, LocationFix> positions,
   required Map<String, String> names,
+  required Map<String, Color> colors,
+  required String Function(DateTime) formatTime,
+}) => _positionsLayer(
+  keyPrefix: 'hunter',
+  positions: positions,
+  names: names,
+  colors: colors,
+  fallbackColor: AppColors.hunter,
+  icon: Icons.track_changes,
+  formatTime: formatTime,
+);
+
+/// Other players' current positions from the player joker (R-PLAY-03).
+MarkerLayer playersLayer({
+  required Map<String, LocationFix> positions,
+  required Map<String, String> names,
+  required Map<String, Color> colors,
+  required String Function(DateTime) formatTime,
+}) => _positionsLayer(
+  keyPrefix: 'player',
+  positions: positions,
+  names: names,
+  colors: colors,
+  fallbackColor: AppColors.player,
+  icon: Icons.person_pin_circle,
+  formatTime: formatTime,
+);
+
+/// Named pins with the time of each position ("Alex · 14:32"), so it is
+/// clear how old a revealed position is.
+MarkerLayer _positionsLayer({
+  required String keyPrefix,
+  required Map<String, LocationFix> positions,
+  required Map<String, String> names,
+  required Map<String, Color> colors,
+  required Color fallbackColor,
+  required IconData icon,
+  required String Function(DateTime) formatTime,
 }) => MarkerLayer(
   markers: [
     for (final entry in positions.entries)
       Marker(
-        key: Key('hunter_${entry.key}'),
+        key: Key('${keyPrefix}_${entry.key}'),
         point: entry.value.point.toLatLng(),
-        width: 140,
+        width: 160,
         height: 64,
         alignment: Alignment.topCenter,
         child: _NamedPin(
-          name: names[entry.key] ?? '?',
-          color: AppColors.hunter,
-          icon: Icons.track_changes,
+          name:
+              '${names[entry.key] ?? '?'} · ${formatTime(entry.value.at.toLocal())}',
+          color: colors[entry.key] ?? fallbackColor,
+          icon: icon,
         ),
       ),
   ],
 );
+
+/// Colour per hunter (by join order), in warm tones distinct from players.
+Map<String, Color> hunterColors(List<String> hunterIds) => {
+  for (final (i, id) in hunterIds.indexed)
+    id: AppColors.hunterPalette[i % AppColors.hunterPalette.length],
+};
 
 /// A player's own pings, numbered 1, 2, 3 … (R-PLAY-01, R-HUNT-04).
 MarkerLayer historyLayer(List<PingRecord> pings, {required Color color}) =>
@@ -172,23 +217,3 @@ class _NamedPin extends StatelessWidget {
 }
 
 /// Other players' current positions from the player joker (R-PLAY-03).
-MarkerLayer playersLayer({
-  required Map<String, LocationFix> positions,
-  required Map<String, String> names,
-}) => MarkerLayer(
-  markers: [
-    for (final entry in positions.entries)
-      Marker(
-        key: Key('player_${entry.key}'),
-        point: entry.value.point.toLatLng(),
-        width: 140,
-        height: 64,
-        alignment: Alignment.topCenter,
-        child: _NamedPin(
-          name: names[entry.key] ?? '?',
-          color: AppColors.player,
-          icon: Icons.person_pin_circle,
-        ),
-      ),
-  ],
-);

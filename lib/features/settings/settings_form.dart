@@ -115,6 +115,14 @@ class SettingsForm extends StatelessWidget {
               apply: (v) => s.copyWith(speedhuntInterval: v),
             ),
             minutes(
+              label: l10n.settingsSpeedhuntFirstDelay,
+              value: s.speedhuntFirstDelay,
+              step: 1,
+              min: 0,
+              max: 30,
+              apply: (v) => s.copyWith(speedhuntFirstDelay: v),
+            ),
+            minutes(
               label: l10n.settingsSpeedhuntEarliest,
               value: s.speedhuntEarliest,
               step: 5,

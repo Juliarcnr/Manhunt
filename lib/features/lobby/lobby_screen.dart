@@ -66,7 +66,7 @@ class LobbyScreen extends ConsumerWidget {
       onTap: _isAdmin
           ? () => run(() => repo.setRoles(session, toggleRole(members, m.id)))
           : null,
-      onLongPress: _isAdmin && m.id != session.userId
+      onRemove: _isAdmin && m.id != session.userId
           ? () async {
               final ok = await _confirm(
                 context,
@@ -362,14 +362,16 @@ class _MemberTile extends StatelessWidget {
     required this.isAdmin,
     required this.isMe,
     this.onTap,
-    this.onLongPress,
+    this.onRemove,
   });
 
   final Member member;
   final bool isAdmin;
   final bool isMe;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
+
+  /// Host only, not for oneself: remove from the group (R-LOBBY-09).
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +383,7 @@ class _MemberTile extends StatelessWidget {
     };
     return ListTile(
       onTap: onTap,
-      onLongPress: onLongPress,
+      onLongPress: onRemove,
       leading: CircleAvatar(
         backgroundColor: color.withValues(alpha: 0.18),
         foregroundColor: color,
@@ -391,13 +393,26 @@ class _MemberTile extends StatelessWidget {
         ),
       ),
       title: Text(member.name),
-      trailing: Wrap(
-        spacing: 6,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (isAdmin) _Badge(l10n.lobbyAdminBadge),
           if (isMe) _Badge(l10n.lobbyYouBadge),
           if (onTap != null)
-            const Icon(Icons.swap_horiz, color: AppColors.textMuted),
+            const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: Icon(Icons.swap_horiz, color: AppColors.textMuted),
+            ),
+          if (onRemove != null)
+            IconButton(
+              key: Key('remove_${member.id}'),
+              tooltip: l10n.lobbyRemove,
+              onPressed: onRemove,
+              icon: const Icon(
+                Icons.person_remove_outlined,
+                color: AppColors.textMuted,
+              ),
+            ),
         ],
       ),
     );

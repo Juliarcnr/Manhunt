@@ -36,6 +36,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-10 | Das Spielfeld kann von allen Mitgliedern der Gruppe eingezeichnet und bearbeitet werden (nur in der Lobby, nicht während einer laufenden Runde). Alle anderen Einstellungen ändert nur der Host. |
 | R-SET-11 | Einstellbar: ab wann (Minuten nach Spielstart) der erste Speedhunt erlaubt ist (Standard: 60 min). |
 | R-SET-12 | Einstellbar: ob es den Joker „Spieler-Standorte“ gibt (Standard: ja). Der Joker „Hunter-Standorte“ ist über R-SET-09 einzeln abschaltbar. |
+| R-SET-13 | Einstellbar: wie lange nach dem Auslösen eines Speedhunts der erste Speedhunt-Ping gesendet wird (Standard: 0 min = sofort, in 1-Minuten-Schritten bis 30 min). Der Wert wird beim Auslösen im Speedhunt festgehalten. |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -49,6 +50,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle. |
 | R-LOBBY-07 | Geht ein Handy verloren, tritt man der Gruppe einfach neu bei (keine Wiederherstellung nötig). |
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
+| R-LOBBY-09 | Der Host kann Mitglieder aus der Gruppe entfernen – in der Lobby (Symbol neben der Person) und während einer Runde (Übersicht), jeweils mit Rückfrage. Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 
 ## 4. Pings (Standortübermittlung)
 
@@ -65,9 +67,10 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-SPEED-01 | Hunter haben eine begrenzte Anzahl Speedhunts (siehe R-SET-05). |
 | R-SPEED-02 | Ein Speedhunt wird von einem Hunter für genau einen Spieler ausgelöst. |
-| R-SPEED-03 | Während des Speedhunts sendet der betroffene Spieler die eingestellte Anzahl zusätzlicher Pings im eingestellten Abstand (Standard: 3 Pings, alle 5 min). Der erste Ping kommt sofort beim Auslösen. |
+| R-SPEED-03 | Während des Speedhunts sendet der betroffene Spieler die eingestellte Anzahl zusätzlicher Pings im eingestellten Abstand (Standard: 3 Pings, alle 5 min). Der erste Ping kommt nach der eingestellten Verzögerung (R-SET-13, Standard: sofort). |
 | R-SPEED-06 | Es läuft höchstens ein Speedhunt gleichzeitig; Ziel kann nur ein nicht gefangener Spieler sein. |
 | R-SPEED-07 | Der erste Speedhunt ist frühestens nach der eingestellten Zeit ab Spielstart möglich (R-SET-11). |
+| R-SPEED-08 | Während eines Speedhunts zeigt das Banner allen (Huntern und Spielern) den Countdown zum nächsten Speedhunt-Ping, z.B. „Speedhunt aktiv · Ping 2/3 in 03:12“. Da alle dasselbe sehen, verrät das kein Ziel. |
 | R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der eigenen Historie. |
 | R-SPEED-05 | Im Haupt-View (Karte) ist für alle (Hunter und Spieler) sichtbar, ob gerade ein Speedhunt läuft. |
 
@@ -83,7 +86,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | ID | Anforderung |
 |---|---|
 | R-HUNT-01 | Filter-Buttons (Chips) auf der Karte, mehrere gleichzeitig aktivierbar. |
-| R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter. |
+| R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter, jeder Hunter in eigener Farbe, mit Uhrzeit am Pin („Alex · 14:32“). |
 | R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**; Speedhunt-Pings mit Blitz-Symbol. |
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
@@ -97,6 +100,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-PLAY-01 | Eigene Standort-Historie (gesendete Pings) kann angezeigt werden. |
 | R-PLAY-02 | Joker „Hunter-Standorte“: einmal pro Spieler und Runde die aktuellen Hunter-Standorte abfragen, angezeigt als Pins (nur wenn R-SET-09 aktiv). |
 | R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. |
+| R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter in eigenen Farben, Spieler in ihren Spielerfarben). *(Phase 6)* Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
 
 ## 7. Benachrichtigungen
 

@@ -8,6 +8,7 @@ import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
+import 'package:manhunt/core/schedule/speedhunt.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
@@ -127,6 +128,8 @@ void main() {
       await settle(tester);
 
       expect(find.byKey(const Key('speedhuntBanner')), findsOneWidget);
+      // 1st ping goes out immediately, so the countdown shows the 2nd one.
+      expect(find.text('Speedhunt active · ping 2/3 in 05:00'), findsOneWidget);
       expect(find.text('Speedhunt (1)'), findsOneWidget);
       expect(find.text('Speedhunt started!'), findsOneWidget); // notice
     });
@@ -140,6 +143,37 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('60 min after the start'), findsOne);
       expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
+    });
+
+    testWidgets('host removes someone via the overview (R-LOBBY-09)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overviewRemove_alex')), findsNothing);
+      await tester.tap(find.byKey(const Key('overviewRemove_sam')));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove Sam?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirmRemove')));
+      await settle(tester);
+
+      final members = await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .watchMembers(await testSession(code, 'alex'))
+                .first,
+      );
+      expect(members!.map((m) => m.id), isNot(contains('sam')));
+    });
+
+    testWidgets('players cannot remove anyone', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overviewRemove_sam')), findsNothing);
     });
 
     testWidgets('speedhunt during head start is refused', (tester) async {
@@ -264,6 +298,8 @@ void main() {
       await settle(tester);
 
       expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+      // Each pin shows the time of the position ("Alex · 14:30").
+      expect(find.textContaining('Alex · '), findsOneWidget);
       expect(find.textContaining('Hunters at'), findsOneWidget);
 
       // Used up: still listed, but disabled.
@@ -302,6 +338,7 @@ void main() {
       });
       await settle(tester);
       expect(find.byKey(const Key('player_sam')), findsOneWidget);
+      expect(find.textContaining('Sam · '), findsOneWidget);
     });
 
     testWidgets('only enabled jokers are offered (R-SET-09, R-SET-12)', (
@@ -431,6 +468,25 @@ void main() {
         ),
       );
       expect(kim.style!.decoration, isNull);
+    });
+
+    testWidgets('every player sees the speedhunt countdown, not the target '
+        '(R-SPEED-05, R-SPEED-08)', (tester) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 70)),
+            settings: settings,
+          ),
+        ),
+      );
+      await pumpAs(tester, 'kim');
+      expect(find.text('Speedhunt active · ping 2/3 in 03:00'), findsOneWidget);
+      expect(find.textContaining('Sam'), findsNothing);
     });
 
     testWidgets('self catch stops sharing the location (R-CATCH-01)', (

@@ -124,3 +124,13 @@ Map<String, List<PingRecord>> pingsByPlayer(Iterable<PingRecord> pings) {
   }
   return map;
 }
+
+/// Next ping of a running speedhunt as number (1-based) and time, or null if
+/// all its pings are done. Same for everyone, so it reveals no target
+/// (R-SPEED-04, R-SPEED-08).
+({int number, DateTime at})? nextSpeedhuntPing(Speedhunt s, DateTime now) {
+  for (final (i, t) in s.pingTimes().indexed) {
+    if (t.isAfter(now)) return (number: i + 1, at: t);
+  }
+  return null;
+}

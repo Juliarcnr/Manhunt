@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/models/member.dart';
 import '../data/game_repository.dart';
 import '../l10n/app_localizations.dart';
 import '../state/providers.dart';
@@ -33,6 +35,9 @@ class SessionGate extends ConsumerWidget {
           ),
           data: (game) {
             if (game == null) return const _GroupGone();
+            if (_wasRemoved(ref.watch(membersProvider), session.userId)) {
+              return const _GroupGone(removed: true);
+            }
             return switch (game.status) {
               GameStatus.lobby => LobbyScreen(session: session, game: game),
               GameStatus.running => GameScreen(session: session, game: game),
@@ -82,7 +87,10 @@ class _ErrorView extends StatelessWidget {
 
 /// Shown when the stored group was deleted (by the host or the TTL cleanup).
 class _GroupGone extends ConsumerWidget {
-  const _GroupGone();
+  const _GroupGone({this.removed = false});
+
+  /// Removed by the host instead of the whole group being deleted.
+  final bool removed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -94,7 +102,11 @@ class _GroupGone extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.lobbyGroupGone, textAlign: TextAlign.center),
+              Text(
+                removed ? l10n.removedTitle : l10n.lobbyGroupGone,
+                key: const Key('groupGone'),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () =>
@@ -107,4 +119,15 @@ class _GroupGone extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The host removed this device's member (R-LOBBY-09): either the list no
+/// longer contains it, or the rules now deny reading the member list.
+bool _wasRemoved(AsyncValue<List<Member>> members, String myId) {
+  final error = members.error;
+  if (error is FirebaseException && error.code == 'permission-denied') {
+    return true;
+  }
+  final list = members.value;
+  return list != null && list.isNotEmpty && !list.any((m) => m.id == myId);
 }

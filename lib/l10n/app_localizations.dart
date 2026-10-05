@@ -368,6 +368,12 @@ abstract class AppLocalizations {
   /// **'First speedhunt after'**
   String get settingsSpeedhuntEarliest;
 
+  /// No description provided for @settingsSpeedhuntFirstDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'First speedhunt ping after'**
+  String get settingsSpeedhuntFirstDelay;
+
   /// No description provided for @settingsHunterCount.
   ///
   /// In en, this message translates to:
@@ -626,6 +632,18 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get lobbyRemove;
 
+  /// No description provided for @removeMemberText.
+  ///
+  /// In en, this message translates to:
+  /// **'They will be removed from the group. With the code they can join again.'**
+  String get removeMemberText;
+
+  /// No description provided for @removedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You were removed from the group by the host.'**
+  String get removedTitle;
+
   /// No description provided for @lobbyLeave.
   ///
   /// In en, this message translates to:
@@ -758,11 +776,11 @@ abstract class AppLocalizations {
   /// **'You were caught – your location is no longer shared.'**
   String get gameCaughtSelf;
 
-  /// No description provided for @gameSpeedhuntUntil.
+  /// No description provided for @gameSpeedhuntNext.
   ///
   /// In en, this message translates to:
-  /// **'Speedhunt active until {time}'**
-  String gameSpeedhuntUntil(String time);
+  /// **'Speedhunt active · ping {number}/{total} in {time}'**
+  String gameSpeedhuntNext(int number, int total, String time);
 
   /// No description provided for @gameYou.
   ///
@@ -829,6 +847,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{pings} locations, {minutes} min apart. Players only learn that a speedhunt is running – not on whom.'**
   String speedhuntInfo(int pings, int minutes);
+
+  /// No description provided for @speedhuntInfoDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'The first location is sent {minutes} min after starting.'**
+  String speedhuntInfoDelay(int minutes);
 
   /// No description provided for @speedhuntConfirm.
   ///

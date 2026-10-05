@@ -81,6 +81,15 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
             ),
             style: const TextStyle(color: AppColors.textMuted),
           ),
+          if (widget.settings.speedhuntFirstDelay > Duration.zero) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.speedhuntInfoDelay(
+                widget.settings.speedhuntFirstDelay.inMinutes,
+              ),
+              style: const TextStyle(color: AppColors.textMuted),
+            ),
+          ],
         ],
       ),
       actions: [

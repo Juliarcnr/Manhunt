@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/app.dart';
+import 'package:manhunt/data/session_store.dart';
 
 import 'helpers.dart';
 
@@ -23,6 +24,30 @@ void main() {
     );
     await tester.pumpAndSettle();
     return firestore;
+  }
+
+  /// App start for a device that already belongs to group ABCDE-FGHJK.
+  Future<void> pumpAppWithSession(
+    WidgetTester tester, {
+    required FakeFirebaseFirestore db,
+    required String userId,
+  }) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: deviceOverrides(
+          db: db,
+          userId: userId,
+          store: MemorySessionStore()..code = 'ABCDE-FGHJK',
+        ),
+        child: const ManhuntApp(locale: Locale('en')),
+      ),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+    }
   }
 
   /// Lets real async work (key derivation in an isolate, fake Firestore) finish.
@@ -176,5 +201,57 @@ void main() {
     // Everyone may draw the play area (R-SET-10), only the host starts.
     expect(find.byKey(const Key('editAreaButton')), findsOneWidget);
     expect(find.byKey(const Key('startButton')), findsNothing);
+  });
+
+  testWidgets('host removes a member in the lobby (R-LOBBY-09)', (
+    tester,
+  ) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    final guest = await tester.runAsync(
+      () => testSession('ABCDE-FGHJK', 'guest'),
+    );
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(me!, name: 'Julia', settings: defaultSettings);
+      await deviceRepo(db).joinGame(guest!, name: 'Kim');
+    });
+    await pumpAppWithSession(tester, db: db, userId: 'me');
+
+    expect(find.text('Kim'), findsOneWidget);
+    expect(find.byKey(const Key('remove_me')), findsNothing); // not oneself
+    await tester.ensureVisible(find.byKey(const Key('remove_guest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('remove_guest')));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove Kim?'), findsOneWidget);
+    await tester.tap(find.text('Remove'));
+    await settleAsync(tester);
+    expect(find.text('Kim'), findsNothing);
+  });
+
+  testWidgets('removed member is told and can go back home (R-LOBBY-09)', (
+    tester,
+  ) async {
+    final db = FakeFirebaseFirestore();
+    final admin = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'a'));
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(admin!, name: 'Julia', settings: defaultSettings);
+      await deviceRepo(db).joinGame(me!, name: 'Kim');
+    });
+    await pumpAppWithSession(tester, db: db, userId: 'me');
+    expect(find.text('Lobby'), findsOneWidget);
+
+    await tester.runAsync(() => deviceRepo(db).removeMember(admin!, 'me'));
+    await settleAsync(tester);
+    expect(
+      find.text('You were removed from the group by the host.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Back to start'));
+    await settleAsync(tester);
+    expect(find.byKey(const Key('createButton')), findsOneWidget);
   });
 }

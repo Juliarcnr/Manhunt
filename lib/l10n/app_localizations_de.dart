@@ -150,6 +150,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpeedhuntEarliest => 'Erster Speedhunt ab';
 
   @override
+  String get settingsSpeedhuntFirstDelay => 'Erster Speedhunt-Ping nach';
+
+  @override
   String get settingsHunterCount => 'Anzahl Hunter';
 
   @override
@@ -305,6 +308,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyRemove => 'Entfernen';
 
   @override
+  String get removeMemberText =>
+      'Die Person wird aus der Gruppe entfernt. Mit dem Code kann sie wieder beitreten.';
+
+  @override
+  String get removedTitle => 'Du wurdest vom Host aus der Gruppe entfernt.';
+
+  @override
   String get lobbyLeave => 'Gruppe verlassen';
 
   @override
@@ -379,8 +389,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Du wurdest gefangen – dein Standort wird nicht mehr geteilt.';
 
   @override
-  String gameSpeedhuntUntil(String time) {
-    return 'Speedhunt aktiv bis $time';
+  String gameSpeedhuntNext(int number, int total, String time) {
+    return 'Speedhunt aktiv · Ping $number/$total in $time';
   }
 
   @override
@@ -420,6 +430,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String speedhuntInfo(int pings, int minutes) {
     return '$pings Standorte im Abstand von $minutes min. Die Spieler erfahren nur, dass ein Speedhunt läuft – nicht auf wen.';
+  }
+
+  @override
+  String speedhuntInfoDelay(int minutes) {
+    return 'Der erste Standort wird $minutes min nach dem Start gesendet.';
   }
 
   @override

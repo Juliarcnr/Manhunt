@@ -356,6 +356,25 @@ class _GameScreenState extends ConsumerState<GameScreen>
     if (mounted) setState(() => _ending = false);
   }
 
+  /// Host removes someone during the round (R-LOBBY-09).
+  Future<void> _removeMember(Member m) async {
+    final l10n = AppLocalizations.of(context);
+    if (!await _confirm(
+      icon: Icons.person_remove_outlined,
+      color: Colors.redAccent,
+      title: l10n.lobbyRemoveMember(m.name),
+      text: l10n.removeMemberText,
+      action: l10n.lobbyRemove,
+      actionKey: const Key('confirmRemove'),
+      destructive: true,
+    )) {
+      return;
+    }
+    await _run(
+      () => ref.read(gameRepositoryProvider).removeMember(widget.session, m.id),
+    );
+  }
+
   Future<void> _reportCatchAsHunter(List<Member> members) async {
     final playerId = await showHunterCatchDialog(context, members: members);
     if (playerId == null) return;
@@ -503,6 +522,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final members = ref.watch(membersProvider).value ?? const <Member>[];
     final me = _me(members);
     final names = {for (final m in members) m.id: m.name};
+    final huntersByColor = hunterColors([
+      for (final m in members)
+        if (m.isHunter) m.id,
+    ]);
+    final playersByColor = playerColors([
+      for (final m in members)
+        if (m.isPlayer) m.id,
+    ]);
     final caught = {
       for (final m in members)
         if (m.caught) m.id,
@@ -553,10 +580,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             byPlayer: pingsByPlayer(pings),
             names: names,
             caught: caught,
-            colors: playerColors([
-              for (final m in members)
-                if (m.isPlayer) m.id,
-            ]),
+            colors: playersByColor,
           ),
         )
         ..add(
@@ -566,6 +590,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 if (e.key != widget.session.userId) e.key: e.value,
             },
             names: names,
+            colors: huntersByColor,
+            formatTime: timeFmt.format,
           ),
         );
     } else if (isPlayer) {
@@ -582,14 +608,28 @@ class _GameScreenState extends ConsumerState<GameScreen>
       }
       final reveal = _jokerReveal;
       if (reveal != null) {
-        layers.add(huntersLayer(positions: reveal.positions, names: names));
+        layers.add(
+          huntersLayer(
+            positions: reveal.positions,
+            names: names,
+            colors: huntersByColor,
+            formatTime: timeFmt.format,
+          ),
+        );
       }
       final playerReveal = _playerReveal;
       if (playerReveal != null) {
         final answers =
             ref.watch(jokerAnswersProvider(playerReveal.requestId)).value ??
             const <String, LocationFix>{};
-        layers.add(playersLayer(positions: answers, names: names));
+        layers.add(
+          playersLayer(
+            positions: answers,
+            names: names,
+            colors: playersByColor,
+            formatTime: timeFmt.format,
+          ),
+        );
       }
       // Answer other players' joker requests (R-PLAY-03) – players only, the
       // rules hide requests from hunters.
@@ -655,6 +695,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
               members: members,
               myId: widget.session.userId,
               speedhuntRunning: running != null,
+              onRemove: _isAdmin ? _removeMember : null,
             ),
           ),
           if (_isAdmin)
@@ -717,9 +758,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 if (running != null) ...[
                   const SizedBox(height: 8),
                   _SpeedhuntBanner(
-                    text: l10n.gameSpeedhuntUntil(
-                      timeFmt.format(running.endsAt.toLocal()),
-                    ),
+                    // Countdown to the next speedhunt ping – the same for
+                    // everyone, so it reveals no target (R-SPEED-08).
+                    text: switch (nextSpeedhuntPing(running, now)) {
+                      (:final number, :final at) => l10n.gameSpeedhuntNext(
+                        number,
+                        running.pings,
+                        _formatCountdown(at.difference(now)),
+                      ),
+                      null => l10n.speedhuntActive,
+                    },
                   ),
                 ],
                 if (reveal != null) ...[

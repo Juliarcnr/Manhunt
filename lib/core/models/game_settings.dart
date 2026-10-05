@@ -1,6 +1,6 @@
 import 'geo_point.dart';
 
-/// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11, R-SET-12).
+/// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11, R-SET-12, R-SET-13).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -10,6 +10,7 @@ class GameSettings {
     this.speedhuntPings = 3,
     this.speedhuntInterval = const Duration(minutes: 5),
     this.speedhuntEarliest = const Duration(minutes: 60),
+    this.speedhuntFirstDelay = Duration.zero,
     this.hunterCount = 1,
     this.jokerEnabled = true,
     this.playerJokerEnabled = true,
@@ -25,6 +26,9 @@ class GameSettings {
 
   /// Earliest time after the round start for the first speedhunt (R-SET-11).
   final Duration speedhuntEarliest;
+
+  /// Delay between triggering a speedhunt and its first ping (R-SET-13).
+  final Duration speedhuntFirstDelay;
   final int hunterCount;
 
   /// Joker "hunter positions": each player may see the hunters once
@@ -49,7 +53,8 @@ class GameSettings {
       errors.add(SettingsError.pingIntervalTooShort);
     }
     if (speedhuntCount < 0) errors.add(SettingsError.speedhuntCountInvalid);
-    if (speedhuntEarliest < Duration.zero) {
+    if (speedhuntEarliest < Duration.zero ||
+        speedhuntFirstDelay < Duration.zero) {
       errors.add(SettingsError.speedhuntCountInvalid);
     }
     if (speedhuntPings < 1) errors.add(SettingsError.speedhuntPingsInvalid);
@@ -72,6 +77,7 @@ class GameSettings {
     int? speedhuntPings,
     Duration? speedhuntInterval,
     Duration? speedhuntEarliest,
+    Duration? speedhuntFirstDelay,
     int? hunterCount,
     bool? jokerEnabled,
     bool? playerJokerEnabled,
@@ -84,6 +90,7 @@ class GameSettings {
     speedhuntPings: speedhuntPings ?? this.speedhuntPings,
     speedhuntInterval: speedhuntInterval ?? this.speedhuntInterval,
     speedhuntEarliest: speedhuntEarliest ?? this.speedhuntEarliest,
+    speedhuntFirstDelay: speedhuntFirstDelay ?? this.speedhuntFirstDelay,
     hunterCount: hunterCount ?? this.hunterCount,
     jokerEnabled: jokerEnabled ?? this.jokerEnabled,
     playerJokerEnabled: playerJokerEnabled ?? this.playerJokerEnabled,
@@ -98,6 +105,7 @@ class GameSettings {
     'speedhuntPings': speedhuntPings,
     'speedhuntIntervalSec': speedhuntInterval.inSeconds,
     'speedhuntEarliestSec': speedhuntEarliest.inSeconds,
+    'speedhuntFirstDelaySec': speedhuntFirstDelay.inSeconds,
     'hunterCount': hunterCount,
     'jokerEnabled': jokerEnabled,
     'playerJokerEnabled': playerJokerEnabled,
@@ -113,6 +121,9 @@ class GameSettings {
     speedhuntInterval: Duration(seconds: json['speedhuntIntervalSec']! as int),
     speedhuntEarliest: Duration(
       seconds: json['speedhuntEarliestSec'] as int? ?? 3600,
+    ),
+    speedhuntFirstDelay: Duration(
+      seconds: json['speedhuntFirstDelaySec'] as int? ?? 0,
     ),
     hunterCount: json['hunterCount']! as int,
     jokerEnabled: json['jokerEnabled'] as bool? ?? true,

@@ -11,6 +11,7 @@ Future<void> showOverviewSheet(
   required List<Member> members,
   required String myId,
   required bool speedhuntRunning,
+  void Function(Member member)? onRemove,
 }) => showModalBottomSheet<void>(
   context: context,
   showDragHandle: true,
@@ -19,6 +20,7 @@ Future<void> showOverviewSheet(
     members: members,
     myId: myId,
     speedhuntRunning: speedhuntRunning,
+    onRemove: onRemove,
   ),
 );
 
@@ -28,11 +30,15 @@ class OverviewSheet extends StatelessWidget {
     required this.members,
     required this.myId,
     required this.speedhuntRunning,
+    this.onRemove,
   });
 
   final List<Member> members;
   final String myId;
   final bool speedhuntRunning;
+
+  /// Host only: remove someone from the group (R-LOBBY-09).
+  final void Function(Member member)? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -82,9 +88,26 @@ class OverviewSheet extends StatelessWidget {
           color: m.caught ? AppColors.textMuted : null,
         ),
       ),
-      trailing: m.caught
-          ? const Icon(Icons.back_hand_outlined, color: AppColors.textMuted)
-          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (m.caught)
+            const Icon(Icons.back_hand_outlined, color: AppColors.textMuted),
+          if (onRemove != null && m.id != myId)
+            IconButton(
+              key: Key('overviewRemove_${m.id}'),
+              tooltip: l10n.lobbyRemove,
+              icon: const Icon(
+                Icons.person_remove_outlined,
+                color: AppColors.textMuted,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                onRemove!(m);
+              },
+            ),
+        ],
+      ),
     );
 
     return SafeArea(

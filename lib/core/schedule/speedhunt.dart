@@ -9,6 +9,7 @@ class Speedhunt {
     required this.startedAt,
     required this.pings,
     required this.interval,
+    this.firstDelay = Duration.zero,
   });
 
   factory Speedhunt.fromSettings({
@@ -20,6 +21,7 @@ class Speedhunt {
     startedAt: startedAt,
     pings: settings.speedhuntPings,
     interval: settings.speedhuntInterval,
+    firstDelay: settings.speedhuntFirstDelay,
   );
 
   final String targetId;
@@ -27,12 +29,17 @@ class Speedhunt {
   final int pings;
   final Duration interval;
 
-  /// The first ping fires immediately, then one every [interval] (R-SPEED-03).
+  /// Time from triggering to the first ping (R-SET-13). Frozen at trigger
+  /// time, so all devices agree even if the settings change afterwards.
+  final Duration firstDelay;
+
+  /// First ping after [firstDelay] (default: immediately), then one every
+  /// [interval] (R-SPEED-03).
   List<DateTime> pingTimes() => [
-    for (var i = 0; i < pings; i++) startedAt.add(interval * i),
+    for (var i = 0; i < pings; i++) startedAt.add(firstDelay + interval * i),
   ];
 
-  DateTime get endsAt => startedAt.add(interval * (pings - 1));
+  DateTime get endsAt => startedAt.add(firstDelay + interval * (pings - 1));
 
   /// Active from trigger until the last ping has been sent.
   bool isActiveAt(DateTime now) =>
@@ -43,6 +50,7 @@ class Speedhunt {
     'startedAt': startedAt.toUtc().toIso8601String(),
     'pings': pings,
     'intervalSec': interval.inSeconds,
+    'firstDelaySec': firstDelay.inSeconds,
   };
 
   factory Speedhunt.fromJson(Map<String, Object?> json) => Speedhunt(
@@ -50,6 +58,7 @@ class Speedhunt {
     startedAt: DateTime.parse(json['startedAt']! as String),
     pings: json['pings']! as int,
     interval: Duration(seconds: json['intervalSec']! as int),
+    firstDelay: Duration(seconds: json['firstDelaySec'] as int? ?? 0),
   );
 }
 

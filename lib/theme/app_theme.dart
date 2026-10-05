@@ -14,6 +14,16 @@ abstract final class AppColors {
   /// Players: electric teal.
   static const player = Color(0xFF1DE9B6);
 
+  /// One colour per hunter: warm tones, clearly apart from the players.
+  static const hunterPalette = [
+    Color(0xFFFF4D2E), // hunter red-orange
+    Color(0xFFFF9100), // orange
+    Color(0xFFE040FB), // magenta
+    Color(0xFFFF1744), // red
+    Color(0xFFFF6E40), // deep orange
+    Color(0xFFF50057), // pink-red
+  ];
+
   /// One distinct colour per player on the hunters' map (field test feedback).
   /// Avoids the hunter red and the speedhunt yellow.
   static const playerPalette = [

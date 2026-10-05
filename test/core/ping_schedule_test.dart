@@ -108,4 +108,12 @@ void main() {
     expect(grouped['a']!.map((r) => r.fix.at), [at(20), at(40)]);
     expect(grouped['b'], hasLength(1));
   });
+
+  test('nextSpeedhuntPing counts down the speedhunt (R-SPEED-08)', () {
+    final s = speedhunt(30); // pings at 30, 35, 40
+    expect(nextSpeedhuntPing(s, at(29)), (number: 1, at: at(30)));
+    expect(nextSpeedhuntPing(s, at(30)), (number: 2, at: at(35)));
+    expect(nextSpeedhuntPing(s, at(37)), (number: 3, at: at(40)));
+    expect(nextSpeedhuntPing(s, at(40)), isNull);
+  });
 }

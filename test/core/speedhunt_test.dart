@@ -120,4 +120,44 @@ void main() {
       expect(checkAt(5), SpeedhuntDenial.notHunting);
     });
   });
+
+  group('delay until the first speedhunt ping (R-SET-13)', () {
+    final delayed = Speedhunt.fromSettings(
+      targetId: 'p',
+      startedAt: at(30),
+      settings: const GameSettings(speedhuntFirstDelay: Duration(minutes: 2)),
+    );
+
+    test('default is no delay', () {
+      expect(const GameSettings().speedhuntFirstDelay, Duration.zero);
+    });
+
+    test('pings shift by the delay, the speedhunt counts from the trigger', () {
+      expect(delayed.pingTimes(), [at(32), at(37), at(42)]);
+      expect(delayed.endsAt, at(42));
+      expect(delayed.isActiveAt(at(30)), isTrue); // banner from the start
+      expect(delayed.isActiveAt(at(42)), isTrue);
+      expect(delayed.isActiveAt(at(43)), isFalse);
+    });
+
+    test('stored with the speedhunt; older ones without it = no delay', () {
+      expect(Speedhunt.fromJson(delayed.toJson()).pingTimes(), [
+        at(32),
+        at(37),
+        at(42),
+      ]);
+      final legacy = delayed.toJson()..remove('firstDelaySec');
+      expect(Speedhunt.fromJson(legacy).pingTimes().first, at(30));
+    });
+
+    test('settings json roundtrip', () {
+      const s = GameSettings(speedhuntFirstDelay: Duration(minutes: 4));
+      expect(
+        GameSettings.fromJson(s.toJson()).speedhuntFirstDelay,
+        const Duration(minutes: 4),
+      );
+      final legacy = s.toJson()..remove('speedhuntFirstDelaySec');
+      expect(GameSettings.fromJson(legacy).speedhuntFirstDelay, Duration.zero);
+    });
+  });
 }
