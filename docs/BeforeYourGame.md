@@ -10,6 +10,7 @@ Dauert 2–3 Minuten.
   - Android: „Bei Nutzung der App zulassen“ und **„Genauer Standort“** an.
   - iPhone: „Beim Verwenden der App erlauben“ (reicht aus) und **„Genauer Standort“** an.
 - [ ] **Benachrichtigungen erlauben** – sonst gibt es keine Meldung bei Catches, Speedhunts und eigenen Pings.
+  Handy laut = Ton + Vibration, Handy lautlos = nur Vibration.
 - [ ] **Akku-Optimierung für Manhunt ausschalten** (Android, besonders Samsung, Xiaomi, Huawei, OnePlus):
   Sonst legt Android die App trotz Bildschirm-aus-Modus schlafen und es kommen keine Pings mehr.
   Die Menüs heißen je nach Hersteller etwas anders, ungefähr so:

@@ -12,6 +12,7 @@ import 'package:manhunt/core/schedule/speedhunt.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
+import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
 import 'package:manhunt/features/game/game_screen.dart';
 import 'package:manhunt/l10n/app_localizations.dart';
@@ -31,6 +32,7 @@ void main() {
 
   late FakeFirebaseFirestore db;
   late FakeLocationService location;
+  late SilentNotificationService notifications;
   late DateTime now;
 
   /// Lets real async work (fake Firestore, isolates) finish.
@@ -72,6 +74,7 @@ void main() {
           userId: userId,
           store: MemorySessionStore()..code = code,
           location: location,
+          notifications: notifications,
         ),
         child: MaterialApp(
           locale: const Locale('en'),
@@ -96,6 +99,7 @@ void main() {
   setUp(() {
     db = FakeFirebaseFirestore();
     location = FakeLocationService();
+    notifications = SilentNotificationService();
     now = start.add(const Duration(minutes: 30));
   });
 
@@ -132,6 +136,10 @@ void main() {
       expect(find.text('Speedhunt active · ping 2/3 in 05:00'), findsOneWidget);
       expect(find.text('Speedhunt (1)'), findsOneWidget);
       expect(find.text('Speedhunt started!'), findsOneWidget); // notice
+      // App open: sound via the system (follows mute switch), no pop-up
+      // (R-NOTIF-05).
+      expect(notifications.shown.single.title, 'Speedhunt started!');
+      expect(notifications.shown.single.foreground, isTrue);
     });
 
     testWidgets('speedhunt before minute 60 is refused (R-SET-11)', (

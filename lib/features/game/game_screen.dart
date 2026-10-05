@@ -247,19 +247,22 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
       PingSentNotice() => (l10n.noticePingSent, null),
     };
+    final notifications = ref.read(notificationServiceProvider);
     if (_lifecycle == AppLifecycleState.resumed) {
+      // App open: own banner + vibration always (also when muted); the
+      // system notification only adds the sound, which the OS plays only if
+      // the phone is not muted (R-NOTIF-05).
       unawaited(HapticFeedback.vibrate());
+      unawaited(
+        notifications.show(title: title, body: body ?? '', foreground: true),
+      );
       _bannerTimer?.cancel();
       setState(() => _banner = (title: title, body: body));
       _bannerTimer = Timer(const Duration(seconds: 5), () {
         if (mounted) setState(() => _banner = null);
       });
     } else {
-      unawaited(
-        ref
-            .read(notificationServiceProvider)
-            .show(title: title, body: body ?? ''),
-      );
+      unawaited(notifications.show(title: title, body: body ?? ''));
     }
   }
 

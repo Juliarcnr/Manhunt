@@ -110,6 +110,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-NOTIF-02 | Benachrichtigung an alle, wenn jemand gefangen wurde. |
 | R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort bei einem regulären Ping an die Hunter gesendet wurde (nicht bei Speedhunt-Pings, siehe R-SPEED-04). |
 | R-NOTIF-04 | Benachrichtigung, wenn ein Speedhunt gestartet wurde (ohne das Ziel an Spieler zu verraten). |
+| R-NOTIF-05 | Ton richtet sich nach den Handy-Einstellungen: Ist das Handy laut, gibt es zusätzlich zur Vibration einen Benachrichtigungston; ist es stumm/lautlos, nur Vibration. Bei geöffneter App gibt es kein zusätzliches System-Pop-up (nur das Banner in der App). |
 
 ## 8. Catch
 
