@@ -12,6 +12,53 @@ import '../data/game_repository.dart';
 import '../data/location_service.dart';
 import '../data/round_repository.dart';
 
+enum TrackingState {
+  /// Not needed right now (lobby, caught, time up, hunter/player not set).
+  off,
+
+  /// Tracking requested, no position yet.
+  waiting,
+
+  /// Positions arrive.
+  ok,
+
+  /// Location permission missing or location services off.
+  noPermission,
+
+  /// Something failed; the engine retries automatically.
+  error,
+}
+
+/// What the engine is doing – shown in the game screen so problems in the
+/// field are visible instead of silently losing pings.
+@immutable
+class EngineStatus {
+  const EngineStatus({
+    this.state = TrackingState.off,
+    this.lastFixAt,
+    this.lastPingAt,
+    this.lastError,
+  });
+
+  final TrackingState state;
+  final DateTime? lastFixAt;
+  final DateTime? lastPingAt;
+  final String? lastError;
+
+  EngineStatus copyWith({
+    TrackingState? state,
+    DateTime? lastFixAt,
+    DateTime? lastPingAt,
+    String? lastError,
+    bool clearError = false,
+  }) => EngineStatus(
+    state: state ?? this.state,
+    lastFixAt: lastFixAt ?? this.lastFixAt,
+    lastPingAt: lastPingAt ?? this.lastPingAt,
+    lastError: clearError ? null : lastError ?? this.lastError,
+  );
+}
+
 /// Drives this device during a running round, without any server:
 /// - tracks the location only while needed (R-PRIV-04),
 /// - players: sends every due ping automatically (R-PING-01, R-SPEED-03),
@@ -29,6 +76,10 @@ class RoundEngine {
     this.hunterUploadInterval = const Duration(seconds: 15),
   }) : _now = now ?? DateTime.now;
 
+  /// A position older than this is not used for a ping; a fresh one is
+  /// requested directly from the GPS instead.
+  static const maxFixAge = Duration(minutes: 2);
+
   final GroupSession session;
   final RoundRepository rounds;
   final LocationService location;
@@ -44,9 +95,14 @@ class RoundEngine {
   StreamSubscription<LocationFix>? _tracking;
   Timer? _timer;
   LocationFix? _lastFix;
+  var _permissionMissing = false;
 
   /// Latest own position while tracking, for the "you are here" dot.
   final position = ValueNotifier<LocationFix?>(null);
+
+  /// Health of tracking and pinging, for the status line.
+  final status = ValueNotifier(const EngineStatus());
+
   DateTime? _lastUpload;
   var _busy = false;
   final _sent = <String>{};
@@ -97,18 +153,55 @@ class RoundEngine {
     _sync();
   }
 
+  /// After the user granted the permission (e.g. in the system settings).
+  void retry() {
+    _permissionMissing = false;
+    _sync();
+  }
+
+  void _setStatus(EngineStatus Function(EngineStatus s) change) =>
+      status.value = change(status.value);
+
   void _sync() {
-    if (_shouldTrack) {
-      _tracking ??= location.track(notice).listen((fix) {
-        _lastFix = fix;
-        position.value = fix;
-        // Hunters upload right away when they have no position online yet.
-        if (_lastUpload == null) unawaited(tick());
-      });
-      _timer ??= Timer.periodic(tickInterval, (_) => unawaited(tick()));
-    } else {
+    if (!_shouldTrack) {
       _stop();
+      return;
     }
+    _timer ??= Timer.periodic(tickInterval, (_) => unawaited(tick()));
+    if (_tracking != null || _permissionMissing) return;
+    _setStatus(
+      (s) => s.copyWith(
+        state: _lastFix == null ? TrackingState.waiting : TrackingState.ok,
+      ),
+    );
+    _tracking = location
+        .track(notice)
+        .listen(
+          (fix) {
+            _lastFix = fix;
+            position.value = fix;
+            _setStatus(
+              (s) => s.copyWith(state: TrackingState.ok, lastFixAt: fix.at),
+            );
+            // Hunters upload right away when they have no position online yet.
+            if (_lastUpload == null) unawaited(tick());
+          },
+          onError: (Object e) {
+            // Never lose tracking silently: show it and restart on the next
+            // tick – except for a missing permission, which needs the user.
+            _tracking = null;
+            if (e is LocationPermissionMissing) {
+              _permissionMissing = true;
+              _setStatus((s) => s.copyWith(state: TrackingState.noPermission));
+            } else {
+              _setStatus(
+                (s) => s.copyWith(state: TrackingState.error, lastError: '$e'),
+              );
+            }
+          },
+          onDone: () => _tracking = null,
+          cancelOnError: true,
+        );
   }
 
   void _stop() {
@@ -118,44 +211,84 @@ class RoundEngine {
     _timer = null;
     _lastFix = null;
     position.value = null;
+    if (status.value.state != TrackingState.off) {
+      _setStatus((s) => s.copyWith(state: TrackingState.off));
+    }
   }
+
+  bool _isFresh(LocationFix? fix) =>
+      fix != null && _now().difference(fix.at) <= maxFixAge;
 
   /// Sends what is due. Called periodically; public for tests.
   Future<void> tick() async {
-    // Phases change with time alone (e.g. time is up), not only on updates.
+    // Phases change with time alone (e.g. time is up), not only on updates;
+    // this also restarts tracking after an error.
     _sync();
     final me = _me;
-    final fix = _lastFix;
-    if (_busy || !_shouldTrack || me == null || fix == null) return;
+    if (_busy || !_shouldTrack || me == null) return;
     _busy = true;
     try {
       if (me.isPlayer) {
-        await _sendDuePings(fix);
+        await _sendDuePings();
         await _answerJokerRequests();
       } else if (me.isHunter) {
-        await _uploadHunterLocation(fix);
+        final fix = _lastFix;
+        if (_isFresh(fix)) await _uploadHunterLocation(fix!);
       }
     } finally {
       _busy = false;
     }
   }
 
-  Future<void> _sendDuePings(LocationFix fix) async {
-    for (final slot in duePings(mySlots, now: _now(), sentIds: _sent)) {
+  /// Latest tracked position, or – if there is none or it is stale (phone
+  /// lying still, GPS stream stalled) – one fetched directly from the GPS.
+  Future<LocationFix?> _fixForPing() async {
+    final fix = _lastFix;
+    if (_isFresh(fix)) return fix;
+    try {
+      final point = await location.currentPosition();
+      if (point == null) return null;
+      final fresh = LocationFix(point: point, at: _now().toUtc());
+      _lastFix = fresh;
+      position.value = fresh;
+      _setStatus(
+        (s) => s.copyWith(state: TrackingState.ok, lastFixAt: fresh.at),
+      );
+      return fresh;
+    } on Exception catch (e) {
+      _setStatus(
+        (s) => s.copyWith(state: TrackingState.error, lastError: '$e'),
+      );
+      return null;
+    }
+  }
+
+  Future<void> _sendDuePings() async {
+    final due = duePings(mySlots, now: _now(), sentIds: _sent);
+    if (due.isEmpty) return;
+    final fix = await _fixForPing();
+    if (fix == null) return; // retry on the next tick (within the grace period)
+    for (final slot in due) {
       try {
         await rounds.sendPing(session, slot, fix);
       } on FirebaseException catch (e) {
-        // Already sent before an app restart: the rules forbid overwriting.
         if (e.code == 'permission-denied') {
+          // Usually: already sent before an app restart (no overwriting).
+          // Shown anyway, so a real rules problem cannot hide.
           _sent.add(slot.id);
+          _setStatus(
+            (s) => s.copyWith(lastError: 'Ping ${slot.id}: ${e.code}'),
+          );
           continue;
         }
+        _setStatus((s) => s.copyWith(lastError: 'Ping: ${e.code}'));
         return; // Offline etc.: retry on the next tick.
-      } on Exception {
-        // Offline etc.: retry on the next tick (within the grace period).
+      } on Exception catch (e) {
+        _setStatus((s) => s.copyWith(lastError: 'Ping: $e'));
         return;
       }
       _sent.add(slot.id);
+      _setStatus((s) => s.copyWith(lastPingAt: _now(), clearError: true));
       _pingsSent.add(slot);
     }
   }
@@ -166,8 +299,8 @@ class RoundEngine {
     try {
       await rounds.updateHunterLocation(session, fix);
       _lastUpload = _now();
-    } on Exception {
-      // Retry on the next tick.
+    } on Exception catch (e) {
+      _setStatus((s) => s.copyWith(lastError: 'Upload: $e'));
     }
   }
 
@@ -202,5 +335,6 @@ class RoundEngine {
     _stop();
     await _pingsSent.close();
     position.dispose();
+    status.dispose();
   }
 }

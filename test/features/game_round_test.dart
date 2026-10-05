@@ -297,6 +297,32 @@ void main() {
       expect(find.byKey(const Key('jokerButton')), findsNothing);
     });
 
+    testWidgets('status line shows GPS state (no silent failures)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      expect(find.text('Waiting for GPS signal …'), findsOneWidget);
+      location.emit(
+        LocationFix(point: const GeoPoint(52.505, 13.405), at: now),
+      );
+      await settle(tester);
+      expect(find.text('GPS ok'), findsOneWidget);
+    });
+
+    testWidgets('missing location access is shown with a retry button', (
+      tester,
+    ) async {
+      location.permissionGranted = false;
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      expect(find.textContaining('No location access'), findsOneWidget);
+      location.permissionGranted = true;
+      await tester.tap(find.byKey(const Key('trackingRetry')));
+      await settle(tester);
+      expect(find.text('Waiting for GPS signal …'), findsOneWidget);
+    });
+
     testWidgets('self catch stops sharing the location (R-CATCH-01)', (
       tester,
     ) async {

@@ -54,8 +54,11 @@ class FakeLocationService implements LocationService {
   FakeLocationService({this.position});
 
   GeoPoint? position;
+  var permissionGranted = true;
   var currentCalls = 0;
+  var trackCalls = 0;
   final _fixes = StreamController<LocationFix>.broadcast();
+  final _errors = StreamController<Object>.broadcast();
   var trackingListeners = 0;
   TrackingNotice? lastNotice;
 
@@ -63,25 +66,39 @@ class FakeLocationService implements LocationService {
 
   void emit(LocationFix fix) => _fixes.add(fix);
 
+  /// Simulates the GPS stream failing (e.g. a platform exception).
+  void fail(Object error) => _errors.add(error);
+
+  @override
+  Future<bool> ensurePermission() async => permissionGranted;
+
   @override
   Future<GeoPoint?> currentPosition() async {
     currentCalls++;
-    return position;
+    return permissionGranted ? position : null;
   }
 
   @override
   Stream<LocationFix> track(TrackingNotice notice) {
     lastNotice = notice;
+    trackCalls++;
+    if (!permissionGranted) {
+      return Stream.error(const LocationPermissionMissing());
+    }
     late StreamController<LocationFix> c;
-    StreamSubscription<LocationFix>? sub;
+    final subs = <StreamSubscription<Object>>[];
     c = StreamController<LocationFix>(
       onListen: () {
         trackingListeners++;
-        sub = _fixes.stream.listen(c.add);
+        subs
+          ..add(_fixes.stream.listen(c.add))
+          ..add(_errors.stream.listen(c.addError));
       },
-      onCancel: () {
+      onCancel: () async {
         trackingListeners--;
-        return sub?.cancel();
+        for (final s in subs) {
+          await s.cancel();
+        }
       },
     );
     return c.stream;

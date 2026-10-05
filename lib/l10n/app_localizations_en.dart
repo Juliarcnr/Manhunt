@@ -377,6 +377,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your location is shared with your group for the game.';
 
   @override
+  String get trackingWaiting => 'Waiting for GPS signal …';
+
+  @override
+  String get trackingOk => 'GPS ok';
+
+  @override
+  String trackingOkLastPing(String time) {
+    return 'GPS ok · last ping $time';
+  }
+
+  @override
+  String get trackingNoPermission =>
+      'No location access – please allow it in the settings (precise location), then retry.';
+
+  @override
+  String get trackingError => 'GPS problem – restarting automatically …';
+
+  @override
   String speedhuntButton(int left) {
     return 'Speedhunt ($left)';
   }

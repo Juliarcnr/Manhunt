@@ -90,7 +90,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _pingsSentSub = engine.pingsSent.listen(
       (slot) => _notify(PingSentNotice(slot.kind)),
     );
-    unawaited(ref.read(notificationServiceProvider).init());
+    // Location first, then notifications: Android drops a permission dialog
+    // requested while another one is open (field test 2026-10-05).
+    unawaited(_requestPermissions());
 
     _subscriptions
       ..add(ref.listenManual(membersProvider, (_, _) => _feedEngine()))
@@ -114,6 +116,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
         }, fireImmediately: true),
       );
     _feedEngine();
+  }
+
+  Future<void> _requestPermissions() async {
+    await ref.read(locationServiceProvider).ensurePermission();
+    await ref.read(notificationServiceProvider).init();
   }
 
   void _feedEngine() => _engine?.update(
@@ -581,6 +588,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       ),
                   ],
                 ),
+                if (engine != null)
+                  ValueListenableBuilder(
+                    valueListenable: engine.status,
+                    builder: (_, status, _) => _TrackingStatusLine(
+                      status: status,
+                      isPlayer: isPlayer,
+                      onRetry: engine.retry,
+                    ),
+                  ),
                 if (running != null) ...[
                   const SizedBox(height: 8),
                   _SpeedhuntBanner(
@@ -844,6 +860,92 @@ class _NoticeBanner extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shows whether tracking and pinging work, so problems are visible in the
+/// field (no silent failures).
+class _TrackingStatusLine extends StatelessWidget {
+  const _TrackingStatusLine({
+    required this.status,
+    required this.isPlayer,
+    required this.onRetry,
+  });
+
+  final EngineStatus status;
+  final bool isPlayer;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
+    final lastPing = status.lastPingAt;
+    final (icon, color, text) = switch (status.state) {
+      TrackingState.off => (null, null, null),
+      TrackingState.waiting => (
+        Icons.gps_not_fixed,
+        AppColors.speedhunt,
+        l10n.trackingWaiting,
+      ),
+      TrackingState.ok => (
+        Icons.gps_fixed,
+        AppColors.player,
+        isPlayer && lastPing != null
+            ? l10n.trackingOkLastPing(timeFmt.format(lastPing.toLocal()))
+            : l10n.trackingOk,
+      ),
+      TrackingState.noPermission => (
+        Icons.location_disabled,
+        Colors.redAccent,
+        l10n.trackingNoPermission,
+      ),
+      TrackingState.error => (
+        Icons.gps_off,
+        Colors.redAccent,
+        l10n.trackingError,
+      ),
+    };
+    if (text == null) return const SizedBox.shrink();
+    final error = status.lastError;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        key: const Key('trackingStatus'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(child: Text(text)),
+                if (status.state == TrackingState.noPermission)
+                  TextButton(
+                    key: const Key('trackingRetry'),
+                    onPressed: onRetry,
+                    child: Text(l10n.commonRetry),
+                  ),
+              ],
+            ),
+            if (error != null)
+              Text(
+                error,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
           ],
         ),
       ),

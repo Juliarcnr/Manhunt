@@ -758,6 +758,36 @@ abstract class AppLocalizations {
   /// **'Your location is shared with your group for the game.'**
   String get trackingText;
 
+  /// No description provided for @trackingWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for GPS signal …'**
+  String get trackingWaiting;
+
+  /// No description provided for @trackingOk.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS ok'**
+  String get trackingOk;
+
+  /// No description provided for @trackingOkLastPing.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS ok · last ping {time}'**
+  String trackingOkLastPing(String time);
+
+  /// No description provided for @trackingNoPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'No location access – please allow it in the settings (precise location), then retry.'**
+  String get trackingNoPermission;
+
+  /// No description provided for @trackingError.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS problem – restarting automatically …'**
+  String get trackingError;
+
   /// No description provided for @speedhuntButton.
   ///
   /// In en, this message translates to:

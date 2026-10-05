@@ -129,6 +129,12 @@
   "gameNoPingsYet": "No pings yet",
   "trackingTitle": "Manhunt is running",
   "trackingText": "Your location is shared with your group for the game.",
+  "trackingWaiting": "Waiting for GPS signal …",
+  "trackingOk": "GPS ok",
+  "trackingOkLastPing": "GPS ok · last ping {time}",
+  "@trackingOkLastPing": {"placeholders": {"time": {"type": "String"}}},
+  "trackingNoPermission": "No location access – please allow it in the settings (precise location), then retry.",
+  "trackingError": "GPS problem – restarting automatically …",
 
   "speedhuntButton": "Speedhunt ({left})",
   "@speedhuntButton": {"placeholders": {"left": {"type": "int"}}},

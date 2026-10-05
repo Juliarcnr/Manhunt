@@ -114,6 +114,8 @@ void main() {
 
   group('player pings (R-PING-01, R-PING-02, R-SPEED-03)', () {
     setUp(() async {
+      // Fallback position for when the tracked one is stale.
+      location.position = const GeoPoint(52.0, 13.0);
       engine = await engineFor('kim');
       engine.update(game: game(), me: player, speedhuntsOnMe: []);
     });
@@ -153,18 +155,22 @@ void main() {
       expect(sent, hasLength(1));
     });
 
-    test('no position yet → ping is sent as soon as one arrives', () async {
-      now = at(20);
-      await engine.tick();
-      await flush();
-      expect(sent, isEmpty);
-      now = at(21);
-      location.emit(fix(52.5));
-      await flush();
-      await engine.tick();
-      await flush();
-      expect(sent.single.id, 'regular_1');
-    });
+    test(
+      'no GPS at all → ping is sent as soon as a position arrives',
+      () async {
+        location.position = null; // GPS gives nothing yet
+        now = at(20);
+        await engine.tick();
+        await flush();
+        expect(sent, isEmpty);
+        now = at(21);
+        location.emit(fix(52.5));
+        await flush();
+        await engine.tick();
+        await flush();
+        expect(sent.single.id, 'regular_1');
+      },
+    );
 
     test('speedhunt on me adds pings', () async {
       final sh = Speedhunt.fromSettings(
@@ -239,6 +245,73 @@ void main() {
       await flush();
       await flush();
       expect(await answersForSam(), isEmpty);
+    });
+  });
+
+  group('robust tracking (field test 2026-10-05)', () {
+    test('stale position → fresh one directly from the GPS', () async {
+      location.position = const GeoPoint(52.9, 13.9);
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      location.emit(fix(52.5)); // at minute 0
+      await flush();
+      now = at(20); // 20 min later: too old
+      await engine.tick();
+      await flush();
+      expect(location.currentCalls, 1);
+      final pings = await rounds.watchAllPings(hunterSession).first;
+      expect(pings.single.fix.point.lat, 52.9);
+    });
+
+    test('no position at all → GPS asked at ping time', () async {
+      location.position = const GeoPoint(52.8, 13.8);
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      now = at(20);
+      await engine.tick();
+      await flush();
+      expect(sent.single.id, 'regular_1');
+    });
+
+    test('tracking error is shown and tracking restarts', () async {
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      expect(location.trackCalls, 1);
+      location.fail(Exception('GPS crashed'));
+      await flush();
+      expect(engine.status.value.state, TrackingState.error);
+      expect(engine.status.value.lastError, contains('GPS crashed'));
+      await engine.tick();
+      expect(location.trackCalls, 2);
+      expect(location.isTracking, isTrue);
+    });
+
+    test('missing permission is shown, retried only on request', () async {
+      location.permissionGranted = false;
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      await flush();
+      expect(engine.status.value.state, TrackingState.noPermission);
+      await engine.tick();
+      expect(location.trackCalls, 1); // no endless permission dialogs
+
+      location.permissionGranted = true;
+      engine.retry();
+      expect(location.trackCalls, 2);
+      expect(location.isTracking, isTrue);
+    });
+
+    test('status shows positions and the last ping', () async {
+      engine = await engineFor('kim');
+      engine.update(game: game(), me: player, speedhuntsOnMe: []);
+      expect(engine.status.value.state, TrackingState.waiting);
+      now = at(20);
+      location.emit(fix(52.5));
+      await flush();
+      expect(engine.status.value.state, TrackingState.ok);
+      await engine.tick();
+      await flush();
+      expect(engine.status.value.lastPingAt, at(20));
     });
   });
 

@@ -125,3 +125,6 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - **Gefangene Spieler** tracken nicht mehr; ihre App kann im Hintergrund pausiert werden, Benachrichtigungen kommen
   dann erst beim Öffnen.
 - iOS-Hintergrundbetrieb ist ungetestet (Build nur auf dem Mac).
+- Feldtest 2026-10-05: Android sendete keine Pings. Ursachen behoben: gleichzeitige Berechtigungsdialoge (Android
+  bricht den zweiten ab) → jetzt nacheinander; Tracking-Fehler wurden verschluckt → Statuszeile + Neustart;
+  `distanceFilter` 5 m lieferte im Stillstand keine Updates → 0 m + GPS-Direktabfrage bei veralteter Position.

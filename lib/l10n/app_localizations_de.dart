@@ -380,6 +380,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dein Standort wird für das Spiel mit deiner Gruppe geteilt.';
 
   @override
+  String get trackingWaiting => 'Warte auf GPS-Signal …';
+
+  @override
+  String get trackingOk => 'GPS ok';
+
+  @override
+  String trackingOkLastPing(String time) {
+    return 'GPS ok · letzter Ping $time';
+  }
+
+  @override
+  String get trackingNoPermission =>
+      'Kein Standortzugriff – bitte in den Einstellungen erlauben (genauer Standort), dann erneut versuchen.';
+
+  @override
+  String get trackingError => 'GPS-Problem – wird automatisch neu gestartet …';
+
+  @override
   String speedhuntButton(int left) {
     return 'Speedhunt ($left)';
   }

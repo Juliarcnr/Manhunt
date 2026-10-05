@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
@@ -14,20 +15,35 @@ class TrackingNotice {
   final String text;
 }
 
+/// Location access is not granted (or location services are off).
+class LocationPermissionMissing implements Exception {
+  const LocationPermissionMissing();
+}
+
 /// Device location access.
 abstract interface class LocationService {
+  /// Asks for location permission if needed. Concurrent calls share one
+  /// request: Android aborts a second permission dialog while one is open.
+  Future<bool> ensurePermission();
+
   /// Current position, or null if permission was denied / location is off.
   Future<GeoPoint?> currentPosition();
 
   /// Continuous positions while a round runs, also in the background
   /// (R-PING-03): Android foreground service with a permanent notification,
   /// iOS background location mode. Cancel the subscription to stop (R-PRIV-04).
-  /// Emits nothing if permission is missing.
+  /// Fails with [LocationPermissionMissing] if access is not granted.
   Stream<LocationFix> track(TrackingNotice notice);
 }
 
 class GeolocatorLocationService implements LocationService {
-  Future<bool> _ensurePermission() async {
+  Future<bool>? _pending;
+
+  @override
+  Future<bool> ensurePermission() =>
+      _pending ??= _requestPermission().whenComplete(() => _pending = null);
+
+  Future<bool> _requestPermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) return false;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -39,7 +55,7 @@ class GeolocatorLocationService implements LocationService {
 
   @override
   Future<GeoPoint?> currentPosition() async {
-    if (!await _ensurePermission()) return null;
+    if (!await ensurePermission()) return null;
     final pos = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
@@ -51,7 +67,7 @@ class GeolocatorLocationService implements LocationService {
 
   @override
   Stream<LocationFix> track(TrackingNotice notice) async* {
-    if (!await _ensurePermission()) return;
+    if (!await ensurePermission()) throw const LocationPermissionMissing();
     yield* Geolocator.getPositionStream(locationSettings: _settings(notice))
         .map(
           (p) => LocationFix(
@@ -66,7 +82,9 @@ class GeolocatorLocationService implements LocationService {
     if (Platform.isAndroid) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+        // No distance filter: also deliver updates while standing still, so a
+        // fresh position is available at every ping.
+        distanceFilter: 0,
         intervalDuration: const Duration(seconds: 10),
         foregroundNotificationConfig: ForegroundNotificationConfig(
           notificationTitle: notice.title,
@@ -89,9 +107,6 @@ class GeolocatorLocationService implements LocationService {
         allowBackgroundLocationUpdates: true,
       );
     }
-    return const LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 5,
-    );
+    return const LocationSettings(accuracy: LocationAccuracy.high);
   }
 }
