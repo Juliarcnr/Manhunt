@@ -1,0 +1,852 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../core/history/round_summary.dart';
+import '../../core/models/member.dart';
+import '../../core/round/notices.dart';
+import '../../core/round/ping_schedule.dart';
+import '../../core/schedule/game_clock.dart';
+import '../../core/schedule/speedhunt.dart';
+import '../../data/game_repository.dart';
+import '../../data/location_service.dart';
+import '../../l10n/app_localizations.dart';
+import '../../state/providers.dart';
+import '../../state/round_engine.dart';
+import '../../theme/app_theme.dart';
+import '../history/history_button.dart';
+import '../map/base_map.dart';
+import 'catch_dialog.dart';
+import 'joker_sheet.dart';
+import 'game_map_layers.dart';
+import 'speedhunt_dialog.dart';
+
+/// Running round: map with role-specific layers, status, actions, automatic
+/// pings in the background and notifications (phase 5).
+class GameScreen extends ConsumerStatefulWidget {
+  const GameScreen({
+    super.key,
+    required this.session,
+    required this.game,
+    this.now = DateTime.now,
+  });
+
+  final GroupSession session;
+  final GameInfo game;
+
+  /// Injectable clock for tests.
+  final DateTime Function() now;
+
+  @override
+  ConsumerState<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends ConsumerState<GameScreen>
+    with WidgetsBindingObserver {
+  Timer? _ticker;
+  var _ending = false;
+  RoundEngine? _engine;
+  final _notices = NoticeTracker();
+  final _subscriptions = <ProviderSubscription<Object?>>[];
+  StreamSubscription<PingSlot>? _pingsSentSub;
+  var _lifecycle = AppLifecycleState.resumed;
+  ({String title, String? body})? _banner;
+  Timer? _bannerTimer;
+  ({DateTime at, Map<String, LocationFix> positions})? _jokerReveal;
+  ({DateTime at, String requestId})? _playerReveal;
+
+  bool get _isAdmin => widget.game.adminId == widget.session.userId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => setState(() {}),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_engine != null) return;
+    final l10n = AppLocalizations.of(context);
+    final engine = RoundEngine(
+      session: widget.session,
+      rounds: ref.read(roundRepositoryProvider),
+      location: ref.read(locationServiceProvider),
+      notice: TrackingNotice(
+        title: l10n.trackingTitle,
+        text: l10n.trackingText,
+      ),
+      now: widget.now,
+    );
+    _engine = engine;
+    _pingsSentSub = engine.pingsSent.listen(
+      (slot) => _notify(PingSentNotice(slot.kind)),
+    );
+    unawaited(ref.read(notificationServiceProvider).init());
+
+    _subscriptions
+      ..add(ref.listenManual(membersProvider, (_, _) => _feedEngine()))
+      ..add(ref.listenManual(speedhuntsOnMeProvider, (_, _) => _feedEngine()))
+      ..add(
+        ref.listenManual<AsyncValue<List<CatchRecord>>>(catchesProvider, (
+          _,
+          next,
+        ) {
+          final catches = next.value;
+          if (catches != null) _notices.onCatches(catches).forEach(_notify);
+        }, fireImmediately: true),
+      )
+      ..add(
+        ref.listenManual<AsyncValue<List<Speedhunt>>>(speedhuntsProvider, (
+          _,
+          next,
+        ) {
+          final list = next.value;
+          if (list != null) _notices.onSpeedhunts(list).forEach(_notify);
+        }, fireImmediately: true),
+      );
+    _feedEngine();
+  }
+
+  void _feedEngine() => _engine?.update(
+    game: widget.game,
+    me: _me(ref.read(membersProvider).value),
+    speedhuntsOnMe: ref.read(speedhuntsOnMeProvider).value ?? const [],
+  );
+
+  @override
+  void didUpdateWidget(GameScreen old) {
+    super.didUpdateWidget(old);
+    _feedEngine();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      _lifecycle = state;
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _ticker?.cancel();
+    _bannerTimer?.cancel();
+    for (final s in _subscriptions) {
+      s.close();
+    }
+    unawaited(_pingsSentSub?.cancel());
+    unawaited(_engine?.dispose());
+    super.dispose();
+  }
+
+  Member? _me(List<Member>? members) {
+    for (final m in members ?? const <Member>[]) {
+      if (m.id == widget.session.userId) return m;
+    }
+    return null;
+  }
+
+  /// In-app banner + vibration in the foreground, system notification in the
+  /// background (R-NOTIF-01).
+  void _notify(GameNotice notice) {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final names = {
+      for (final m in ref.read(membersProvider).value ?? const <Member>[])
+        m.id: m.name,
+    };
+    final (title, body) = switch (notice) {
+      CatchNotice(:final record) => (
+        l10n.noticeCaught(names[record.playerId] ?? '?'),
+        null,
+      ),
+      SpeedhuntNotice(:final speedhunt) => (
+        l10n.noticeSpeedhunt,
+        l10n.noticeSpeedhuntBody(speedhunt.pings, speedhunt.interval.inMinutes),
+      ),
+      PingSentNotice(:final kind) => (
+        kind == PingKind.speedhunt
+            ? l10n.noticeSpeedhuntPingSent
+            : l10n.noticePingSent,
+        null,
+      ),
+    };
+    if (_lifecycle == AppLifecycleState.resumed) {
+      unawaited(HapticFeedback.vibrate());
+      _bannerTimer?.cancel();
+      setState(() => _banner = (title: title, body: body));
+      _bannerTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) setState(() => _banner = null);
+      });
+    } else {
+      unawaited(
+        ref
+            .read(notificationServiceProvider)
+            .show(title: title, body: body ?? ''),
+      );
+    }
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    try {
+      await action();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      _snack(AppLocalizations.of(context).commonError('$e'));
+    }
+  }
+
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  Future<bool> _confirm({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String text,
+    required String action,
+    required Key actionKey,
+    bool destructive = false,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(icon, color: color),
+        title: Text(title),
+        content: Text(text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            key: actionKey,
+            style: destructive
+                ? FilledButton.styleFrom(backgroundColor: Colors.red.shade700)
+                : null,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+    return ok == true && mounted;
+  }
+
+  /// Host ends the round (R-GAME-06). While time is left this is an early
+  /// abort that needs two confirmations (R-GAME-07).
+  Future<void> _endRound() async {
+    final l10n = AppLocalizations.of(context);
+    final startAt = widget.game.startAt;
+    final endAt = startAt?.add(widget.game.settings.duration);
+    final now = widget.now();
+    final early = endAt != null && now.isBefore(endAt);
+
+    if (early) {
+      if (!await _confirm(
+        icon: Icons.warning_amber_rounded,
+        color: AppColors.speedhunt,
+        title: l10n.gameAbortTitle,
+        text: l10n.gameAbortText(_formatCountdown(endAt.difference(now))),
+        action: l10n.gameAbortContinue,
+        actionKey: const Key('confirmAbortFirst'),
+      )) {
+        return;
+      }
+      if (!await _confirm(
+        icon: Icons.delete_forever_outlined,
+        color: Colors.redAccent,
+        title: l10n.gameAbortFinalTitle,
+        text: l10n.gameEndConfirmText,
+        action: l10n.gameAbortFinalAction,
+        actionKey: const Key('confirmEndRound'),
+        destructive: true,
+      )) {
+        return;
+      }
+    } else if (!await _confirm(
+      icon: Icons.delete_sweep_outlined,
+      color: AppColors.speedhunt,
+      title: l10n.gameEndConfirmTitle,
+      text: l10n.gameEndConfirmText,
+      action: l10n.gameEndConfirmAction,
+      actionKey: const Key('confirmEndRound'),
+    )) {
+      return;
+    }
+    setState(() => _ending = true);
+    await _run(() => ref.read(gameRepositoryProvider).endRound(widget.session));
+    if (mounted) setState(() => _ending = false);
+  }
+
+  Future<void> _reportCatchAsHunter(List<Member> members) async {
+    final playerId = await showHunterCatchDialog(context, members: members);
+    if (playerId == null) return;
+    await _run(
+      () => ref
+          .read(gameRepositoryProvider)
+          .recordCatch(
+            widget.session,
+            CatchRecord(playerId: playerId, at: widget.now().toUtc()),
+          ),
+    );
+  }
+
+  Future<void> _reportSelfCatch() async {
+    if (!await showSelfCatchDialog(context)) return;
+    await _run(
+      () => ref
+          .read(gameRepositoryProvider)
+          .recordCatch(
+            widget.session,
+            CatchRecord(
+              playerId: widget.session.userId,
+              at: widget.now().toUtc(),
+            ),
+          ),
+    );
+  }
+
+  Future<void> _startSpeedhunt(
+    GameClock clock,
+    List<Member> members,
+    List<Speedhunt> previous,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    // Check time/count/running first, so nobody picks a target in vain.
+    final early = canStartSpeedhunt(
+      clock: clock,
+      now: widget.now(),
+      previous: previous,
+      target: const Member(id: '', name: '', role: Role.player),
+    );
+    if (early != null) {
+      _snack(speedhuntDenialText(l10n, early, widget.game.settings));
+      return;
+    }
+    final targetId = await showSpeedhuntDialog(
+      context,
+      members: members,
+      settings: widget.game.settings,
+    );
+    if (targetId == null || !mounted) return;
+    final denial = canStartSpeedhunt(
+      clock: clock,
+      now: widget.now(),
+      previous: previous,
+      target: members.firstWhere((m) => m.id == targetId),
+    );
+    if (denial != null) {
+      _snack(speedhuntDenialText(l10n, denial, widget.game.settings));
+      return;
+    }
+    await _run(
+      () => ref
+          .read(roundRepositoryProvider)
+          .startSpeedhunt(
+            widget.session,
+            Speedhunt.fromSettings(
+              targetId: targetId,
+              startedAt: widget.now().toUtc(),
+              settings: widget.game.settings,
+            ),
+          ),
+    );
+  }
+
+  Future<void> _openJokers(Member me) async {
+    final settings = widget.game.settings;
+    final kind = await showJokerSheet(
+      context,
+      huntersEnabled: settings.jokerEnabled,
+      huntersUsed: me.jokerUsed,
+      playersEnabled: settings.playerJokerEnabled,
+      playersUsed: me.playerJokerUsed,
+    );
+    if (!mounted) return;
+    switch (kind) {
+      case JokerKind.hunters:
+        await _useHunterJoker();
+      case JokerKind.players:
+        await _usePlayerJoker();
+      case null:
+        return;
+    }
+  }
+
+  bool _jokersLeft(Member me) {
+    final s = widget.game.settings;
+    return (s.jokerEnabled && !me.jokerUsed) ||
+        (s.playerJokerEnabled && !me.playerJokerUsed);
+  }
+
+  /// R-PLAY-02: see the hunters once.
+  Future<void> _useHunterJoker() async {
+    final l10n = AppLocalizations.of(context);
+    if (!await showJokerConfirm(
+      context,
+      title: l10n.jokerTitle,
+      text: l10n.jokerText,
+    )) {
+      return;
+    }
+    await _run(() async {
+      final positions = await ref
+          .read(roundRepositoryProvider)
+          .useJoker(widget.session);
+      if (!mounted) return;
+      if (positions.isEmpty) _snack(l10n.jokerNoHunters);
+      setState(() => _jokerReveal = (at: widget.now(), positions: positions));
+    });
+  }
+
+  /// R-PLAY-03: see all other players once – their devices answer the request.
+  Future<void> _usePlayerJoker() async {
+    final l10n = AppLocalizations.of(context);
+    if (!await showJokerConfirm(
+      context,
+      title: l10n.jokerPlayersTitle,
+      text: l10n.jokerPlayersText,
+    )) {
+      return;
+    }
+    await _run(() async {
+      final requestId = await ref
+          .read(roundRepositoryProvider)
+          .requestPlayerPositions(widget.session);
+      if (!mounted) return;
+      setState(() => _playerReveal = (at: widget.now(), requestId: requestId));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
+    final members = ref.watch(membersProvider).value ?? const <Member>[];
+    final me = _me(members);
+    final names = {for (final m in members) m.id: m.name};
+    final caught = {
+      for (final m in members)
+        if (m.caught) m.id,
+    };
+    final speedhunts = ref.watch(speedhuntsProvider).value ?? const [];
+    final isHunter = me?.isHunter ?? false;
+    final isPlayer = me?.isPlayer ?? false;
+
+    final startAt = widget.game.startAt;
+    // startAt is a server timestamp and briefly null right after "start".
+    final clock = startAt == null
+        ? null
+        : GameClock(startAt: startAt, settings: widget.game.settings);
+    final now = widget.now();
+    final phase = clock?.phaseAt(now) ?? GamePhase.notStarted;
+    final running = activeSpeedhunt(speedhunts, now);
+
+    final (title, color, until) = switch (phase) {
+      GamePhase.notStarted => (
+        l10n.gamePhaseStarting,
+        AppColors.textMuted,
+        null,
+      ),
+      GamePhase.headStart => (
+        l10n.gamePhaseHeadStart,
+        AppColors.player,
+        clock!.huntersReleaseAt,
+      ),
+      GamePhase.hunting => (
+        l10n.gamePhaseHunting,
+        AppColors.hunter,
+        clock!.endAt,
+      ),
+      GamePhase.ended => (l10n.gamePhaseTimeUp, AppColors.speedhunt, null),
+    };
+
+    // Role-specific map content. Hunter-only data is only watched by hunters
+    // (the security rules reject it for players).
+    final layers = <Widget>[...areaLayers(widget.game.settings.area)];
+    if (isHunter) {
+      final pings = ref.watch(allPingsProvider).value ?? const [];
+      final hunters =
+          ref.watch(hunterLocationsProvider).value ??
+          const <String, LocationFix>{};
+      layers
+        ..add(
+          lastPingsLayer(
+            byPlayer: pingsByPlayer(pings),
+            names: names,
+            caught: caught,
+          ),
+        )
+        ..add(
+          huntersLayer(
+            positions: {
+              for (final e in hunters.entries)
+                if (e.key != widget.session.userId) e.key: e.value,
+            },
+            names: names,
+          ),
+        );
+    } else if (isPlayer) {
+      final mine = pingsByPlayer(
+        ref.watch(myPingsProvider).value ?? const [],
+      )[widget.session.userId];
+      if (mine != null) {
+        layers.add(historyLayer(mine, color: AppColors.player));
+      }
+      final reveal = _jokerReveal;
+      if (reveal != null) {
+        layers.add(huntersLayer(positions: reveal.positions, names: names));
+      }
+      final playerReveal = _playerReveal;
+      if (playerReveal != null) {
+        final answers =
+            ref.watch(jokerAnswersProvider(playerReveal.requestId)).value ??
+            const <String, LocationFix>{};
+        layers.add(playersLayer(positions: answers, names: names));
+      }
+      // Answer other players' joker requests (R-PLAY-03) – players only, the
+      // rules hide requests from hunters.
+      ref.listen(jokerRequestsProvider, (_, next) {
+        _engine?.updateJokerRequests(next.value ?? const []);
+      });
+    }
+
+    final engine = _engine;
+    final nextSlot = isPlayer && !(me?.caught ?? false) && engine != null
+        ? nextPing(engine.mySlots, now)
+        : null;
+    final speedhuntsLeft =
+        widget.game.settings.speedhuntCount - speedhunts.length;
+    final reveal = _jokerReveal;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.appTitle),
+        actions: [
+          const HistoryButton(),
+          if (_isAdmin)
+            IconButton(
+              key: const Key('endRoundButton'),
+              tooltip: l10n.gameEndButton,
+              onPressed: _ending ? null : _endRound,
+              icon: const Icon(Icons.flag_outlined),
+            ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          BaseMap(
+            options: MapOptions(
+              initialCenter: fallbackCenter,
+              initialZoom: 6,
+              initialCameraFit: fitArea(widget.game.settings.area),
+            ),
+            children: [
+              ...layers,
+              if (engine != null)
+                ValueListenableBuilder(
+                  valueListenable: engine.position,
+                  builder: (_, fix, _) =>
+                      fix == null ? const SizedBox.shrink() : selfLayer(fix),
+                ),
+            ],
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            top: 12,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StatusCard(
+                  title: title,
+                  color: color,
+                  countdown: until == null
+                      ? null
+                      : _formatCountdown(until.difference(now)),
+                  lines: [
+                    if (phase == GamePhase.ended) l10n.gameTimeUpHint,
+                    if (me?.caught ?? false) l10n.gameCaughtSelf,
+                    if (nextSlot != null)
+                      l10n.gameNextPing(
+                        _formatCountdown(nextSlot.at.difference(now)),
+                      ),
+                  ],
+                ),
+                if (running != null) ...[
+                  const SizedBox(height: 8),
+                  _SpeedhuntBanner(
+                    text: l10n.gameSpeedhuntUntil(
+                      timeFmt.format(running.endsAt.toLocal()),
+                    ),
+                  ),
+                ],
+                if (reveal != null) ...[
+                  const SizedBox(height: 8),
+                  _InfoChip(
+                    icon: Icons.visibility_outlined,
+                    text: l10n.jokerResult(timeFmt.format(reveal.at.toLocal())),
+                  ),
+                ],
+                if (_playerReveal case final pr?) ...[
+                  const SizedBox(height: 8),
+                  _InfoChip(
+                    icon: Icons.groups_outlined,
+                    text: l10n.jokerPlayersResult(
+                      timeFmt.format(pr.at.toLocal()),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (_banner case final banner?)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: _NoticeBanner(title: banner.title, body: banner.body),
+            ),
+        ],
+      ),
+      bottomNavigationBar: me == null || clock == null
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  children: [
+                    if (isHunter) ...[
+                      Expanded(
+                        child: FilledButton.icon(
+                          key: const Key('catchButton'),
+                          onPressed: () => _reportCatchAsHunter(members),
+                          icon: const Icon(Icons.back_hand_outlined),
+                          label: Text(l10n.catchTitle),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('speedhuntButton'),
+                          onPressed: speedhuntsLeft > 0
+                              ? () =>
+                                    _startSpeedhunt(clock, members, speedhunts)
+                              : null,
+                          icon: const Icon(Icons.bolt),
+                          label: Text(l10n.speedhuntButton(speedhuntsLeft)),
+                        ),
+                      ),
+                    ],
+                    if (isPlayer && !me.caught) ...[
+                      if (widget.game.settings.jokerEnabled ||
+                          widget.game.settings.playerJokerEnabled) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            key: const Key('jokerButton'),
+                            onPressed: _jokersLeft(me)
+                                ? () => _openJokers(me)
+                                : null,
+                            icon: const Icon(Icons.visibility_outlined),
+                            label: Text(l10n.jokerButton),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: FilledButton.icon(
+                          key: const Key('selfCatchButton'),
+                          onPressed: _reportSelfCatch,
+                          icon: const Icon(Icons.back_hand_outlined),
+                          label: Text(l10n.catchSelfTitle),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+String _formatCountdown(Duration d) {
+  if (d.isNegative) d = Duration.zero;
+  String two(int n) => n.toString().padLeft(2, '0');
+  final h = d.inHours;
+  final m = two(d.inMinutes % 60);
+  final s = two(d.inSeconds % 60);
+  return h > 0 ? '$h:$m:$s' : '$m:$s';
+}
+
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({
+    required this.title,
+    required this.color,
+    required this.countdown,
+    required this.lines,
+  });
+
+  final String title;
+  final Color color;
+  final String? countdown;
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  key: const Key('gamePhase'),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              if (countdown case final countdown?)
+                Text(
+                  countdown,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+            ],
+          ),
+          for (final line in lines) ...[
+            const SizedBox(height: 4),
+            Text(line, style: const TextStyle(color: AppColors.textMuted)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Visible to everyone while a speedhunt runs (R-SPEED-05).
+class _SpeedhuntBanner extends StatelessWidget {
+  const _SpeedhuntBanner({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('speedhuntBanner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.speedhunt,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, color: Colors.black),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.hunter),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.hunter),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+}
+
+/// In-app notification banner (R-NOTIF-01).
+class _NoticeBanner extends StatelessWidget {
+  const _NoticeBanner({required this.title, this.body});
+
+  final String title;
+  final String? body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('noticeBanner'),
+      color: AppColors.surfaceHigh,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            const Icon(Icons.notifications_active, color: AppColors.speedhunt),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  if (body case final body?)
+                    Text(
+                      body,
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "manhunt-54b5d",
+          "appId": "1:339011355400:android:41ffbc478e218046d422bd",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "manhunt-54b5d",
+          "configurations": {
+            "android": "1:339011355400:android:41ffbc478e218046d422bd",
+            "ios": "1:339011355400:ios:b9696b26cbdd1c1ad422bd"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "firestore": { "port": 8080 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}

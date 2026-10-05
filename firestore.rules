@@ -1,0 +1,238 @@
+rules_version = '2';
+
+// Manhunt security rules. Sensitive values (names, settings, locations) are
+// end-to-end encrypted on the device; these rules only control who may
+// read/write which documents. Tests: firestore-tests/rules.test.mjs
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function gamePath(gid) {
+      return /databases/$(database)/documents/games/$(gid);
+    }
+
+    function game(gid) {
+      return get(gamePath(gid)).data;
+    }
+
+    function isAdmin(gid) {
+      return signedIn() && game(gid).adminUid == request.auth.uid;
+    }
+
+    function isMember(gid) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/games/$(gid)/members/$(request.auth.uid));
+    }
+
+    function myMember(gid) {
+      return get(/databases/$(database)/documents/games/$(gid)/members/$(request.auth.uid)).data;
+    }
+
+    function isHunter(gid) {
+      return isMember(gid) && myMember(gid).role == 'hunter';
+    }
+
+    function isPlayer(gid) {
+      return isMember(gid) && myMember(gid).role == 'player';
+    }
+
+    function isRunning(gid) {
+      return game(gid).status == 'running';
+    }
+
+    // A player who just used the joker may read hunter positions for 2 minutes.
+    function jokerWindowOpen(gid) {
+      return isPlayer(gid)
+        && myMember(gid).get('jokerAt', null) != null
+        && myMember(gid).jokerAt > request.time - duration.value(2, 'm');
+    }
+
+    // At most 180 days (+1 day clock tolerance) into the future.
+    function validExpiry() {
+      return request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(181, 'd');
+    }
+
+    // 180 days without anyone opening the group: any member may clean up (no server, no TTL).
+    function isExpired(gid) {
+      return signedIn() && game(gid).expiresAt < request.time;
+    }
+
+    function isRoundCollection(name) {
+      return name in [
+        'pings', 'hunterLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers'
+      ];
+    }
+
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    match /games/{gid} {
+      // The id is derived from the secret code, so knowing it = being invited.
+      // Needed before joining to check the group exists; content is encrypted.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['adminUid', 'status', 'settings', 'area', 'startAt', 'createdAt', 'expiresAt'])
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.status == 'lobby'
+        && request.resource.data.settings is string
+        && request.resource.data.expiresAt is timestamp;
+
+      allow update: if (isAdmin(gid)
+          && request.resource.data.adminUid == resource.data.adminUid
+          && request.resource.data.status in ['lobby', 'running']
+          && validExpiry())
+        // Any member opening the group extends its lifetime (R-PRIV-05).
+        || (isMember(gid) && onlyChanges(['expiresAt']) && validExpiry())
+        // Any member may edit the (encrypted) play area while in the lobby (R-SET-10).
+        || (isMember(gid) && resource.data.status == 'lobby'
+            && onlyChanges(['area', 'expiresAt'])
+            && request.resource.data.area is string && validExpiry());
+
+      allow delete: if isAdmin(gid) || isExpired(gid);
+
+      match /members/{uid} {
+        allow get: if isMember(gid) || (signedIn() && request.auth.uid == uid);
+        allow list: if isMember(gid);
+
+        // Joining is possible in the lobby and during a round (lost phone).
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && exists(gamePath(gid))
+          && request.resource.data.keys().hasOnly(
+               ['name', 'role', 'caught', 'jokerUsed', 'joinedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.role == 'unassigned'
+          && request.resource.data.caught == false
+          && request.resource.data.jokerUsed == false;
+
+        // Host: roles + reset of caught/joker at round end. Self: own name.
+        allow update: if
+          (isAdmin(gid) && onlyChanges(['role', 'caught', 'jokerUsed', 'playerJokerUsed'])
+            && request.resource.data.role in ['unassigned', 'hunter', 'player'])
+          || (signedIn() && request.auth.uid == uid && onlyChanges(['name']))
+          // Catch (R-CATCH-01): a hunter marks a player, or the player themself.
+          || (isRunning(gid) && onlyChanges(['caught'])
+            && resource.data.role == 'player'
+            && request.resource.data.caught == true
+            && (isHunter(gid) || request.auth.uid == uid))
+          // Joker (R-PLAY-02): once per round, timestamped by the server.
+          || (isRunning(gid) && signedIn() && request.auth.uid == uid
+            && onlyChanges(['jokerUsed', 'jokerAt'])
+            && resource.data.role == 'player'
+            && resource.data.jokerUsed == false
+            && request.resource.data.jokerUsed == true
+            && request.resource.data.jokerAt == request.time)
+          // Joker "player positions" (R-PLAY-03): once per round, same pattern.
+          || (isRunning(gid) && signedIn() && request.auth.uid == uid
+            && onlyChanges(['playerJokerUsed', 'playerJokerAt'])
+            && resource.data.role == 'player'
+            && resource.data.get('playerJokerUsed', false) == false
+            && request.resource.data.playerJokerUsed == true
+            && request.resource.data.playerJokerAt == request.time);
+
+        allow delete: if (signedIn() && request.auth.uid == uid)
+          || isAdmin(gid) || isExpired(gid);
+      }
+
+      // Per-round data, deleted by the host at round end (R-PRIV-03) or by
+      // anyone after expiry. Reading is defined per collection below.
+      match /{roundCollection}/{docId} {
+        // To delete, the docs must be found first: the host may read leftovers
+        // only while no round runs (nothing left to cheat with), anyone after
+        // expiry. During a round reading is defined per collection below.
+        allow read: if isRoundCollection(roundCollection)
+          && (isExpired(gid) || (isAdmin(gid) && game(gid).status == 'lobby'));
+        allow delete: if isRoundCollection(roundCollection)
+          && (isAdmin(gid) || isExpired(gid));
+      }
+
+      // Location pings of players (R-PING-01). Hunters read all, players
+      // only their own (R-HUNT-03, R-PLAY-01). One doc per slot, never edited.
+      match /pings/{pingId} {
+        allow read: if isHunter(gid)
+          || (isMember(gid) && resource.data.uid == request.auth.uid);
+        allow create: if isRunning(gid) && isPlayer(gid)
+          && request.resource.data.keys().hasOnly(['uid', 'kind', 'slot', 'createdAt', 'data'])
+          && request.resource.data.uid == request.auth.uid
+          && pingId == request.auth.uid + '_' + request.resource.data.slot
+          && request.resource.data.kind in ['regular', 'speedhunt']
+          && request.resource.data.data is string;
+      }
+
+      // Live hunter positions (R-HUNT-02): hunters only; a player right after
+      // using their joker may read them once (R-PLAY-02).
+      match /hunterLocs/{hunterId} {
+        allow read: if isHunter(gid) || jokerWindowOpen(gid);
+        allow create, update: if isRunning(gid) && isHunter(gid)
+          && request.auth.uid == hunterId
+          && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
+          && request.resource.data.data is string;
+        allow delete: if signedIn() && request.auth.uid == hunterId;
+      }
+
+      // Catches (R-CATCH-01) and speedhunts (R-SPEED-02). Content encrypted;
+      // a speedhunt event carries no target (R-SPEED-04).
+      match /events/{eventId} {
+        allow read: if isMember(gid);
+        allow create: if isRunning(gid) && isMember(gid)
+          && request.resource.data.keys().hasOnly(['type', 'createdAt', 'data'])
+          && request.resource.data.data is string
+          && (request.resource.data.type == 'catch'
+            || (request.resource.data.type == 'speedhunt' && isHunter(gid)));
+      }
+
+      // Who a speedhunt targets: only hunters and the target may read it.
+      match /speedhuntTargets/{eventId} {
+        allow read: if isHunter(gid)
+          || (isMember(gid) && resource.data.uid == request.auth.uid);
+        allow create: if isRunning(gid) && isHunter(gid)
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid is string;
+      }
+
+      // Joker "player positions" (R-PLAY-03): a player asks, the other players'
+      // devices answer with their position. Only possible together with
+      // marking the joker as used (same batch, same server time).
+      match /jokerRequests/{requestId} {
+        allow read: if isPlayer(gid);
+        allow create: if isRunning(gid) && isPlayer(gid)
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/games/$(gid)/members/$(request.auth.uid))
+               .data.get('playerJokerAt', null) == request.time;
+      }
+
+      // Answers are readable only by the asking player; never by hunters.
+      match /jokerAnswers/{answerId} {
+        allow read: if signedIn() && resource.data.requester == request.auth.uid;
+        allow create: if isRunning(gid) && isPlayer(gid)
+          && request.resource.data.keys().hasOnly(['request', 'requester', 'uid', 'createdAt', 'data'])
+          && request.resource.data.uid == request.auth.uid
+          && answerId == request.resource.data.request + '_' + request.auth.uid
+          && request.resource.data.data is string
+          && get(/databases/$(database)/documents/games/$(gid)/jokerRequests/$(request.resource.data.request))
+               .data.uid == request.resource.data.requester
+          && request.resource.data.requester != request.auth.uid;
+      }
+
+      // Round summaries, kept across rounds (R-HIST-02); written by the host
+      // when ending a round, never edited, deleted with the group.
+      match /history/{roundId} {
+        allow read: if isMember(gid);
+        allow create: if isAdmin(gid)
+          && request.resource.data.keys().hasOnly(['endedAt', 'data'])
+          && request.resource.data.endedAt is timestamp
+          && request.resource.data.data is string;
+        allow delete: if isAdmin(gid) || isExpired(gid);
+      }
+    }
+  }
+}
