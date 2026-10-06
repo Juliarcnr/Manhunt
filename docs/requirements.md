@@ -78,7 +78,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 
 | ID | Anforderung |
 |---|---|
-| R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. Die Kopfzeile zeigt nur Phase und Countdown (z.B. „DIE JAGD LÄUFT 1:23:45“), damit möglichst viel Karte sichtbar bleibt; darunter nur kleine Hinweise (nächster Ping, GPS-Status, Speedhunt). Bei Spielern steht „Nächster Ping in …“ ganz oben, über den Filtern. |
+| R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. Die Kopfzeile zeigt nur Phase und Countdown (z.B. „DIE JAGD LÄUFT 1:23:45“), damit möglichst viel Karte sichtbar bleibt; darunter nur kleine Hinweise (nächster Ping, GPS-Status, Speedhunt). Bei Spielern steht „Nächster Ping in …“ ganz oben, über den Filtern. Unter den Filtern (GPS-Status, Speedhunt-Banner) derselbe Abstand wie über ihnen (Kopfzeile bzw. „Nächster Ping“). |
 | R-MAP-02 | Die Karte ist immer nach Norden ausgerichtet: zoomen und verschieben ja, drehen nein (alle Karten). |
 
 ### Hunter-View
@@ -92,6 +92,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
 | R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers hat zusätzlich einen Location-Pin in Spielerfarbe unter dem Badge. Sie lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
+| R-HUNT-08 | Ist „Letzte Pings“ ausgeschaltet und kommen neue normale Pings rein, schaltet sich der Filter automatisch wieder ein (Speedhunt-Pings lösen das nicht aus). |
 
 ### Spieler-View
 

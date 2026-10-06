@@ -520,6 +520,66 @@ void main() {
       expect(find.textContaining('Sam'), findsNothing);
     });
 
+    for (final who in ['kim', 'alex']) {
+      testWidgets('$who: below the filters the same gap as above them: header '
+          'for hunters, "next ping" for players (R-MAP-01)', (tester) async {
+        now = start.add(const Duration(minutes: 72));
+        await seed(tester);
+        await tester.runAsync(
+          () async => FirestoreRoundRepository(db).startSpeedhunt(
+            await testSession(code, 'alex'),
+            Speedhunt.fromSettings(
+              targetId: 'sam',
+              startedAt: start.add(const Duration(minutes: 70)),
+              settings: settings,
+            ),
+          ),
+        );
+        await pumpAs(tester, who);
+        // The visible chip, without its invisible tap-target margin.
+        final chip = tester.getRect(
+          find
+              .descendant(
+                of: find.byType(FilterChip).first,
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+        final above = who == 'alex'
+            ? tester.getRect(find.byType(AppBar)).bottom
+            : tester
+                  .getRect(
+                    find
+                        .ancestor(
+                          of: find.textContaining('Next ping'),
+                          matching: find.byType(Container),
+                        )
+                        .first,
+                  )
+                  .bottom;
+        final gapAbove = chip.top - above;
+        double gapTo(Finder below) => tester.getRect(below).top - chip.bottom;
+
+        // GPS still waiting: the status line follows the filters …
+        expect(
+          gapTo(find.byKey(const Key('trackingStatus'))),
+          gapAbove,
+          reason: who,
+        );
+        // … once GPS works, the speedhunt banner takes its place.
+        location.emit(
+          LocationFix(point: const GeoPoint(52.505, 13.405), at: now),
+        );
+        await settle(tester);
+        expect(find.byKey(const Key('trackingStatus')), findsNothing);
+        expect(
+          gapTo(find.byKey(const Key('speedhuntBanner'))),
+          gapAbove,
+          reason: who,
+        );
+      });
+    }
+
     testWidgets('self catch stops sharing the location (R-CATCH-01)', (
       tester,
     ) async {
@@ -596,6 +656,34 @@ void main() {
       expect(find.byKey(const Key('lastPing_kim')), findsNothing);
       await tapFilter(tester, 'lastPings');
       expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
+    });
+
+    testWidgets('new regular pings switch "last pings" back on (R-HUNT-08)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await ping(tester, 'kim', 'regular_1', 52.505, 20);
+      await pumpAs(tester, 'alex');
+      await tapFilter(tester, 'lastPings');
+      expect(find.byKey(const Key('lastPing_kim')), findsNothing);
+
+      // A speedhunt ping does not switch it on …
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_1791228604799_1',
+        52.501,
+        30,
+        kind: PingKind.speedhunt,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('filterCheck_lastPings')), findsNothing);
+
+      // … a regular one does.
+      await ping(tester, 'sam', 'regular_2', 52.502, 40);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('filterCheck_lastPings')), findsOneWidget);
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
     });
 
     testWidgets('"last pings" ignore speedhunt pings (R-HUNT-03)', (

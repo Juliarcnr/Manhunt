@@ -146,18 +146,51 @@ PingRecord? lastRegularPing(List<PingRecord> pings) {
   return null;
 }
 
+/// Whether [next] holds a regular ping that [previous] did not – switches the
+/// "last pings" filter back on (R-HUNT-08). Without [previous] (first load)
+/// nothing counts as new.
+bool hasNewRegularPing(List<PingRecord>? previous, List<PingRecord> next) {
+  if (previous == null) return false;
+  String key(PingRecord p) =>
+      '${p.playerId}|${p.slotId ?? p.fix.at.toIso8601String()}';
+  final known = {
+    for (final p in previous)
+      if (p.kind == PingKind.regular) key(p),
+  };
+  return next.any((p) => p.kind == PingKind.regular && !known.contains(key(p)));
+}
+
 /// Latest speedhunt ping per player – only these get a location pin on the
-/// map, older ones stay small badges (R-HUNT-07).
+/// map, older ones stay small badges (R-HUNT-07). Ordered by slot (speedhunt
+/// start, then number), not by the fix time: a ping resends the last known
+/// fix, so ⚡1 and ⚡2 can carry the same time when the phone barely moved.
 Map<String, PingRecord> latestSpeedhuntPings(Iterable<PingRecord> pings) {
   final latest = <String, PingRecord>{};
   for (final p in pings) {
     if (p.kind != PingKind.speedhunt) continue;
     final current = latest[p.playerId];
-    if (current == null || p.fix.at.isAfter(current.fix.at)) {
+    if (current == null || _compareSpeedhuntSlots(p, current) > 0) {
       latest[p.playerId] = p;
     }
   }
   return latest;
+}
+
+/// Compares two speedhunt pings by their slot id `speedhunt_<ms>_<n>`;
+/// falls back to the fix time if an id cannot be parsed.
+int _compareSpeedhuntSlots(PingRecord a, PingRecord b) {
+  (int, int)? order(PingRecord p) {
+    final parts = p.slotId?.split('_');
+    if (parts == null || parts.length != 3) return null;
+    final start = int.tryParse(parts[1]);
+    final number = int.tryParse(parts[2]);
+    return start == null || number == null ? null : (start, number);
+  }
+
+  final (oa, ob) = (order(a), order(b));
+  if (oa == null || ob == null) return a.fix.at.compareTo(b.fix.at);
+  final byStart = oa.$1.compareTo(ob.$1);
+  return byStart != 0 ? byStart : oa.$2.compareTo(ob.$2);
 }
 
 /// Next ping of a running speedhunt as number (1-based) and time, or null if

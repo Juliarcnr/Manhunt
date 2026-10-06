@@ -620,6 +620,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final filterItems = <FilterItem>[];
     if (isHunter) {
       final pings = ref.watch(allPingsProvider).value ?? const [];
+      // New regular pings switch "last pings" back on (R-HUNT-08).
+      ref.listen(allPingsProvider, (previous, next) {
+        final pings = next.value;
+        if (!_filters.lastPings &&
+            pings != null &&
+            hasNewRegularPing(previous?.value, pings)) {
+          setState(() => _filters = _filters.copyWith(lastPings: true));
+        }
+      });
       final hunters =
           ref.watch(hunterLocationsProvider).value ??
           const <String, LocationFix>{};
@@ -793,9 +802,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final nextSlot = isPlayer && !(me?.caught ?? false) && engine != null
         ? nextPing(engine.visibleSlots, now)
         : null;
+    final infoLines = [
+      if (nextSlot != null)
+        l10n.gameNextPing(_formatCountdown(nextSlot.at.difference(now))),
+      if (me?.caught ?? false) l10n.gameCaughtSelf,
+      if (phase == GamePhase.ended) l10n.gameTimeUpHint,
+    ];
+    // Below the filters the same gap as above them: the info lines for
+    // players, the app bar (top inset of the overlay) otherwise.
+    final filterGap = isPlayer && infoLines.isNotEmpty ? 6.0 : 12.0;
     final filterBar = [
       FilterBar(items: filterItems),
-      if (filterItems.isNotEmpty) const SizedBox(height: 8),
+      if (filterItems.isNotEmpty) SizedBox(height: filterGap),
     ];
     final speedhuntsLeft =
         widget.game.settings.speedhuntCount - speedhunts.length;
@@ -890,14 +908,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
               children: [
                 // Players see "next ping in …" on top, above their filters.
                 if (!isPlayer) ...filterBar,
-                for (final line in [
-                  if (nextSlot != null)
-                    l10n.gameNextPing(
-                      _formatCountdown(nextSlot.at.difference(now)),
-                    ),
-                  if (me?.caught ?? false) l10n.gameCaughtSelf,
-                  if (phase == GamePhase.ended) l10n.gameTimeUpHint,
-                ])
+                for (final line in infoLines)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: _InfoChip(icon: Icons.schedule, text: line),
@@ -912,8 +923,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       onRetry: engine.retry,
                     ),
                   ),
-                if (running != null) ...[
-                  const SizedBox(height: 8),
+                if (running != null)
                   _SpeedhuntBanner(
                     // Countdown to the next speedhunt ping – the same for
                     // everyone, so it reveals no target (R-SPEED-08).
@@ -926,7 +936,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       null => l10n.speedhuntActive,
                     },
                   ),
-                ],
               ],
             ),
           ),
@@ -1177,8 +1186,9 @@ class _TrackingStatusLine extends StatelessWidget {
     };
     if (text == null) return const SizedBox.shrink();
     final error = status.lastError;
+    // Gap below, so whatever follows (speedhunt banner) keeps its distance.
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         key: const Key('trackingStatus'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

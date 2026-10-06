@@ -128,6 +128,40 @@ void main() {
     expect(lastRegularPing(const []), isNull);
   });
 
+  group('hasNewRegularPing (R-HUNT-08)', () {
+    PingRecord p(String player, PingKind kind, String slot) => PingRecord(
+      playerId: player,
+      kind: kind,
+      slotId: slot,
+      fix: LocationFix(point: const GeoPoint(0, 0), at: at(10)),
+    );
+    final old = p('a', PingKind.regular, 'regular_1');
+
+    test('a new regular ping counts', () {
+      expect(
+        hasNewRegularPing([old], [old, p('a', PingKind.regular, 'regular_2')]),
+        isTrue,
+      );
+      // Same slot, other player.
+      expect(
+        hasNewRegularPing([old], [old, p('b', PingKind.regular, 'regular_1')]),
+        isTrue,
+      );
+    });
+
+    test('speedhunt pings, unchanged lists and the first load do not', () {
+      expect(
+        hasNewRegularPing(
+          [old],
+          [old, p('a', PingKind.speedhunt, 'speedhunt_1_1')],
+        ),
+        isFalse,
+      );
+      expect(hasNewRegularPing([old], [old]), isFalse);
+      expect(hasNewRegularPing(null, [old]), isFalse);
+    });
+  });
+
   test(
     'latestSpeedhuntPings: newest speedhunt ping per player (R-HUNT-07)',
     () {
@@ -148,6 +182,27 @@ void main() {
       expect(latestSpeedhuntPings([p('a', PingKind.regular, 10)]), isEmpty);
     },
   );
+
+  test('latestSpeedhuntPings follows the slot order, even when the resent '
+      'fix has the same time (R-HUNT-07)', () {
+    PingRecord sh(String slot) => PingRecord(
+      playerId: 'a',
+      kind: PingKind.speedhunt,
+      slotId: slot,
+      // Phone did not move: every ping resends the same fix.
+      fix: LocationFix(point: const GeoPoint(0, 0), at: at(30)),
+    );
+    final first = sh('speedhunt_1000_1');
+    final second = sh('speedhunt_1000_2');
+    expect(latestSpeedhuntPings([first, second])['a'], same(second));
+    expect(latestSpeedhuntPings([second, first])['a'], same(second));
+    // A later speedhunt beats a higher number of an earlier one.
+    final next = sh('speedhunt_2000_1');
+    expect(
+      latestSpeedhuntPings([sh('speedhunt_1000_3'), next])['a'],
+      same(next),
+    );
+  });
 
   test('nextSpeedhuntPing counts down the speedhunt (R-SPEED-08)', () {
     final s = speedhunt(30); // pings at 30, 35, 40
