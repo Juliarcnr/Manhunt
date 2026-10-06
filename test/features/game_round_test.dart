@@ -17,6 +17,7 @@ import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
 import 'package:manhunt/features/game/game_screen.dart';
 import 'package:manhunt/l10n/app_localizations.dart';
+import 'package:manhunt/theme/app_theme.dart';
 
 import '../helpers.dart';
 
@@ -289,6 +290,17 @@ void main() {
       expect(find.byKey(const Key('selfCatchButton')), findsOneWidget);
       expect(find.byKey(const Key('speedhuntButton')), findsNothing);
       expect(location.isTracking, isTrue);
+    });
+
+    testWidgets('"next ping" sits above the filter bar (R-MAP-01)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      expect(
+        tester.getTopLeft(find.text('Next ping in 10:00')).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('filterBar'))).dy),
+      );
     });
 
     testWidgets('hunter joker reveals hunters once (R-PLAY-02)', (
@@ -586,6 +598,51 @@ void main() {
       expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
     });
 
+    testWidgets('"last pings" ignore speedhunt pings (R-HUNT-03)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await ping(tester, 'kim', 'regular_1', 52.505, 20);
+      await ping(
+        tester,
+        'kim',
+        'speedhunt_1791228604799_1',
+        52.509,
+        70,
+        kind: PingKind.speedhunt,
+      );
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_1791228604799_1',
+        52.501,
+        70,
+        kind: PingKind.speedhunt,
+      );
+      await pumpAs(tester, 'alex');
+      final kim = tester
+          .widgetList<MarkerLayer>(find.byType(MarkerLayer))
+          .expand((l) => l.markers)
+          .singleWhere((m) => m.key == const Key('lastPing_kim'));
+      expect(kim.point.latitude, 52.505);
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+    });
+
+    testWidgets('chips are dark; selected ones get a check mark (R-HUNT-01)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      final chip = tester.widget<FilterChip>(
+        find.byKey(const Key('filter_lastPings')),
+      );
+      expect(chip.selectedColor, chip.backgroundColor);
+      expect(find.byKey(const Key('filterCheck_lastPings')), findsOneWidget);
+      expect(find.byKey(const Key('filterCheck_player_kim')), findsNothing);
+      await tapFilter(tester, 'lastPings');
+      expect(find.byKey(const Key('filterCheck_lastPings')), findsNothing);
+    });
+
     testWidgets('player chip shows the numbered history with arrows '
         '(R-HUNT-04, R-HUNT-05)', (tester) async {
       await seed(tester);
@@ -629,6 +686,14 @@ void main() {
       expect(find.text('⚡1'), findsOneWidget);
       expect(find.text('⚡2'), findsOneWidget);
       expect(find.text('⚡3'), findsOneWidget);
+      // No yellow badge – the bolt would vanish on it.
+      final badge = tester.widget<Container>(
+        find.ancestor(of: find.text('⚡1'), matching: find.byType(Container)),
+      );
+      expect(
+        (badge.decoration! as BoxDecoration).color,
+        isNot(AppColors.speedhunt),
+      );
       await tapFilter(tester, 'speedhunts');
       expect(find.text('⚡1'), findsNothing);
     });

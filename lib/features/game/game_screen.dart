@@ -677,7 +677,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             },
             names: names,
             colors: huntersByColor,
-            formatTime: timeFmt.format,
           ),
         );
       }
@@ -800,6 +799,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final nextSlot = isPlayer && !(me?.caught ?? false) && engine != null
         ? nextPing(engine.visibleSlots, now)
         : null;
+    final filterBar = [
+      FilterBar(items: filterItems),
+      if (filterItems.isNotEmpty) const SizedBox(height: 8),
+    ];
     final speedhuntsLeft =
         widget.game.settings.speedhuntCount - speedhunts.length;
 
@@ -891,8 +894,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                FilterBar(items: filterItems),
-                if (filterItems.isNotEmpty) const SizedBox(height: 8),
+                // Players see "next ping in …" on top, above their filters.
+                if (!isPlayer) ...filterBar,
                 for (final line in [
                   if (nextSlot != null)
                     l10n.gameNextPing(
@@ -905,6 +908,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                     padding: const EdgeInsets.only(bottom: 6),
                     child: _InfoChip(icon: Icons.schedule, text: line),
                   ),
+                if (isPlayer) ...filterBar,
                 if (engine != null)
                   ValueListenableBuilder(
                     valueListenable: engine.status,

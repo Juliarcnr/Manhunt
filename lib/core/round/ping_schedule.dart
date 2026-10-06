@@ -137,6 +137,15 @@ Map<String, List<PingRecord>> pingsByPlayer(Iterable<PingRecord> pings) {
   return map;
 }
 
+/// Latest regular ping of a chronological list, or null – the "last pings"
+/// filter ignores speedhunt pings (R-HUNT-03).
+PingRecord? lastRegularPing(List<PingRecord> pings) {
+  for (final p in pings.reversed) {
+    if (p.kind == PingKind.regular) return p;
+  }
+  return null;
+}
+
 /// Next ping of a running speedhunt as number (1-based) and time, or null if
 /// all its pings are done. Same for everyone, so it reveals no target
 /// (R-SPEED-04, R-SPEED-08).

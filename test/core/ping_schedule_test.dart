@@ -109,6 +109,25 @@ void main() {
     expect(grouped['b'], hasLength(1));
   });
 
+  test('lastRegularPing skips speedhunt pings (R-HUNT-03)', () {
+    PingRecord p(PingKind kind, int minute) => PingRecord(
+      playerId: 'a',
+      kind: kind,
+      fix: LocationFix(point: const GeoPoint(0, 0), at: at(minute)),
+    );
+    final regular = p(PingKind.regular, 20);
+    expect(
+      lastRegularPing([
+        p(PingKind.regular, 10),
+        regular,
+        p(PingKind.speedhunt, 30),
+      ]),
+      same(regular),
+    );
+    expect(lastRegularPing([p(PingKind.speedhunt, 30)]), isNull);
+    expect(lastRegularPing(const []), isNull);
+  });
+
   test('nextSpeedhuntPing counts down the speedhunt (R-SPEED-08)', () {
     final s = speedhunt(30); // pings at 30, 35, 40
     expect(nextSpeedhuntPing(s, at(29)), (number: 1, at: at(30)));

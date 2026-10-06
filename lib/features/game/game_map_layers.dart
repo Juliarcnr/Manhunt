@@ -6,17 +6,15 @@ import '../../core/round/ping_schedule.dart';
 import '../../theme/app_theme.dart';
 import '../map/base_map.dart';
 
-/// Last ping of every player as a location pin with the name above
-/// (R-HUNT-03). Caught players are greyed out.
 /// Colour per player, stable for the round: by join order (R-HUNT-03).
 Map<String, Color> playerColors(List<String> playerIds) => {
   for (final (i, id) in playerIds.indexed)
     id: AppColors.playerPalette[i % AppColors.playerPalette.length],
 };
 
-/// Last ping of every player as a location pin with the name above, in the
-/// player's own colour (R-HUNT-03). A speedhunt ping gets a bolt badge;
-/// caught players are greyed out.
+/// Last regular ping of every player as a location pin with the name above,
+/// in the player's own colour (R-HUNT-03). Speedhunt pings have their own
+/// filter (R-HUNT-07) and are left out; caught players are greyed out.
 MarkerLayer lastPingsLayer({
   required Map<String, List<PingRecord>> byPlayer,
   required Map<String, String> names,
@@ -28,38 +26,41 @@ MarkerLayer lastPingsLayer({
 }) => MarkerLayer(
   markers: [
     for (final entry in byPlayer.entries)
-      if (entry.value.isNotEmpty && !skip.contains(entry.key))
-        Marker(
-          key: Key('lastPing_${entry.key}'),
-          point: entry.value.last.fix.point.toLatLng(),
-          width: 140,
-          height: 64,
-          alignment: Alignment.topCenter,
-          child: _NamedPin(
-            name: names[entry.key] ?? '?',
-            color: caught.contains(entry.key)
-                ? AppColors.textMuted
-                : colors[entry.key] ?? AppColors.player,
-            icon: Icons.location_on,
-            speedhunt: entry.value.last.kind == PingKind.speedhunt,
+      if (!skip.contains(entry.key))
+        if (lastRegularPing(entry.value) case final last?)
+          Marker(
+            key: Key('lastPing_${entry.key}'),
+            point: last.fix.point.toLatLng(),
+            width: 140,
+            height: 64,
+            alignment: Alignment.topCenter,
+            child: _NamedPin(
+              name: names[entry.key] ?? '?',
+              color: caught.contains(entry.key)
+                  ? AppColors.textMuted
+                  : colors[entry.key] ?? AppColors.player,
+              icon: Icons.location_on,
+            ),
           ),
-        ),
   ],
 );
 
-/// Live positions of hunters (R-HUNT-02) or a joker snapshot (R-PLAY-02).
+/// Live positions of hunters (R-HUNT-02) or a joker snapshot (R-PLAY-02):
+/// location pins with the hunter symbol before the name. Live positions
+/// carry no time; pass [formatTime] for a snapshot, whose age matters.
 MarkerLayer huntersLayer({
   required Map<String, LocationFix> positions,
   required Map<String, String> names,
   required Map<String, Color> colors,
-  required String Function(DateTime) formatTime,
+  String Function(DateTime)? formatTime,
 }) => _positionsLayer(
   keyPrefix: 'hunter',
   positions: positions,
   names: names,
   colors: colors,
   fallbackColor: AppColors.hunter,
-  icon: Icons.track_changes,
+  icon: Icons.location_on,
+  labelIcon: Icons.track_changes,
   formatTime: formatTime,
 );
 
@@ -79,8 +80,8 @@ MarkerLayer playersLayer({
   formatTime: formatTime,
 );
 
-/// Named pins with the time of each position ("Alex · 14:32"), so it is
-/// clear how old a revealed position is.
+/// Named pins; with [formatTime] the label also shows the time of each
+/// position ("Alex · 14:32"), so it is clear how old a revealed position is.
 MarkerLayer _positionsLayer({
   required String keyPrefix,
   required Map<String, LocationFix> positions,
@@ -88,7 +89,8 @@ MarkerLayer _positionsLayer({
   required Map<String, Color> colors,
   required Color fallbackColor,
   required IconData icon,
-  required String Function(DateTime) formatTime,
+  IconData? labelIcon,
+  String Function(DateTime)? formatTime,
 }) => MarkerLayer(
   markers: [
     for (final entry in positions.entries)
@@ -99,10 +101,13 @@ MarkerLayer _positionsLayer({
         height: 64,
         alignment: Alignment.topCenter,
         child: _NamedPin(
-          name:
-              '${names[entry.key] ?? '?'} · ${formatTime(entry.value.at.toLocal())}',
+          name: [
+            names[entry.key] ?? '?',
+            if (formatTime != null) formatTime(entry.value.at.toLocal()),
+          ].join(' · '),
           color: colors[entry.key] ?? fallbackColor,
           icon: icon,
+          labelIcon: labelIcon,
         ),
       ),
   ],
@@ -140,9 +145,9 @@ MarkerLayer historyLayer(
   ],
 );
 
-/// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt, ring in
-/// the player's colour (R-HUNT-07). Players in [skip] already show their
-/// full history.
+/// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt: dark
+/// badge (so the yellow bolt stays visible), ring in the player's colour
+/// (R-HUNT-07). Players in [skip] already show their full history.
 MarkerLayer speedhuntPingsLayer({
   required List<PingRecord> pings,
   required Map<String, Color> colors,
@@ -158,7 +163,8 @@ MarkerLayer speedhuntPingsLayer({
           height: 28,
           child: _NumberDot(
             text: '⚡${p.speedhuntNumber ?? ''}',
-            color: AppColors.speedhunt,
+            color: AppColors.surface,
+            textColor: Colors.white,
             ring: colors[p.playerId] ?? AppColors.player,
             wide: true,
           ),
@@ -217,12 +223,14 @@ class _NumberDot extends StatelessWidget {
     required this.text,
     required this.color,
     required this.ring,
+    this.textColor = Colors.black,
     this.wide = false,
   });
 
   final String text;
   final Color color;
   final Color ring;
+  final Color textColor;
   final bool wide;
 
   @override
@@ -237,8 +245,8 @@ class _NumberDot extends StatelessWidget {
     alignment: Alignment.center,
     child: Text(
       text,
-      style: const TextStyle(
-        color: Colors.black,
+      style: TextStyle(
+        color: textColor,
         fontSize: 11,
         fontWeight: FontWeight.w900,
       ),
@@ -270,13 +278,15 @@ class _NamedPin extends StatelessWidget {
     required this.name,
     required this.color,
     required this.icon,
-    this.speedhunt = false,
+    this.labelIcon,
   });
 
   final String name;
   final Color color;
   final IconData icon;
-  final bool speedhunt;
+
+  /// Optional role symbol before the name.
+  final IconData? labelIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -293,8 +303,10 @@ class _NamedPin extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (speedhunt)
-                const Icon(Icons.bolt, size: 13, color: AppColors.speedhunt),
+              if (labelIcon case final labelIcon?) ...[
+                Icon(labelIcon, size: 13, color: color),
+                const SizedBox(width: 3),
+              ],
               Flexible(
                 child: Text(
                   name,
