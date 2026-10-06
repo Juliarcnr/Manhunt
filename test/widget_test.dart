@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/app.dart';
+import 'package:manhunt/core/groups/group_list.dart';
 import 'package:manhunt/data/session_store.dart';
 
 import 'helpers.dart';
@@ -14,11 +15,12 @@ void main() {
     Locale locale = const Locale('en'),
     FakeFirebaseFirestore? db,
     String userId = 'me',
+    SessionStore? store,
   }) async {
     final firestore = db ?? FakeFirebaseFirestore();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: deviceOverrides(db: firestore, userId: userId),
+        overrides: deviceOverrides(db: firestore, userId: userId, store: store),
         child: ManhuntApp(locale: locale),
       ),
     );
@@ -37,7 +39,7 @@ void main() {
         overrides: deviceOverrides(
           db: db,
           userId: userId,
-          store: MemorySessionStore()..code = 'ABCDE-FGHJK',
+          store: MemorySessionStore.withGroup('ABCDE-FGHJK'),
         ),
         child: const ManhuntApp(locale: Locale('en')),
       ),
@@ -89,12 +91,15 @@ void main() {
     await tester.tap(find.text('Create group').last);
     await tester.pumpAndSettle();
     expect(find.text('Please enter a name'), findsOneWidget);
+    expect(find.text('Please enter a group name'), findsOneWidget);
 
+    await tester.enterText(find.byKey(const Key('groupNameField')), 'Crew');
     await tester.enterText(find.byKey(const Key('nameField')), 'Julia');
     await tester.tap(find.text('Create group').last);
     await settleAsync(tester);
 
     expect(find.text('Lobby'), findsOneWidget);
+    expect(find.text('Crew'), findsOneWidget); // group name (R-GROUPS-04)
     expect(find.byKey(const Key('groupCode')), findsOneWidget);
     expect(find.text('Julia'), findsOneWidget);
     // No play area yet → start disabled (R-LOBBY-06).
@@ -116,6 +121,7 @@ void main() {
     await pumpApp(tester);
     await tester.tap(find.byKey(const Key('createButton')));
     await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('groupNameField')), 'Crew');
     await tester.enterText(find.byKey(const Key('nameField')), 'Julia');
     await tester.tap(find.text('Create group').last);
     await settleAsync(tester);
@@ -250,8 +256,154 @@ void main() {
       find.text('You were removed from the group by the host.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Back to start'));
+    await tester.tap(find.text('Back to my groups'));
     await settleAsync(tester);
     expect(find.byKey(const Key('createButton')), findsOneWidget);
+  });
+
+  group('group overview (R-GROUPS-01 … R-GROUPS-04)', () {
+    testWidgets('lobby leads to the overview and back (R-GROUPS-03)', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+      await tester.tap(find.byKey(const Key('createButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('groupNameField')), 'Crew');
+      await tester.enterText(find.byKey(const Key('nameField')), 'Julia');
+      await tester.tap(find.text('Create group').last);
+      await settleAsync(tester);
+      expect(find.text('Lobby'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('groupsBackButton')));
+      await settleAsync(tester);
+      expect(find.text('Your groups'), findsOneWidget);
+      expect(find.text('1 of 5'), findsOneWidget);
+      expect(find.text('Crew'), findsOneWidget);
+      expect(find.text('Host'), findsOneWidget);
+      // Create and join stay available from the overview.
+      expect(find.byKey(const Key('createButton')), findsOneWidget);
+      expect(find.byKey(const Key('joinButton')), findsOneWidget);
+
+      await tester.tap(find.text('Crew'));
+      await settleAsync(tester);
+      expect(find.text('Lobby'), findsOneWidget);
+
+      // The system back gesture also returns to the overview.
+      await tester.binding.handlePopRoute();
+      await settleAsync(tester);
+      expect(find.text('Your groups'), findsOneWidget);
+    });
+
+    testWidgets('with 5 groups, create and join are disabled (R-GROUPS-02)', (
+      tester,
+    ) async {
+      final store = MemorySessionStore()
+        ..groups = GroupList([
+          for (var i = 0; i < GroupList.maxGroups; i++)
+            SavedGroup(code: 'CODE$i', name: 'Group $i'),
+        ]);
+      await pumpApp(tester, store: store);
+
+      expect(find.text('5 of 5'), findsOneWidget);
+      expect(find.byKey(const Key('groupLimit')), findsOneWidget);
+      for (final key in ['createButton', 'joinButton']) {
+        final button = tester.widget<ButtonStyleButton>(find.byKey(Key(key)));
+        expect(button.onPressed, isNull, reason: key);
+      }
+    });
+
+    testWidgets('shows running and deleted groups; deleted ones vanish', (
+      tester,
+    ) async {
+      final db = FakeFirebaseFirestore();
+      final admin = await tester.runAsync(
+        () => testSession('ABCDE-FGHJK', 'a'),
+      );
+      await tester.runAsync(() async {
+        await deviceRepo(db).createGame(
+          admin!,
+          name: 'Alex',
+          settings: defaultSettings,
+          groupName: 'Running crew',
+        );
+        await deviceRepo(db).startGame(admin);
+      });
+      final store = MemorySessionStore()
+        ..groups = GroupList([
+          SavedGroup(
+            code: 'ABCDE-FGHJK',
+            groupId: admin!.groupId,
+            name: 'Running crew',
+          ),
+          const SavedGroup(
+            code: 'KLMNP-QRSTU',
+            groupId: 'missing',
+            name: 'Gone crew',
+          ),
+        ]);
+      await pumpApp(tester, db: db, store: store);
+      await settleAsync(tester);
+
+      expect(find.text('Round running'), findsOneWidget);
+      expect(find.text('Deleted'), findsOneWidget);
+
+      await tester.tap(find.text('Gone crew'));
+      await settleAsync(tester);
+      expect(find.text('This group no longer exists.'), findsOneWidget);
+      expect(find.text('Gone crew'), findsNothing);
+      expect(store.groups.groups.map((g) => g.code), ['ABCDE-FGHJK']);
+    });
+
+    testWidgets('host renames the group (R-GROUPS-04)', (tester) async {
+      final db = FakeFirebaseFirestore();
+      final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+      await tester.runAsync(
+        () => deviceRepo(db).createGame(
+          me!,
+          name: 'Julia',
+          settings: defaultSettings,
+          groupName: 'Crew',
+        ),
+      );
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      expect(find.byKey(const Key('groupName')), findsOneWidget);
+      expect(find.text('Crew'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('lobbyMenu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename group'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('groupNameField')),
+        'Night crew',
+      );
+      await tester.tap(find.byKey(const Key('renameSave')));
+      await settleAsync(tester);
+
+      expect(find.text('Night crew'), findsOneWidget);
+    });
+
+    testWidgets('guests cannot rename the group (R-GROUPS-04)', (tester) async {
+      final db = FakeFirebaseFirestore();
+      final admin = await tester.runAsync(
+        () => testSession('ABCDE-FGHJK', 'a'),
+      );
+      final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+      await tester.runAsync(() async {
+        await deviceRepo(db).createGame(
+          admin!,
+          name: 'Alex',
+          settings: defaultSettings,
+          groupName: 'Crew',
+        );
+        await deviceRepo(db).joinGame(me!, name: 'Kim');
+      });
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+
+      await tester.tap(find.byKey(const Key('lobbyMenu')));
+      await tester.pumpAndSettle();
+      expect(find.text('Rename group'), findsNothing);
+      expect(find.text('Leave group'), findsOneWidget);
+    });
   });
 }

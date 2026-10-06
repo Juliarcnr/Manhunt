@@ -79,7 +79,9 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(
-             ['adminUid', 'status', 'settings', 'area', 'startAt', 'createdAt', 'expiresAt'])
+             ['adminUid', 'status', 'name', 'settings', 'area', 'startAt', 'createdAt', 'expiresAt'])
+        // Group name (R-GROUPS-04) is optional and encrypted.
+        && request.resource.data.get('name', '') is string
         && request.resource.data.adminUid == request.auth.uid
         && request.resource.data.status == 'lobby'
         && request.resource.data.settings is string
@@ -88,6 +90,7 @@ service cloud.firestore {
       allow update: if (isAdmin(gid)
           && request.resource.data.adminUid == resource.data.adminUid
           && request.resource.data.status in ['lobby', 'running']
+          && request.resource.data.get('name', '') is string
           && validExpiry())
         // Any member opening the group extends its lifetime (R-PRIV-05).
         || (isMember(gid) && onlyChanges(['expiresAt']) && validExpiry())

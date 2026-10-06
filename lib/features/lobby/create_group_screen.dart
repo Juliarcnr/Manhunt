@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/groups/group_list.dart';
 import '../../core/models/game_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
@@ -18,12 +19,14 @@ class CreateGroupScreen extends ConsumerStatefulWidget {
 class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
+  final _groupName = TextEditingController();
   var _settings = const GameSettings();
   var _busy = false;
 
   @override
   void dispose() {
     _name.dispose();
+    _groupName.dispose();
     super.dispose();
   }
 
@@ -34,13 +37,19 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     try {
       await ref
           .read(sessionControllerProvider.notifier)
-          .create(name: _name.text.trim(), settings: _settings);
+          .create(
+            name: _name.text.trim(),
+            groupName: _groupName.text.trim(),
+            settings: _settings,
+          );
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.commonError('$e'))));
+      final text = e is GroupLimitException
+          ? l10n.groupsLimitReached(GroupList.maxGroups)
+          : l10n.commonError('$e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
     }
   }
 
@@ -55,6 +64,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
           children: [
+            GroupNameField(controller: _groupName),
+            const SizedBox(height: 8),
             NameField(controller: _name),
             const SizedBox(height: 16),
             SettingsForm(

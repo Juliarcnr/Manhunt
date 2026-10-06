@@ -32,3 +32,41 @@ class NameField extends StatelessWidget {
     );
   }
 }
+
+/// Name of the group, shown in the group overview (R-GROUPS-04).
+class GroupNameField extends StatelessWidget {
+  const GroupNameField({
+    super.key,
+    required this.controller,
+    this.autofocus = false,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return TextFormField(
+      key: const Key('groupNameField'),
+      controller: controller,
+      autofocus: autofocus,
+      maxLength: 30,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: onSubmitted == null
+          ? TextInputAction.next
+          : TextInputAction.done,
+      onFieldSubmitted: onSubmitted,
+      onTapOutside: dismissKeyboard,
+      decoration: InputDecoration(
+        labelText: l10n.groupName,
+        hintText: l10n.groupNameHint,
+        prefixIcon: const Icon(Icons.groups_outlined),
+      ),
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? l10n.groupNameRequired : null,
+    );
+  }
+}

@@ -26,6 +26,48 @@ class AppLocalizationsDe extends AppLocalizations {
       'Kein Konto, keine E-Mail. Standorte sind Ende-zu-Ende-verschlüsselt und werden nach dem Spiel gelöscht.';
 
   @override
+  String get groupsTitle => 'Deine Gruppen';
+
+  @override
+  String groupsCount(int count, int max) {
+    return '$count von $max';
+  }
+
+  @override
+  String groupsUnnamed(String code) {
+    return 'Gruppe $code';
+  }
+
+  @override
+  String get groupsRunning => 'Runde läuft';
+
+  @override
+  String get groupsDeleted => 'Gelöscht';
+
+  @override
+  String get groupsGone => 'Diese Gruppe gibt es nicht mehr.';
+
+  @override
+  String groupsLimitReached(int max) {
+    return 'Du kannst in höchstens $max Gruppen sein. Verlasse eine, um eine neue zu erstellen oder beizutreten.';
+  }
+
+  @override
+  String get groupsBack => 'Alle Gruppen';
+
+  @override
+  String get groupName => 'Gruppenname';
+
+  @override
+  String get groupNameHint => 'z.B. Freitagsrunde';
+
+  @override
+  String get groupNameRequired => 'Bitte gib einen Gruppennamen ein';
+
+  @override
+  String get lobbyRename => 'Gruppe umbenennen';
+
+  @override
   String get roleHunter => 'Hunter';
 
   @override
@@ -361,7 +403,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyGroupGone => 'Diese Gruppe gibt es nicht mehr.';
 
   @override
-  String get lobbyBackHome => 'Zurück zum Start';
+  String get lobbyBackHome => 'Zurück zu meinen Gruppen';
 
   @override
   String get gamePhaseStarting => 'Startet…';

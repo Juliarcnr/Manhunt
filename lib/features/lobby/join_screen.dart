@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/groups/group_list.dart';
 import '../../data/game_repository.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
@@ -48,6 +49,7 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
         _error = switch (e) {
           InvalidCodeException() => l10n.joinInvalidCode,
           GroupNotFoundException() => l10n.joinNotFound,
+          GroupLimitException() => l10n.groupsLimitReached(GroupList.maxGroups),
           _ => l10n.commonError('$e'),
         };
       });

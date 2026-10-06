@@ -7,7 +7,7 @@ import '../core/models/member.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
-/// - `games/{groupId}`: adminUid, status, settings + area (encrypted, separate), startAt, createdAt, expiresAt
+/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), startAt, createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
 /// - `games/{groupId}/{pings,hunterLocs,events}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
@@ -51,10 +51,13 @@ class FirestoreGameRepository implements GameRepository {
     GroupSession session, {
     required String name,
     required GameSettings settings,
+    String? groupName,
   }) async {
     await _game(session).set({
       'adminUid': session.userId,
       'status': GameStatus.lobby.name,
+      if (groupName != null)
+        'name': await session.crypto.encryptJson(groupName),
       ...await _encodeSettings(session, settings, withArea: true),
       'startAt': null,
       'createdAt': FieldValue.serverTimestamp(),
@@ -110,13 +113,32 @@ class FirestoreGameRepository implements GameRepository {
             ],
           );
         }
+        final nameEnc = data['name'] as String?;
         return GameInfo(
           adminId: data['adminUid'] as String,
           status: GameStatus.values.byName(data['status'] as String),
           settings: settings,
           startAt: (data['startAt'] as Timestamp?)?.toDate(),
+          name: nameEnc == null
+              ? null
+              : await session.crypto.decryptJson(nameEnc) as String?,
         );
       });
+
+  @override
+  Stream<GameStatus?> watchStatus(String groupId) =>
+      _db.collection('games').doc(groupId).snapshots().map((snap) {
+        final status = snap.data()?['status'] as String?;
+        return status == null ? null : GameStatus.values.byName(status);
+      });
+
+  @override
+  Future<void> renameGroup(GroupSession session, String name) async {
+    await _game(session).update({
+      'name': await session.crypto.encryptJson(name),
+      'expiresAt': _newExpiry(),
+    });
+  }
 
   @override
   Stream<List<Member>> watchMembers(GroupSession session) => _members(session)

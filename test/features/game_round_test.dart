@@ -75,7 +75,7 @@ void main() {
         overrides: deviceOverrides(
           db: db,
           userId: userId,
-          store: MemorySessionStore()..code = code,
+          store: MemorySessionStore.withGroup(code),
           location: location,
           notifications: notifications,
           jokers: jokers,
@@ -773,7 +773,8 @@ void main() {
       await pumpAs(tester, 'alex');
       expect(find.text('⚡1'), findsOneWidget);
       expect(find.text('⚡2'), findsOneWidget);
-      expect(find.text('⚡3'), findsOneWidget);
+      // The latest one also carries the player's name.
+      expect(find.text('⚡3 Sam'), findsOneWidget);
       // No yellow badge – the bolt would vanish on it.
       final badge = tester.widget<Container>(
         find.ancestor(of: find.text('⚡1'), matching: find.byType(Container)),

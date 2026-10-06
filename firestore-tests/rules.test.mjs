@@ -1,4 +1,5 @@
 // Security rule tests. Run via: firebase emulators:exec --only firestore "npm --prefix firestore-tests test"
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import {
@@ -114,6 +115,54 @@ describe('games', () => {
     await assertFails(updateDoc(doc(as('admin'), 'games', GID), { adminUid: 'kim' }));
     await assertFails(deleteDoc(doc(as('kim'), 'games', GID)));
     await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID)));
+  });
+});
+
+describe('group name & overview (R-GROUPS-03, R-GROUPS-04)', () => {
+  const game = (uid) => ({
+    adminUid: uid,
+    status: 'lobby',
+    settings: 'enc',
+    startAt: null,
+    createdAt: serverTimestamp(),
+    expiresAt: new Date(),
+  });
+
+  test('create with an encrypted name, but not with a plain object', async () => {
+    await assertSucceeds(setDoc(doc(as('x'), 'games', 'g2'), { ...game('x'), name: 'enc-name' }));
+    await assertFails(setDoc(doc(as('x'), 'games', 'g3'), { ...game('x'), name: { de: 'x' } }));
+  });
+
+  test('host renames (as hunter, player or unassigned); members and strangers cannot', async () => {
+    for (const role of ['unassigned', 'hunter', 'player']) {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+      );
+      await assertSucceeds(
+        updateDoc(doc(as('admin'), 'games', GID), { name: `enc-${role}`, expiresAt: inDays(180) }),
+      );
+    }
+    await assertFails(updateDoc(doc(as('kim'), 'games', GID), { name: 'enc-kim' }));
+    await assertFails(
+      updateDoc(doc(as('kim'), 'games', GID), { name: 'enc-kim', expiresAt: inDays(180) }),
+    );
+    await assertFails(updateDoc(doc(as('stranger'), 'games', GID), { name: 'enc-x' }));
+    await assertFails(updateDoc(doc(as('admin'), 'games', GID), { name: 42 }));
+  });
+
+  test('overview reads the status of each group by id – also after being removed', async () => {
+    for (const uid of ['admin', 'kim']) {
+      const snap = await assertSucceeds(getDoc(doc(as(uid), 'games', GID)));
+      assert.equal(snap.data().status, 'lobby');
+    }
+    await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID, 'members', 'kim')));
+    const after = await assertSucceeds(getDoc(doc(as('kim'), 'games', GID)));
+    assert.equal(after.data().status, 'lobby');
+    // A deleted group reads as missing (overview shows "deleted").
+    await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID, 'members', 'admin')));
+    await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID)));
+    const gone = await assertSucceeds(getDoc(doc(as('kim'), 'games', GID)));
+    assert.equal(gone.exists(), false);
   });
 });
 

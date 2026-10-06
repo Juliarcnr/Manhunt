@@ -128,6 +128,78 @@ abstract class AppLocalizations {
   /// **'No account, no email. Locations are end-to-end encrypted and deleted after the game.'**
   String get homePrivacyNote;
 
+  /// No description provided for @groupsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your groups'**
+  String get groupsTitle;
+
+  /// No description provided for @groupsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {max}'**
+  String groupsCount(int count, int max);
+
+  /// No description provided for @groupsUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Group {code}'**
+  String groupsUnnamed(String code);
+
+  /// No description provided for @groupsRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Round running'**
+  String get groupsRunning;
+
+  /// No description provided for @groupsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get groupsDeleted;
+
+  /// No description provided for @groupsGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This group no longer exists.'**
+  String get groupsGone;
+
+  /// No description provided for @groupsLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can be in at most {max} groups. Leave one to create or join another.'**
+  String groupsLimitReached(int max);
+
+  /// No description provided for @groupsBack.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get groupsBack;
+
+  /// No description provided for @groupName.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get groupName;
+
+  /// No description provided for @groupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Friday crew'**
+  String get groupNameHint;
+
+  /// No description provided for @groupNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a group name'**
+  String get groupNameRequired;
+
+  /// No description provided for @lobbyRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename group'**
+  String get lobbyRename;
+
   /// No description provided for @roleHunter.
   ///
   /// In en, this message translates to:
@@ -725,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @lobbyBackHome.
   ///
   /// In en, this message translates to:
-  /// **'Back to start'**
+  /// **'Back to my groups'**
   String get lobbyBackHome;
 
   /// No description provided for @gamePhaseStarting.

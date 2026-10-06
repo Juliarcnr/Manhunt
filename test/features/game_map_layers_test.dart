@@ -94,10 +94,14 @@ void main() {
         speedhuntPingsLayer(
           pings: [sh('anna', 1, 30), sh('anna', 2, 35), sh('ben', 1, 20)],
           colors: const {'anna': Colors.pink},
+          names: const {'anna': 'Anna', 'ben': 'Ben'},
         ),
       );
-      expect(find.text('⚡1'), findsNWidgets(2));
-      expect(find.text('⚡2'), findsOneWidget);
+      // Older pings: bolt and number only; the latest also has the name.
+      expect(find.text('⚡1'), findsOneWidget);
+      expect(find.text('⚡2 Anna'), findsOneWidget);
+      expect(find.text('⚡1 Ben'), findsOneWidget);
+      expect(find.text('⚡2'), findsNothing);
       expect(pinIn('speedhunt_anna_speedhunt_1_1'), findsNothing);
       expect(pinIn('speedhunt_anna_speedhunt_1_2'), findsOneWidget);
       expect(pinIn('speedhunt_ben_speedhunt_1_1'), findsOneWidget);

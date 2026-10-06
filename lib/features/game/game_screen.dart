@@ -658,6 +658,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           speedhuntPingsLayer(
             pings: pings,
             colors: playersByColor,
+            names: names,
             skip: selected,
           ),
         );

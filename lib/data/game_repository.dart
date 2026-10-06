@@ -14,6 +14,7 @@ class GameInfo {
     required this.status,
     required this.settings,
     this.startAt,
+    this.name,
   });
 
   final String adminId;
@@ -22,6 +23,9 @@ class GameInfo {
 
   /// Start of the current round; null in the lobby.
   final DateTime? startAt;
+
+  /// Group name (R-GROUPS-04); null for groups created before names existed.
+  final String? name;
 }
 
 /// What a device needs to talk to its group: the derived crypto and its own id.
@@ -49,6 +53,7 @@ abstract interface class GameRepository {
     GroupSession session, {
     required String name,
     required GameSettings settings,
+    String? groupName,
   });
 
   /// Throws [GroupNotFoundException]. Joining a running round is allowed
@@ -58,8 +63,15 @@ abstract interface class GameRepository {
   Stream<GameInfo?> watchGame(GroupSession session);
   Stream<List<Member>> watchMembers(GroupSession session);
 
+  /// Status of any group by its public id, without the key – for the group
+  /// overview (R-GROUPS-03). Emits null if the group no longer exists.
+  Stream<GameStatus?> watchStatus(String groupId);
+
   /// Host only. Does not touch the play area (see [updateArea]).
   Future<void> updateSettings(GroupSession session, GameSettings settings);
+
+  /// Host only (R-GROUPS-04).
+  Future<void> renameGroup(GroupSession session, String name);
 
   /// Any member, in the lobby (R-SET-10).
   Future<void> updateArea(GroupSession session, List<GeoPoint> area);

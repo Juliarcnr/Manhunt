@@ -8,15 +8,23 @@ import '../l10n/app_localizations.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'game/game_screen.dart';
-import 'home/home_screen.dart';
+import 'groups/groups_screen.dart';
 import 'lobby/lobby_screen.dart';
 
-/// Root widget: picks home, lobby or game based on the stored group and its status.
+/// Root widget: picks group overview, lobby or game based on the open group
+/// and its status.
 class SessionGate extends ConsumerWidget {
   const SessionGate({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Keeps name and host flag in the group overview current (R-GROUPS-03).
+    ref.listen(gameProvider, (_, next) {
+      final game = next.value;
+      if (game != null) {
+        ref.read(sessionControllerProvider.notifier).rememberInfo(game);
+      }
+    });
     final session = ref.watch(sessionControllerProvider);
     return session.when(
       loading: () => const _Loading(),
@@ -25,7 +33,7 @@ class SessionGate extends ConsumerWidget {
         onRetry: () => ref.invalidate(sessionControllerProvider),
       ),
       data: (session) {
-        if (session == null) return const HomeScreen();
+        if (session == null) return const GroupsScreen();
         final game = ref.watch(gameProvider);
         return game.when(
           loading: () => const _Loading(),

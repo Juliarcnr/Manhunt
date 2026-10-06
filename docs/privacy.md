@@ -8,6 +8,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Anonyme Firebase-UID | Firebase Auth | ja (zufällige ID, keine E-Mail/kein Name) | bei App-Deinstallation verwaist |
 | Gruppen-ID (aus Code abgeleitet) | Firestore | ja, aber ohne Rückschluss auf den Code | mit Gruppe |
 | Anzeigename | Firestore | nein (verschlüsselt) | mit Gruppe |
+| Gruppenname (R-GROUPS-04) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Rolle, gefangen, Joker benutzt | Firestore | ja (nötig für Regeln) | Rolle mit Gruppe; gefangen/Joker bei Rundenende zurückgesetzt |
 | Spielfeld & Einstellungen | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse | Firestore | **nein** (AES-GCM) | **beim Beenden der Runde** |
@@ -17,6 +18,12 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Zeitstempel (Erstellung, Beitritt, Rundenstart, Ablauf) | Firestore | ja | mit Gruppe |
 | IP-Adresse | Google (technisch bei jeder Verbindung) | ja | nach Google-Richtlinie |
 | Kartenkacheln-Anfragen | MapTiler | ja (welcher Kartenausschnitt, IP) | nach MapTiler-Richtlinie |
+
+## Nur auf dem Gerät
+- **Gruppenliste** (R-GROUPS-01): bis zu 5 Einträge mit Code, Gruppen-ID, Gruppenname (Kopie) und „bin Host“, dazu
+  die zuletzt geöffnete Gruppe – im Schlüsselspeicher des Betriebssystems. Verlassen/Löschen entfernt den Eintrag.
+- Die Gruppenübersicht liest pro Gruppe nur das Gruppendokument per ID (Status „Lobby/läuft/gelöscht“); dafür
+  wird kein Schlüssel abgeleitet und nichts geschrieben. Erst das Öffnen einer Gruppe verlängert ihre Frist (R-PRIV-05).
 
 ## Was es nicht gibt
 Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Reporting, keine Push-Tokens, keine Werbung.

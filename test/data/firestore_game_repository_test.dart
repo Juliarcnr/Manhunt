@@ -371,4 +371,37 @@ void main() {
       expect((await gameDoc().collection('members').get()).docs, isEmpty);
     });
   });
+
+  group('group name & status (R-GROUPS-03, R-GROUPS-04)', () {
+    test('name is stored encrypted and can be renamed', () async {
+      await repo.createGame(
+        admin,
+        name: 'Julia',
+        settings: defaultSettings,
+        groupName: 'Friday crew',
+      );
+      final raw = (await gameDoc().get()).data()!['name'] as String;
+      expect(raw, isNot(contains('Friday')));
+      expect((await repo.watchGame(guest).first)!.name, 'Friday crew');
+
+      now = now.add(const Duration(days: 10));
+      await repo.renameGroup(admin, 'Night crew');
+      expect((await repo.watchGame(guest).first)!.name, 'Night crew');
+      expect(await expiresAt(), now.add(FirestoreGameRepository.groupLifetime));
+    });
+
+    test('groups without a name still load', () async {
+      await createDefault();
+      expect((await repo.watchGame(admin).first)!.name, isNull);
+    });
+
+    test('status by group id, without the key; null once deleted', () async {
+      await createDefault();
+      expect(await repo.watchStatus(admin.groupId).first, GameStatus.lobby);
+      await repo.startGame(admin);
+      expect(await repo.watchStatus(admin.groupId).first, GameStatus.running);
+      await repo.deleteGame(admin);
+      expect(await repo.watchStatus(admin.groupId).first, isNull);
+    });
+  });
 }

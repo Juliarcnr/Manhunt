@@ -13,6 +13,7 @@ import '../settings/settings_form.dart';
 import '../history/history_button.dart';
 import '../map/area_card.dart';
 import '../settings/settings_screen.dart';
+import 'name_field.dart';
 
 /// Waiting room: code, participants, team assignment, start (R-LOBBY-02 … 06).
 class LobbyScreen extends ConsumerWidget {
@@ -85,139 +86,237 @@ class LobbyScreen extends ConsumerWidget {
       if (!check.hasUnassigned && check.noPlayer) l10n.errorNotEnoughPlayers,
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.lobbyTitle),
-        actions: [
-          const HistoryButton(),
-          if (_isAdmin)
-            IconButton(
-              key: const Key('settingsButton'),
-              icon: const Icon(Icons.tune),
-              tooltip: l10n.settingsTitle,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      SettingsScreen(session: session, initial: game.settings),
-                ),
-              ),
-            ),
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              final controller = ref.read(sessionControllerProvider.notifier);
-              if (value == 'leave') {
-                await run(controller.leave);
-              } else if (value == 'delete' &&
-                  await _confirm(
-                    context,
-                    l10n.lobbyDeleteConfirm,
-                    l10n.lobbyDelete,
-                  )) {
-                await run(controller.deleteGroup);
-              }
-            },
-            itemBuilder: (_) => [
-              if (!_isAdmin)
-                PopupMenuItem(value: 'leave', child: Text(l10n.lobbyLeave)),
-              if (_isAdmin)
-                PopupMenuItem(value: 'delete', child: Text(l10n.lobbyDelete)),
-            ],
+    final controller = ref.read(sessionControllerProvider.notifier);
+    final name = game.name;
+
+    // Back (button or system gesture) leads to the group overview; the group
+    // stays on this device (R-GROUPS-03).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) controller.close();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            key: const Key('groupsBackButton'),
+            icon: const Icon(Icons.arrow_back),
+            tooltip: l10n.groupsBack,
+            onPressed: controller.close,
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _CodeCard(code: session.code),
-          const SizedBox(height: 16),
-          AreaCard(
-            area: game.settings.area,
-            onChanged: (area) => run(() => repo.updateArea(session, area)),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.lobbyParticipants(members.length),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              if (_isAdmin)
-                TextButton.icon(
-                  key: const Key('randomButton'),
-                  onPressed: assignRandom,
-                  icon: const Icon(Icons.casino_outlined),
-                  label: Text(l10n.lobbyAssignRandom),
-                ),
-            ],
-          ),
-          if (_isAdmin)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                l10n.lobbyTapToSwitch,
-                style: const TextStyle(color: AppColors.textMuted),
-              ),
-            ),
-          if (unassigned.isNotEmpty)
-            _RoleSection(
-              title: l10n.roleUnassigned,
-              color: AppColors.textMuted,
-              icon: Icons.help_outline,
-              children: unassigned.map(memberTile).toList(),
-            ),
-          _RoleSection(
-            title: l10n.roleHunters,
-            color: AppColors.hunter,
-            icon: Icons.track_changes,
-            children: hunters.map(memberTile).toList(),
-          ),
-          _RoleSection(
-            title: l10n.rolePlayers,
-            color: AppColors.player,
-            icon: Icons.directions_run,
-            children: players.map(memberTile).toList(),
-          ),
-          if (_isAdmin && problems.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            for (final p in problems)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
+          title: name == null
+              ? Text(l10n.lobbyTitle)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: AppColors.speedhunt,
+                    Text(name, key: const Key('groupName')),
+                    Text(
+                      l10n.lobbyTitle,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: AppColors.textMuted),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(p)),
                   ],
                 ),
+          actions: [
+            const HistoryButton(),
+            if (_isAdmin)
+              IconButton(
+                key: const Key('settingsButton'),
+                icon: const Icon(Icons.tune),
+                tooltip: l10n.settingsTitle,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SettingsScreen(
+                      session: session,
+                      initial: game.settings,
+                    ),
+                  ),
+                ),
               ),
+            PopupMenuButton<String>(
+              key: const Key('lobbyMenu'),
+              onSelected: (value) async {
+                if (value == 'leave') {
+                  await run(controller.leave);
+                } else if (value == 'rename') {
+                  final newName = await _askGroupName(context, name ?? '');
+                  if (newName != null) {
+                    await run(() => repo.renameGroup(session, newName));
+                  }
+                } else if (value == 'delete' &&
+                    await _confirm(
+                      context,
+                      l10n.lobbyDeleteConfirm,
+                      l10n.lobbyDelete,
+                    )) {
+                  await run(controller.deleteGroup);
+                }
+              },
+              itemBuilder: (_) => [
+                if (!_isAdmin)
+                  PopupMenuItem(value: 'leave', child: Text(l10n.lobbyLeave)),
+                if (_isAdmin)
+                  PopupMenuItem(value: 'rename', child: Text(l10n.lobbyRename)),
+                if (_isAdmin)
+                  PopupMenuItem(value: 'delete', child: Text(l10n.lobbyDelete)),
+              ],
+            ),
           ],
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
+        ),
+        body: ListView(
           padding: const EdgeInsets.all(16),
-          child: _isAdmin
-              ? FilledButton.icon(
-                  key: const Key('startButton'),
-                  onPressed: check.canStart
-                      ? () => run(() => repo.startGame(session))
-                      : null,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text(l10n.lobbyStart),
-                )
-              : Text(
-                  l10n.lobbyWaitingForAdmin,
-                  textAlign: TextAlign.center,
+          children: [
+            _CodeCard(code: session.code),
+            const SizedBox(height: 16),
+            AreaCard(
+              area: game.settings.area,
+              onChanged: (area) => run(() => repo.updateArea(session, area)),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.lobbyParticipants(members.length),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (_isAdmin)
+                  TextButton.icon(
+                    key: const Key('randomButton'),
+                    onPressed: assignRandom,
+                    icon: const Icon(Icons.casino_outlined),
+                    label: Text(l10n.lobbyAssignRandom),
+                  ),
+              ],
+            ),
+            if (_isAdmin)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  l10n.lobbyTapToSwitch,
                   style: const TextStyle(color: AppColors.textMuted),
                 ),
+              ),
+            if (unassigned.isNotEmpty)
+              _RoleSection(
+                title: l10n.roleUnassigned,
+                color: AppColors.textMuted,
+                icon: Icons.help_outline,
+                children: unassigned.map(memberTile).toList(),
+              ),
+            _RoleSection(
+              title: l10n.roleHunters,
+              color: AppColors.hunter,
+              icon: Icons.track_changes,
+              children: hunters.map(memberTile).toList(),
+            ),
+            _RoleSection(
+              title: l10n.rolePlayers,
+              color: AppColors.player,
+              icon: Icons.directions_run,
+              children: players.map(memberTile).toList(),
+            ),
+            if (_isAdmin && problems.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final p in problems)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: AppColors.speedhunt,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(p)),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: _isAdmin
+                ? FilledButton.icon(
+                    key: const Key('startButton'),
+                    onPressed: check.canStart
+                        ? () => run(() => repo.startGame(session))
+                        : null,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(l10n.lobbyStart),
+                  )
+                : Text(
+                    l10n.lobbyWaitingForAdmin,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textMuted),
+                  ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Host renames the group (R-GROUPS-04). Returns null if cancelled.
+Future<String?> _askGroupName(BuildContext context, String current) =>
+    showDialog<String>(
+      context: context,
+      builder: (_) => _GroupNameDialog(current: current),
+    );
+
+class _GroupNameDialog extends StatefulWidget {
+  const _GroupNameDialog({required this.current});
+
+  final String current;
+
+  @override
+  State<_GroupNameDialog> createState() => _GroupNameDialogState();
+}
+
+class _GroupNameDialogState extends State<_GroupNameDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _controller = TextEditingController(text: widget.current);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.pop(context, _controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.lobbyRename),
+      content: Form(
+        key: _formKey,
+        child: GroupNameField(
+          controller: _controller,
+          autofocus: true,
+          onSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.commonCancel),
+        ),
+        TextButton(
+          key: const Key('renameSave'),
+          onPressed: _submit,
+          child: Text(l10n.commonSave),
+        ),
+      ],
     );
   }
 }

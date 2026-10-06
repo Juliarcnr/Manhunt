@@ -52,6 +52,15 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-LOBBY-09 | Der Host kann Mitglieder aus der Gruppe entfernen – in der Lobby (Symbol neben der Person) und während einer Runde (Übersicht), jeweils mit Rückfrage. Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 
+### Mehrere Gruppen
+
+| ID | Anforderung |
+|---|---|
+| R-GROUPS-01 | Ein Gerät kann zu mehreren Gruppen gehören. Die Codes liegen nur lokal im Schlüsselspeicher; beim App-Start öffnet sich die zuletzt geöffnete Gruppe (oder die Übersicht). |
+| R-GROUPS-02 | Höchstens **5 Gruppen** pro Gerät – selbst erstellte und beigetretene zusammen. Bei 5/5 sind „Erstellen“ und „Beitreten“ gesperrt, mit Hinweis. Erneutes Beitreten zu einer bekannten Gruppe zählt nicht extra. |
+| R-GROUPS-03 | Aus der Lobby (Zurück-Pfeil oder Zurück-Geste) kommt man in die Gruppenübersicht, ohne die Gruppe zu verlassen. Die Übersicht zeigt alle Gruppen (Name, Host-Kennzeichen, „Runde läuft“, „Gelöscht“) und bietet „Gruppe erstellen“ und „Mit Code beitreten“. Tippen öffnet eine Gruppe; eine inzwischen gelöschte verschwindet dabei mit Hinweis. Ohne Gruppen sieht die Übersicht aus wie der bisherige Startbildschirm. |
+| R-GROUPS-04 | Jede Gruppe hat einen Namen (Pflichtfeld beim Erstellen, verschlüsselt gespeichert); der Host kann ihn in der Lobby ändern. Ältere Gruppen ohne Namen erscheinen als „Gruppe ABCDE-FGHJK“. |
+
 ## 4. Pings (Standortübermittlung)
 
 | ID | Anforderung |
@@ -91,7 +100,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
-| R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers hat zusätzlich einen Location-Pin in Spielerfarbe unter dem Badge. Sie lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
+| R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers zeigt im Badge zusätzlich den Spielernamen („⚡2 Anna“) und hat einen Location-Pin in Spielerfarbe unter dem Badge. Sie lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
 | R-HUNT-08 | Ist „Letzte Pings“ ausgeschaltet und kommen neue normale Pings rein, schaltet sich der Filter automatisch wieder ein (Speedhunt-Pings lösen das nicht aus). |
 
 ### Spieler-View

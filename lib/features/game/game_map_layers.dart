@@ -141,11 +141,13 @@ MarkerLayer historyLayer(
 
 /// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt: dark
 /// badge (so the yellow bolt stays visible), ring in the player's colour
-/// (R-HUNT-07). Each player's latest one also gets a location pin in their
-/// colour below the badge. Players in [skip] already show their full history.
+/// (R-HUNT-07). Each player's latest one also shows the name in the badge
+/// ("⚡2 Anna") and a location pin in their colour below it. Players in [skip]
+/// already show their full history.
 MarkerLayer speedhuntPingsLayer({
   required List<PingRecord> pings,
   required Map<String, Color> colors,
+  required Map<String, String> names,
   Set<String> skip = const {},
 }) {
   final latest = latestSpeedhuntPings(pings).values.toSet();
@@ -156,24 +158,21 @@ MarkerLayer speedhuntPingsLayer({
           _speedhuntMarker(
             p,
             colors[p.playerId] ?? AppColors.player,
-            pin: latest.contains(p),
+            name: latest.contains(p) ? names[p.playerId] ?? '?' : null,
           ),
     ],
   );
 }
 
-Marker _speedhuntMarker(PingRecord p, Color color, {required bool pin}) {
-  final badge = _NumberDot(
-    text: '⚡${p.speedhuntNumber ?? ''}',
-    color: AppColors.surface,
-    textColor: Colors.white,
-    ring: color,
-    wide: true,
-  );
+/// With a [name] (the player's latest ping) the badge also carries the name
+/// and a location pin sits below it.
+Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
+  final label = '⚡${p.speedhuntNumber ?? ''}';
+  final pin = name != null;
   return Marker(
     key: Key('speedhunt_${p.playerId}_${p.slotId}'),
     point: p.fix.point.toLatLng(),
-    width: 34,
+    width: pin ? 140 : 34,
     height: pin ? 60 : 28,
     // With a pin, its tip marks the position, like the other location pins.
     alignment: pin ? Alignment.topCenter : Alignment.center,
@@ -181,7 +180,29 @@ Marker _speedhuntMarker(PingRecord p, Color color, {required bool pin}) {
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(width: 34, height: 28, child: badge),
+              Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color, width: 2.5),
+                  boxShadow: const [
+                    BoxShadow(blurRadius: 3, color: Colors.black38),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$label $name',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
               Icon(
                 Icons.location_on,
                 color: color,
@@ -190,7 +211,13 @@ Marker _speedhuntMarker(PingRecord p, Color color, {required bool pin}) {
               ),
             ],
           )
-        : badge,
+        : _NumberDot(
+            text: label,
+            color: AppColors.surface,
+            textColor: Colors.white,
+            ring: color,
+            wide: true,
+          ),
   );
 }
 

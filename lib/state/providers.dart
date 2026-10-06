@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/crypto/group_crypto.dart';
+import '../core/groups/group_list.dart';
 import '../core/history/round_summary.dart';
 import '../core/models/member.dart';
 import '../core/round/joker.dart';
@@ -51,6 +52,16 @@ final sessionControllerProvider =
     AsyncNotifierProvider<SessionController, GroupSession?>(
       SessionController.new,
     );
+
+/// This device's groups for the overview (R-GROUPS-01).
+final groupListProvider = FutureProvider<GroupList>(
+  (ref) => ref.read(sessionStoreProvider).loadGroups(),
+);
+
+/// Lobby/running/deleted per group, by public group id (R-GROUPS-03).
+final groupStatusProvider = StreamProvider.family<GameStatus?, String>(
+  (ref, groupId) => ref.watch(gameRepositoryProvider).watchStatus(groupId),
+);
 
 final gameProvider = StreamProvider<GameInfo?>((ref) {
   final session = ref.watch(sessionControllerProvider).value;

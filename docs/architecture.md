@@ -17,10 +17,10 @@ lib/
     geo/       Punkt-in-Polygon, Fläche/Ausdehnung, Überkreuzungs-Check, AreaDraft (Editor-Logik mit Undo)
     history/   CatchRecord, RoundSummary (Rundenübersicht für die Historie)
     join_code.dart
-  data/        GameRepository (Interface) + FirestoreGameRepository, SessionStore (Code im Keystore),
-               LocationService (geolocator; Phase 4 nur „wo bin ich“)
-  state/       Riverpod-Provider, SessionController (erstellen/beitreten/verlassen/löschen)
-  features/    UI: session_gate (Weiche), home, lobby, settings, game, history,
+  data/        GameRepository (Interface) + FirestoreGameRepository, SessionStore (Gruppenliste + offene
+               Gruppe im Keystore), LocationService (geolocator; Phase 4 nur „wo bin ich“)
+  state/       Riverpod-Provider, SessionController (erstellen/beitreten/öffnen/schließen/verlassen/löschen)
+  features/    UI: session_gate (Weiche), groups (Übersicht/Start), lobby, settings, game, history,
                map (BaseMap = MapTiler-Kacheln + Attribution, areaLayers, AreaEditorScreen, AreaCard)
   l10n/        ARB-Dateien (de/en), generiert app_localizations.dart
   theme/       AppTheme, AppColors
@@ -43,11 +43,17 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
   Benachrichtigungen können lokal ausgelöst werden.
 - **Neu beitreten erlaubt**: Auch in ein laufendes Spiel (verlorenes Handy, R-LOBBY-07) – neue anonyme ID,
   Host teilt die Rolle neu zu.
+- **Mehrere Gruppen** (R-GROUPS-01 … 04): `SessionStore` hält eine `GroupList` (core/groups, max. 5) und den Code
+  der offenen Gruppe; `null` = Übersicht. Dieselbe anonyme UID ist Mitglied in allen Gruppen. Es ist immer nur
+  **eine** Gruppe offen (Schlüssel abgeleitet, Listener, Tracking); die Übersicht liest den Status der anderen per
+  `watchStatus(groupId)` ohne Schlüssel. Name/Host-Flag in der Liste aktualisiert `SessionGate` aus `gameProvider`.
+  Aus dem Spielbildschirm geht es bewusst nicht in die Übersicht, damit das Tracking nicht stoppt.
+  Alte Installationen: der einzelne Code (`group_code`) wird beim ersten Laden in die Liste übernommen.
 
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `settings`, `area`, startAt, createdAt, expiresAt | settings; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, startAt, createdAt, expiresAt | name, settings; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker | Standort | ✔ |
