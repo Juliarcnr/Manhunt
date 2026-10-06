@@ -191,16 +191,23 @@ Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
                     BoxShadow(blurRadius: 3, color: Colors.black38),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$label $name',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
+                // Only as wide as the text needs (up to the marker width).
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '$label $name',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Icon(

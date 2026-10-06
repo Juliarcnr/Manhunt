@@ -110,5 +110,22 @@ void main() {
         Colors.pink,
       );
     });
+
+    testWidgets('the named badge is only as wide as its text', (tester) async {
+      await pumpLayer(
+        tester,
+        speedhuntPingsLayer(
+          pings: [sh('anna', 1, 30)],
+          colors: const {},
+          names: const {'anna': 'Al'},
+        ),
+      );
+      final badge = find
+          .ancestor(of: find.text('⚡1 Al'), matching: find.byType(Container))
+          .first;
+      final text = tester.getSize(find.text('⚡1 Al')).width;
+      // Text plus padding and border – not the full marker width.
+      expect(tester.getSize(badge).width, lessThan(text + 30));
+    });
   });
 }
