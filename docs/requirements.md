@@ -174,6 +174,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-DEV-01 | Zu jedem Code werden Tests geschrieben. |
 | R-DEV-02 | Jede Änderung wird mit `flutter analyze`, `flutter test` und einem Build geprüft. |
 | R-DEV-03 | Projektwissen wird in md-Dateien gepflegt (`CLAUDE.md`, `docs/`), wiederkehrende Abläufe als Skills. |
+| R-DEV-04 | Versionsname bleibt vorerst `0.1.0`; die Buildnummer startet bei 1 und wird vor jedem Store-/Test-Build mit `dart run tool/bump_build.dart` hochgezählt. |
 
 ## 13. Technische Entscheidungen
 
