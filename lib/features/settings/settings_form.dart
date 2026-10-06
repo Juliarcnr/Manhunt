@@ -23,6 +23,7 @@ class SettingsForm extends StatelessWidget {
 
     Widget minutes({
       required String label,
+      String? hint,
       required Duration value,
       required int step,
       required int min,
@@ -30,6 +31,7 @@ class SettingsForm extends StatelessWidget {
       required GameSettings Function(Duration) apply,
     }) => StepperTile(
       label: label,
+      hint: hint,
       valueText: formatDuration(l10n, value),
       canDecrease: value.inMinutes - step >= min,
       canIncrease: value.inMinutes + step <= max,
@@ -99,6 +101,15 @@ class SettingsForm extends StatelessWidget {
               max: 10,
               apply: (v) => s.copyWith(speedhuntCount: v),
             ),
+            minutes(
+              label: l10n.settingsSpeedhuntEarliest,
+              hint: l10n.settingsSpeedhuntEarliestHint,
+              value: s.speedhuntEarliest,
+              step: 5,
+              min: 0,
+              max: 600,
+              apply: (v) => s.copyWith(speedhuntEarliest: v),
+            ),
             count(
               label: l10n.settingsSpeedhuntPings,
               value: s.speedhuntPings,
@@ -107,15 +118,8 @@ class SettingsForm extends StatelessWidget {
               apply: (v) => s.copyWith(speedhuntPings: v),
             ),
             minutes(
-              label: l10n.settingsSpeedhuntInterval,
-              value: s.speedhuntInterval,
-              step: 1,
-              min: 1,
-              max: 15,
-              apply: (v) => s.copyWith(speedhuntInterval: v),
-            ),
-            minutes(
               label: l10n.settingsSpeedhuntFirstDelay,
+              hint: l10n.settingsSpeedhuntFirstDelayHint,
               value: s.speedhuntFirstDelay,
               step: 1,
               min: 0,
@@ -123,12 +127,12 @@ class SettingsForm extends StatelessWidget {
               apply: (v) => s.copyWith(speedhuntFirstDelay: v),
             ),
             minutes(
-              label: l10n.settingsSpeedhuntEarliest,
-              value: s.speedhuntEarliest,
-              step: 5,
-              min: 0,
-              max: 600,
-              apply: (v) => s.copyWith(speedhuntEarliest: v),
+              label: l10n.settingsSpeedhuntInterval,
+              value: s.speedhuntInterval,
+              step: 1,
+              min: 1,
+              max: 15,
+              apply: (v) => s.copyWith(speedhuntInterval: v),
             ),
           ],
         ),
@@ -228,6 +232,7 @@ class StepperTile extends StatelessWidget {
   const StepperTile({
     super.key,
     required this.label,
+    this.hint,
     required this.valueText,
     required this.canDecrease,
     required this.canIncrease,
@@ -236,6 +241,9 @@ class StepperTile extends StatelessWidget {
   });
 
   final String label;
+
+  /// Optional explanation shown muted below the label.
+  final String? hint;
   final String valueText;
   final bool canDecrease;
   final bool canIncrease;
@@ -248,7 +256,21 @@ class StepperTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Expanded(child: Text(label)),
+          Expanded(
+            child: hint == null
+                ? Text(label)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label),
+                      Text(
+                        hint!,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+          ),
           IconButton(
             tooltip: '−',
             onPressed: canDecrease ? onDecrease : null,

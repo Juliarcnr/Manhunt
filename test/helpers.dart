@@ -9,6 +9,7 @@ import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
+import 'package:manhunt/data/joker_store.dart';
 import 'package:manhunt/data/location_service.dart';
 import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
@@ -34,6 +35,7 @@ List<Override> deviceOverrides({
   DateTime Function()? now,
   LocationService? location,
   NotificationService? notifications,
+  JokerStore? jokers,
 }) => [
   gameRepositoryProvider.overrideWithValue(
     FirestoreGameRepository(db, now: now),
@@ -43,6 +45,7 @@ List<Override> deviceOverrides({
   cryptoFactoryProvider.overrideWithValue(testCrypto),
   locationServiceProvider.overrideWithValue(location ?? FakeLocationService()),
   roundRepositoryProvider.overrideWithValue(FirestoreRoundRepository(db)),
+  jokerStoreProvider.overrideWithValue(jokers ?? MemoryJokerStore()),
   notificationServiceProvider.overrideWithValue(
     notifications ?? SilentNotificationService(),
   ),

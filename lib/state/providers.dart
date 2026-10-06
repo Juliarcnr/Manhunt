@@ -11,6 +11,7 @@ import '../core/schedule/speedhunt.dart';
 import '../data/firestore_game_repository.dart';
 import '../data/firestore_round_repository.dart';
 import '../data/game_repository.dart';
+import '../data/joker_store.dart';
 import '../data/location_service.dart';
 import '../data/notification_service.dart';
 import '../data/round_repository.dart';
@@ -162,3 +163,6 @@ final jokerAnswersProvider =
             ref.watch(roundRepositoryProvider).watchJokerAnswers(s, requestId),
       ),
     );
+
+/// Joker results kept on this device (R-PLAY-04).
+final jokerStoreProvider = Provider<JokerStore>((ref) => SecureJokerStore());

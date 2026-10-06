@@ -47,13 +47,14 @@ void main() {
     return (db, session);
   }
 
-  testWidgets('shows head start countdown', (tester) async {
+  testWidgets('shows head start countdown with a short title', (tester) async {
     await pumpGame(
       tester,
       userId: 'admin',
       now: start.add(const Duration(minutes: 5)),
     );
-    expect(find.text('HEAD START – HUNTERS WAIT'), findsOneWidget);
+    // Short label so it isn't truncated in the compact header.
+    expect(find.text('HEAD START'), findsOneWidget);
     expect(find.text('10:00'), findsOneWidget);
   });
 

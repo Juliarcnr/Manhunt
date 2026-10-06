@@ -85,13 +85,13 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 
 | ID | Anforderung |
 |---|---|
-| R-HUNT-01 | Filter-Buttons (Chips) auf der Karte, mehrere gleichzeitig aktivierbar. |
+| R-HUNT-01 | Filter-Buttons (Chips) in einer Leiste unter der Kopfzeile, mehrere gleichzeitig aktivierbar: Hunter, Letzte Pings, Speedhunts, Linien und ein Chip pro Spieler (in seiner Farbe) für dessen Ping-Historie. Spieler haben „Meine Pings“ und nach dem Einlösen je einen Chip pro Joker. |
 | R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter, jeder Hunter in eigener Farbe, mit Uhrzeit am Pin („Alex · 14:32“). |
 | R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**; Speedhunt-Pings mit Blitz-Symbol. |
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
 | R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
-| R-HUNT-07 | *(Phase 6)* Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert, und lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
+| R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert, und lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
 
 ### Spieler-View
 
@@ -100,7 +100,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-PLAY-01 | Eigene Standort-Historie (gesendete Pings) kann angezeigt werden. |
 | R-PLAY-02 | Joker „Hunter-Standorte“: einmal pro Spieler und Runde die aktuellen Hunter-Standorte abfragen, angezeigt als Pins (nur wenn R-SET-09 aktiv). |
 | R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. |
-| R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter in eigenen Farben, Spieler in ihren Spielerfarben). *(Phase 6)* Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
+| R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter in eigenen Farben, Spieler in ihren Spielerfarben). Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
 
 ## 7. Benachrichtigungen
 

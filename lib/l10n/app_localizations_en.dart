@@ -47,6 +47,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get overviewTitle => 'Overview';
 
   @override
+  String get filterHunters => 'Hunters';
+
+  @override
+  String get filterLastPings => 'Last pings';
+
+  @override
+  String get filterSpeedhunts => 'Speedhunts';
+
+  @override
+  String get filterLines => 'Lines';
+
+  @override
+  String get filterMyPings => 'My pings';
+
+  @override
+  String filterHunterJoker(String time) {
+    return 'Hunters $time';
+  }
+
+  @override
+  String filterPlayerJoker(String time) {
+    return 'Players $time';
+  }
+
+  @override
   String get overviewNoSpeedhunt => 'No speedhunt running';
 
   @override
@@ -147,10 +172,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSpeedhuntInterval => 'Time between speedhunt pings';
 
   @override
-  String get settingsSpeedhuntEarliest => 'First speedhunt after';
+  String get settingsSpeedhuntEarliest => 'Speedhunts allowed after';
 
   @override
-  String get settingsSpeedhuntFirstDelay => 'First speedhunt ping after';
+  String get settingsSpeedhuntEarliestHint =>
+      'Counted from the game start (including head start). Before that, hunters can\'t trigger a speedhunt.';
+
+  @override
+  String get settingsSpeedhuntFirstDelay => 'Delay until 1st ping';
+
+  @override
+  String get settingsSpeedhuntFirstDelayHint =>
+      'Time between triggering a speedhunt and its first ping.';
 
   @override
   String get settingsHunterCount => 'Number of hunters';
@@ -331,7 +364,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gamePhaseStarting => 'Starting…';
 
   @override
-  String get gamePhaseHeadStart => 'Head start – hunters wait';
+  String get gamePhaseHeadStart => 'Head start';
 
   @override
   String get gamePhaseHunting => 'Hunt is on';
@@ -482,11 +515,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'All other active players\' phones send you their current position once. Afterwards this joker is used up.';
 
   @override
-  String jokerPlayersResult(String time) {
-    return 'Players at $time (joker)';
-  }
-
-  @override
   String get jokerTitle => 'Use hunter joker?';
 
   @override
@@ -495,11 +523,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get jokerConfirm => 'Use joker';
-
-  @override
-  String jokerResult(String time) {
-    return 'Hunters at $time (joker)';
-  }
 
   @override
   String get jokerNoHunters => 'No hunter positions available right now.';

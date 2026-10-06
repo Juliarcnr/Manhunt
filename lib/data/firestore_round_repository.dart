@@ -51,6 +51,7 @@ class FirestoreRoundRepository implements RoundRepository {
               (json) => PingRecord(
                 playerId: doc.data()['uid'] as String,
                 kind: PingKind.values.byName(doc.data()['kind'] as String),
+                slotId: doc.data()['slot'] as String?,
                 fix: LocationFix.fromJson(json! as Map<String, Object?>),
               ),
             ),

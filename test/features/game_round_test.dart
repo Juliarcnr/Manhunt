@@ -12,6 +12,7 @@ import 'package:manhunt/core/schedule/speedhunt.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
+import 'package:manhunt/data/joker_store.dart';
 import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
 import 'package:manhunt/features/game/game_screen.dart';
@@ -33,6 +34,7 @@ void main() {
   late FakeFirebaseFirestore db;
   late FakeLocationService location;
   late SilentNotificationService notifications;
+  late MemoryJokerStore jokers;
   late DateTime now;
 
   /// Lets real async work (fake Firestore, isolates) finish.
@@ -75,6 +77,7 @@ void main() {
           store: MemorySessionStore()..code = code,
           location: location,
           notifications: notifications,
+          jokers: jokers,
         ),
         child: MaterialApp(
           locale: const Locale('en'),
@@ -100,6 +103,7 @@ void main() {
     db = FakeFirebaseFirestore();
     location = FakeLocationService();
     notifications = SilentNotificationService();
+    jokers = MemoryJokerStore();
     now = start.add(const Duration(minutes: 30));
   });
 
@@ -308,7 +312,14 @@ void main() {
       expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
       // Each pin shows the time of the position ("Alex · 14:30").
       expect(find.textContaining('Alex · '), findsOneWidget);
-      expect(find.textContaining('Hunters at'), findsOneWidget);
+      // Joker result is a filter chip with the time, switched on (R-PLAY-04).
+      expect(find.byKey(const Key('filter_hunterJoker')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilterChip>(find.byKey(const Key('filter_hunterJoker')))
+            .selected,
+        isTrue,
+      );
 
       // Used up: still listed, but disabled.
       await tester.tap(find.byKey(const Key('jokerButton')));
@@ -330,7 +341,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('confirmJoker')));
       await settle(tester);
-      expect(find.textContaining('Players at'), findsOneWidget);
+      expect(find.byKey(const Key('filter_playerJoker')), findsOneWidget);
 
       // Sam's device answers (its engine does this automatically).
       await tester.runAsync(() async {
@@ -511,6 +522,155 @@ void main() {
       expect(find.text('Kim was caught'), findsOneWidget);
       expect(find.byKey(const Key('selfCatchButton')), findsNothing);
       expect(location.isTracking, isFalse);
+    });
+  });
+
+  group('map filters (phase 6)', () {
+    /// Sends a ping of [player] (regular or speedhunt) [minute] after start.
+    Future<void> ping(
+      WidgetTester tester,
+      String player,
+      String slot,
+      double lat,
+      int minute, {
+      PingKind kind = PingKind.regular,
+    }) => tester.runAsync(
+      () async => FirestoreRoundRepository(db).sendPing(
+        await testSession(code, player),
+        PingSlot(
+          id: slot,
+          kind: kind,
+          at: start.add(Duration(minutes: minute)),
+        ),
+        LocationFix(
+          point: GeoPoint(lat, 13.405),
+          at: start.add(Duration(minutes: minute)),
+        ),
+      ),
+    );
+
+    Future<void> tapFilter(WidgetTester tester, String id) async {
+      await tester.ensureVisible(find.byKey(Key('filter_$id')));
+      await tester.tap(find.byKey(Key('filter_$id')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('hunters get filter chips incl. one per player (R-HUNT-01)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      for (final id in [
+        'hunters',
+        'lastPings',
+        'speedhunts',
+        'lines',
+        'player_kim',
+        'player_sam',
+      ]) {
+        expect(find.byKey(Key('filter_$id')), findsOneWidget, reason: id);
+      }
+      expect(find.byKey(const Key('filter_myPings')), findsNothing);
+    });
+
+    testWidgets('"last pings" can be switched off and on (R-HUNT-03)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await ping(tester, 'kim', 'regular_1', 52.505, 20);
+      await pumpAs(tester, 'alex');
+      expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
+      await tapFilter(tester, 'lastPings');
+      expect(find.byKey(const Key('lastPing_kim')), findsNothing);
+      await tapFilter(tester, 'lastPings');
+      expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
+    });
+
+    testWidgets('player chip shows the numbered history with arrows '
+        '(R-HUNT-04, R-HUNT-05)', (tester) async {
+      await seed(tester);
+      await ping(tester, 'kim', 'regular_1', 52.501, 20);
+      await ping(tester, 'kim', 'regular_2', 52.503, 40);
+      await ping(tester, 'kim', 'regular_3', 52.506, 60);
+      await pumpAs(tester, 'alex');
+      expect(find.byKey(const Key('history_kim_1')), findsNothing);
+
+      await tapFilter(tester, 'player_kim');
+      expect(find.byKey(const Key('history_kim_1')), findsOneWidget);
+      expect(find.byKey(const Key('history_kim_3')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_0')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_1')), findsOneWidget);
+      // The last ping is part of the history – no duplicate pin.
+      expect(find.byKey(const Key('lastPing_kim')), findsNothing);
+
+      await tapFilter(tester, 'lines');
+      expect(find.byKey(const Key('arrow_kim_0')), findsNothing);
+      expect(find.byKey(const Key('history_kim_1')), findsOneWidget);
+
+      await tapFilter(tester, 'player_kim');
+      expect(find.byKey(const Key('history_kim_1')), findsNothing);
+      expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
+    });
+
+    testWidgets('all speedhunt pings stay visible, numbered, toggleable '
+        '(R-HUNT-07)', (tester) async {
+      await seed(tester);
+      for (final (i, lat) in [52.501, 52.502, 52.503].indexed) {
+        await ping(
+          tester,
+          'sam',
+          'speedhunt_1791228604799_${i + 1}',
+          lat,
+          70 + i * 5,
+          kind: PingKind.speedhunt,
+        );
+      }
+      await pumpAs(tester, 'alex');
+      expect(find.text('⚡1'), findsOneWidget);
+      expect(find.text('⚡2'), findsOneWidget);
+      expect(find.text('⚡3'), findsOneWidget);
+      await tapFilter(tester, 'speedhunts');
+      expect(find.text('⚡1'), findsNothing);
+    });
+
+    testWidgets('player: own pings can be hidden (R-PLAY-01)', (tester) async {
+      await seed(tester);
+      await ping(tester, 'kim', 'regular_1', 52.505, 20);
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('history_1')), findsOneWidget);
+      await tapFilter(tester, 'myPings');
+      expect(find.byKey(const Key('history_1')), findsNothing);
+    });
+
+    testWidgets('joker result: chip on after use, toggleable, kept after an '
+        'app restart (R-PLAY-04)', (tester) async {
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).updateHunterLocation(
+          await testSession(code, 'alex'),
+          LocationFix(point: const GeoPoint(52.506, 13.406), at: now),
+        ),
+      );
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('filter_hunterJoker')), findsNothing);
+      await tester.tap(find.byKey(const Key('jokerButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('joker_hunters')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirmJoker')));
+      await settle(tester);
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+
+      await tapFilter(tester, 'hunterJoker');
+      expect(find.byKey(const Key('hunter_alex')), findsNothing);
+      await tapFilter(tester, 'hunterJoker');
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+
+      // "Restart": a fresh app, same device storage.
+      await tester.pumpWidget(const SizedBox());
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('filter_hunterJoker')), findsOneWidget);
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
     });
   });
 }

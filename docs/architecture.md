@@ -83,7 +83,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
       Spielfeld-Vorschau in der Lobby, Karte im Spielbildschirm
 - [x] Phase 5: Hintergrund-Standort (`LocationService.track`), automatische Pings + Hunter-Live (`RoundEngine`),
       Speedhunt, Joker, Catch-Buttons, Benachrichtigungen (Banner+Vibration / System-Notification), Basis-Kartenebenen
-- [ ] Phase 6: Hunter-/Spieler-Views mit Filtern (Übersicht, Spielerfarben und kompakte Kopfzeile sind schon da)
+- [x] Phase 6: Filterleiste (Hunter, Letzte Pings, Speedhunts ⚡1-3, Linien mit Pfeilen, Chip pro Spieler für die
+      nummerierte Historie; Spieler: Meine Pings + Joker-Chips), Joker-Ergebnisse im Keystore (`JokerStore`, pro Runde),
+      Übersicht, Spieler-/Hunterfarben, kompakte Kopfzeile
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise

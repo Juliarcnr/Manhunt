@@ -35,5 +35,10 @@ Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Report
 ## Standort
 Wird nur während eines laufenden Spiels erfasst (R-PRIV-04). Android zeigt dabei eine Dauer-Benachrichtigung.
 
+Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt des Jokers bzw. die Kennung der Spieler-Joker-Anfrage) werden nur
+**auf dem eigenen Gerät** im Schlüsselspeicher des Betriebssystems abgelegt, damit man sie in der laufenden Runde
+wieder einblenden kann (R-PLAY-04). Sie gehören zu genau einer Runde, werden in der nächsten Runde nicht mehr
+angezeigt und beim nächsten Joker überschrieben; sie verlassen das Gerät nicht.
+
 Im Spielfeld-Editor wird der eigene Standort einmal beim Öffnen und auf Knopfdruck abgefragt, um die Karte
 dorthin zu bewegen. Er bleibt auf dem Gerät und wird weder gespeichert noch gesendet.

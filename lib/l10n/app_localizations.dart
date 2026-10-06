@@ -170,6 +170,48 @@ abstract class AppLocalizations {
   /// **'Overview'**
   String get overviewTitle;
 
+  /// No description provided for @filterHunters.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunters'**
+  String get filterHunters;
+
+  /// No description provided for @filterLastPings.
+  ///
+  /// In en, this message translates to:
+  /// **'Last pings'**
+  String get filterLastPings;
+
+  /// No description provided for @filterSpeedhunts.
+  ///
+  /// In en, this message translates to:
+  /// **'Speedhunts'**
+  String get filterSpeedhunts;
+
+  /// No description provided for @filterLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines'**
+  String get filterLines;
+
+  /// No description provided for @filterMyPings.
+  ///
+  /// In en, this message translates to:
+  /// **'My pings'**
+  String get filterMyPings;
+
+  /// No description provided for @filterHunterJoker.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunters {time}'**
+  String filterHunterJoker(String time);
+
+  /// No description provided for @filterPlayerJoker.
+  ///
+  /// In en, this message translates to:
+  /// **'Players {time}'**
+  String filterPlayerJoker(String time);
+
   /// No description provided for @overviewNoSpeedhunt.
   ///
   /// In en, this message translates to:
@@ -365,14 +407,26 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSpeedhuntEarliest.
   ///
   /// In en, this message translates to:
-  /// **'First speedhunt after'**
+  /// **'Speedhunts allowed after'**
   String get settingsSpeedhuntEarliest;
+
+  /// No description provided for @settingsSpeedhuntEarliestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted from the game start (including head start). Before that, hunters can\'t trigger a speedhunt.'**
+  String get settingsSpeedhuntEarliestHint;
 
   /// No description provided for @settingsSpeedhuntFirstDelay.
   ///
   /// In en, this message translates to:
-  /// **'First speedhunt ping after'**
+  /// **'Delay until 1st ping'**
   String get settingsSpeedhuntFirstDelay;
+
+  /// No description provided for @settingsSpeedhuntFirstDelayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Time between triggering a speedhunt and its first ping.'**
+  String get settingsSpeedhuntFirstDelayHint;
 
   /// No description provided for @settingsHunterCount.
   ///
@@ -683,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @gamePhaseHeadStart.
   ///
   /// In en, this message translates to:
-  /// **'Head start – hunters wait'**
+  /// **'Head start'**
   String get gamePhaseHeadStart;
 
   /// No description provided for @gamePhaseHunting.
@@ -938,12 +992,6 @@ abstract class AppLocalizations {
   /// **'All other active players\' phones send you their current position once. Afterwards this joker is used up.'**
   String get jokerPlayersText;
 
-  /// No description provided for @jokerPlayersResult.
-  ///
-  /// In en, this message translates to:
-  /// **'Players at {time} (joker)'**
-  String jokerPlayersResult(String time);
-
   /// No description provided for @jokerTitle.
   ///
   /// In en, this message translates to:
@@ -961,12 +1009,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use joker'**
   String get jokerConfirm;
-
-  /// No description provided for @jokerResult.
-  ///
-  /// In en, this message translates to:
-  /// **'Hunters at {time} (joker)'**
-  String jokerResult(String time);
 
   /// No description provided for @jokerNoHunters.
   ///

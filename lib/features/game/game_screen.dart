@@ -13,6 +13,7 @@ import '../../core/round/ping_schedule.dart';
 import '../../core/schedule/game_clock.dart';
 import '../../core/schedule/speedhunt.dart';
 import '../../data/game_repository.dart';
+import '../../data/joker_store.dart';
 import '../../data/location_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
@@ -21,7 +22,9 @@ import '../../theme/app_theme.dart';
 import 'overview_sheet.dart';
 import '../map/base_map.dart';
 import 'catch_dialog.dart';
+import 'filter_bar.dart';
 import 'joker_sheet.dart';
+import 'map_filters.dart';
 import 'game_map_layers.dart';
 import 'speedhunt_dialog.dart';
 
@@ -59,6 +62,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Timer? _bannerTimer;
   ({DateTime at, Map<String, LocationFix> positions})? _jokerReveal;
   ({DateTime at, String requestId})? _playerReveal;
+  var _filters = const MapFilters();
 
   bool get _isAdmin => widget.game.adminId == widget.session.userId;
 
@@ -95,6 +99,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Location first, then notifications: Android drops a permission dialog
     // requested while another one is open (field test 2026-10-05).
     unawaited(_requestPermissions());
+    unawaited(_loadJokers());
 
     _subscriptions
       ..add(
@@ -200,6 +205,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void didUpdateWidget(GameScreen old) {
     super.didUpdateWidget(old);
     _feedEngine();
+    // The start time arrives a moment after "start" (server timestamp).
+    unawaited(_loadJokers());
   }
 
   @override
@@ -473,6 +480,39 @@ class _GameScreenState extends ConsumerState<GameScreen>
     }
   }
 
+  /// Joker results are kept on the device, so they can be shown again later
+  /// – also after an app restart (R-PLAY-04).
+  Future<void> _saveJokers() async {
+    final startAt = widget.game.startAt;
+    if (startAt == null) return;
+    await ref
+        .read(jokerStoreProvider)
+        .save(
+          widget.session.groupId,
+          SavedJokers(
+            roundStart: startAt,
+            hunters: _jokerReveal,
+            players: _playerReveal,
+          ),
+        );
+  }
+
+  Future<void> _loadJokers() async {
+    final startAt = widget.game.startAt;
+    if (startAt == null || _jokersLoadedFor == startAt) return;
+    _jokersLoadedFor = startAt;
+    final saved = await ref
+        .read(jokerStoreProvider)
+        .load(widget.session.groupId, startAt);
+    if (saved == null || !mounted) return;
+    setState(() {
+      _jokerReveal ??= saved.hunters;
+      _playerReveal ??= saved.players;
+    });
+  }
+
+  DateTime? _jokersLoadedFor;
+
   bool _jokersLeft(Member me) {
     final s = widget.game.settings;
     return (s.jokerEnabled && !me.jokerUsed) ||
@@ -495,7 +535,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
           .useJoker(widget.session);
       if (!mounted) return;
       if (positions.isEmpty) _snack(l10n.jokerNoHunters);
-      setState(() => _jokerReveal = (at: widget.now(), positions: positions));
+      setState(() {
+        _jokerReveal = (at: widget.now(), positions: positions);
+        _filters = _filters.copyWith(hunterJoker: true);
+      });
+      unawaited(_saveJokers());
     });
   }
 
@@ -514,7 +558,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
           .read(roundRepositoryProvider)
           .requestPlayerPositions(widget.session);
       if (!mounted) return;
-      setState(() => _playerReveal = (at: widget.now(), requestId: requestId));
+      setState(() {
+        _playerReveal = (at: widget.now(), requestId: requestId);
+        _filters = _filters.copyWith(playerJoker: true);
+      });
+      unawaited(_saveJokers());
     });
   }
 
@@ -572,21 +620,56 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Role-specific map content. Hunter-only data is only watched by hunters
     // (the security rules reject it for players).
     final layers = <Widget>[...areaLayers(widget.game.settings.area)];
+    final filters = _filters;
+    final filterItems = <FilterItem>[];
     if (isHunter) {
       final pings = ref.watch(allPingsProvider).value ?? const [];
       final hunters =
           ref.watch(hunterLocationsProvider).value ??
           const <String, LocationFix>{};
-      layers
-        ..add(
+      final byPlayer = pingsByPlayer(pings);
+      final selected = {
+        for (final id in filters.playerHistories)
+          if (byPlayer.containsKey(id)) id,
+      };
+      if (filters.lines) {
+        layers.addAll(
+          pathLayers({
+            for (final id in selected) id: byPlayer[id]!,
+          }, playersByColor),
+        );
+      }
+      for (final id in selected) {
+        layers.add(
+          historyLayer(
+            byPlayer[id]!,
+            color: playersByColor[id] ?? AppColors.player,
+            keyPrefix: 'history_$id',
+          ),
+        );
+      }
+      if (filters.speedhunts) {
+        layers.add(
+          speedhuntPingsLayer(
+            pings: pings,
+            colors: playersByColor,
+            skip: selected,
+          ),
+        );
+      }
+      if (filters.lastPings) {
+        layers.add(
           lastPingsLayer(
-            byPlayer: pingsByPlayer(pings),
+            byPlayer: byPlayer,
             names: names,
             caught: caught,
             colors: playersByColor,
+            skip: selected,
           ),
-        )
-        ..add(
+        );
+      }
+      if (filters.hunters) {
+        layers.add(
           huntersLayer(
             positions: {
               for (final e in hunters.entries)
@@ -597,11 +680,54 @@ class _GameScreenState extends ConsumerState<GameScreen>
             formatTime: timeFmt.format,
           ),
         );
+      }
+      void set(MapFilters f) => setState(() => _filters = f);
+      filterItems.addAll([
+        FilterItem(
+          id: 'hunters',
+          label: l10n.filterHunters,
+          icon: Icons.track_changes,
+          color: AppColors.hunter,
+          selected: filters.hunters,
+          onChanged: (v) => set(filters.copyWith(hunters: v)),
+        ),
+        FilterItem(
+          id: 'lastPings',
+          label: l10n.filterLastPings,
+          icon: Icons.location_on,
+          selected: filters.lastPings,
+          onChanged: (v) => set(filters.copyWith(lastPings: v)),
+        ),
+        FilterItem(
+          id: 'speedhunts',
+          label: l10n.filterSpeedhunts,
+          icon: Icons.bolt,
+          color: AppColors.speedhunt,
+          selected: filters.speedhunts,
+          onChanged: (v) => set(filters.copyWith(speedhunts: v)),
+        ),
+        FilterItem(
+          id: 'lines',
+          label: l10n.filterLines,
+          icon: Icons.timeline,
+          selected: filters.lines,
+          onChanged: (v) => set(filters.copyWith(lines: v)),
+        ),
+        for (final m in members)
+          if (m.isPlayer)
+            FilterItem(
+              id: 'player_${m.id}',
+              label: m.name,
+              color: playersByColor[m.id] ?? AppColors.player,
+              selected: filters.playerHistories.contains(m.id),
+              onChanged: (_) => set(filters.togglePlayer(m.id)),
+            ),
+      ]);
     } else if (isPlayer) {
       final mine = pingsByPlayer(
         ref.watch(myPingsProvider).value ?? const [],
       )[widget.session.userId];
-      if (mine != null) {
+      if (mine != null && filters.myPings) {
         // Own speedhunt pings stay hidden (R-SPEED-04).
         final regular = [
           for (final p in mine)
@@ -610,7 +736,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         layers.add(historyLayer(regular, color: AppColors.player));
       }
       final reveal = _jokerReveal;
-      if (reveal != null) {
+      if (reveal != null && filters.hunterJoker) {
         layers.add(
           huntersLayer(
             positions: reveal.positions,
@@ -621,7 +747,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         );
       }
       final playerReveal = _playerReveal;
-      if (playerReveal != null) {
+      if (playerReveal != null && filters.playerJoker) {
         final answers =
             ref.watch(jokerAnswersProvider(playerReveal.requestId)).value ??
             const <String, LocationFix>{};
@@ -634,6 +760,35 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         );
       }
+      void set(MapFilters f) => setState(() => _filters = f);
+      filterItems.addAll([
+        FilterItem(
+          id: 'myPings',
+          label: l10n.filterMyPings,
+          icon: Icons.history,
+          selected: filters.myPings,
+          onChanged: (v) => set(filters.copyWith(myPings: v)),
+        ),
+        if (reveal != null)
+          FilterItem(
+            id: 'hunterJoker',
+            label: l10n.filterHunterJoker(timeFmt.format(reveal.at.toLocal())),
+            icon: Icons.visibility_outlined,
+            color: AppColors.hunter,
+            selected: filters.hunterJoker,
+            onChanged: (v) => set(filters.copyWith(hunterJoker: v)),
+          ),
+        if (playerReveal != null)
+          FilterItem(
+            id: 'playerJoker',
+            label: l10n.filterPlayerJoker(
+              timeFmt.format(playerReveal.at.toLocal()),
+            ),
+            icon: Icons.groups_outlined,
+            selected: filters.playerJoker,
+            onChanged: (v) => set(filters.copyWith(playerJoker: v)),
+          ),
+      ]);
       // Answer other players' joker requests (R-PLAY-03) – players only, the
       // rules hide requests from hunters.
       ref.listen(jokerRequestsProvider, (_, next) {
@@ -647,7 +802,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
         : null;
     final speedhuntsLeft =
         widget.game.settings.speedhuntCount - speedhunts.length;
-    final reveal = _jokerReveal;
 
     return Scaffold(
       appBar: AppBar(
@@ -737,6 +891,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                FilterBar(items: filterItems),
+                if (filterItems.isNotEmpty) const SizedBox(height: 8),
                 for (final line in [
                   if (nextSlot != null)
                     l10n.gameNextPing(
@@ -771,22 +927,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       ),
                       null => l10n.speedhuntActive,
                     },
-                  ),
-                ],
-                if (reveal != null) ...[
-                  const SizedBox(height: 8),
-                  _InfoChip(
-                    icon: Icons.visibility_outlined,
-                    text: l10n.jokerResult(timeFmt.format(reveal.at.toLocal())),
-                  ),
-                ],
-                if (_playerReveal case final pr?) ...[
-                  const SizedBox(height: 8),
-                  _InfoChip(
-                    icon: Icons.groups_outlined,
-                    text: l10n.jokerPlayersResult(
-                      timeFmt.format(pr.at.toLocal()),
-                    ),
                   ),
                 ],
               ],

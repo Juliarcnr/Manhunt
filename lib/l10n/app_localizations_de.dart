@@ -47,6 +47,31 @@ class AppLocalizationsDe extends AppLocalizations {
   String get overviewTitle => 'Übersicht';
 
   @override
+  String get filterHunters => 'Hunter';
+
+  @override
+  String get filterLastPings => 'Letzte Pings';
+
+  @override
+  String get filterSpeedhunts => 'Speedhunts';
+
+  @override
+  String get filterLines => 'Linien';
+
+  @override
+  String get filterMyPings => 'Meine Pings';
+
+  @override
+  String filterHunterJoker(String time) {
+    return 'Hunter $time';
+  }
+
+  @override
+  String filterPlayerJoker(String time) {
+    return 'Spieler $time';
+  }
+
+  @override
   String get overviewNoSpeedhunt => 'Kein Speedhunt aktiv';
 
   @override
@@ -147,10 +172,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpeedhuntInterval => 'Abstand der Speedhunt-Pings';
 
   @override
-  String get settingsSpeedhuntEarliest => 'Erster Speedhunt ab';
+  String get settingsSpeedhuntEarliest => 'Speedhunts erlaubt ab';
 
   @override
-  String get settingsSpeedhuntFirstDelay => 'Erster Speedhunt-Ping nach';
+  String get settingsSpeedhuntEarliestHint =>
+      'Ab Spielstart (inkl. Vorlauf) gezählt. Vorher können Hunter keinen Speedhunt auslösen.';
+
+  @override
+  String get settingsSpeedhuntFirstDelay => 'Verzögerung bis zum 1. Ping';
+
+  @override
+  String get settingsSpeedhuntFirstDelayHint =>
+      'Zeit zwischen dem Auslösen eines Speedhunts und seinem ersten Ping.';
 
   @override
   String get settingsHunterCount => 'Anzahl Hunter';
@@ -334,7 +367,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gamePhaseStarting => 'Startet…';
 
   @override
-  String get gamePhaseHeadStart => 'Vorlauf – Hunter warten';
+  String get gamePhaseHeadStart => 'Vorlauf';
 
   @override
   String get gamePhaseHunting => 'Die Jagd läuft';
@@ -486,11 +519,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Handys aller anderen aktiven Spieler senden dir einmalig ihren aktuellen Standort. Danach ist dieser Joker verbraucht.';
 
   @override
-  String jokerPlayersResult(String time) {
-    return 'Spieler um $time (Joker)';
-  }
-
-  @override
   String get jokerTitle => 'Hunter-Joker einsetzen?';
 
   @override
@@ -499,11 +527,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get jokerConfirm => 'Joker einsetzen';
-
-  @override
-  String jokerResult(String time) {
-    return 'Hunter um $time (Joker)';
-  }
 
   @override
   String get jokerNoHunters => 'Gerade keine Hunter-Standorte verfügbar.';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 
+import '../../core/geo/arrows.dart';
 import '../../core/round/ping_schedule.dart';
 import '../../theme/app_theme.dart';
 import '../map/base_map.dart';
@@ -21,10 +22,13 @@ MarkerLayer lastPingsLayer({
   required Map<String, String> names,
   required Set<String> caught,
   required Map<String, Color> colors,
+
+  /// Players whose full history is shown – their last ping is part of it.
+  Set<String> skip = const {},
 }) => MarkerLayer(
   markers: [
     for (final entry in byPlayer.entries)
-      if (entry.value.isNotEmpty)
+      if (entry.value.isNotEmpty && !skip.contains(entry.key))
         Marker(
           key: Key('lastPing_${entry.key}'),
           point: entry.value.last.fix.point.toLatLng(),
@@ -110,37 +114,137 @@ Map<String, Color> hunterColors(List<String> hunterIds) => {
     id: AppColors.hunterPalette[i % AppColors.hunterPalette.length],
 };
 
-/// A player's own pings, numbered 1, 2, 3 … (R-PLAY-01, R-HUNT-04).
-MarkerLayer historyLayer(List<PingRecord> pings, {required Color color}) =>
+/// Pings of one player, numbered 1, 2, 3 … in their colour (R-PLAY-01,
+/// R-HUNT-04). A speedhunt ping gets a yellow ring; [keyPrefix] keeps marker
+/// keys unique when several players are shown.
+MarkerLayer historyLayer(
+  List<PingRecord> pings, {
+  required Color color,
+  String keyPrefix = 'history',
+}) => MarkerLayer(
+  markers: [
+    for (final (i, p) in pings.indexed)
+      Marker(
+        key: Key('${keyPrefix}_${i + 1}'),
+        point: p.fix.point.toLatLng(),
+        width: 28,
+        height: 28,
+        child: _NumberDot(
+          text: '${i + 1}',
+          color: color,
+          ring: p.kind == PingKind.speedhunt
+              ? AppColors.speedhunt
+              : Colors.white,
+        ),
+      ),
+  ],
+);
+
+/// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt, ring in
+/// the player's colour (R-HUNT-07). Players in [skip] already show their
+/// full history.
+MarkerLayer speedhuntPingsLayer({
+  required List<PingRecord> pings,
+  required Map<String, Color> colors,
+  Set<String> skip = const {},
+}) => MarkerLayer(
+  markers: [
+    for (final p in pings)
+      if (p.kind == PingKind.speedhunt && !skip.contains(p.playerId))
+        Marker(
+          key: Key('speedhunt_${p.playerId}_${p.slotId}'),
+          point: p.fix.point.toLatLng(),
+          width: 34,
+          height: 28,
+          child: _NumberDot(
+            text: '⚡${p.speedhuntNumber ?? ''}',
+            color: AppColors.speedhunt,
+            ring: colors[p.playerId] ?? AppColors.player,
+            wide: true,
+          ),
+        ),
+  ],
+);
+
+/// Connects each selected player's pings in time order, with arrows in the
+/// walking direction (R-HUNT-05).
+List<Widget> pathLayers(
+  Map<String, List<PingRecord>> byPlayer,
+  Map<String, Color> colors,
+) {
+  final paths = {
+    for (final e in byPlayer.entries)
+      if (e.value.length > 1) e.key: [for (final p in e.value) p.fix.point],
+  };
+  if (paths.isEmpty) return const [];
+  return [
+    PolylineLayer(
+      polylines: [
+        for (final e in paths.entries)
+          Polyline(
+            points: [for (final p in e.value) p.toLatLng()],
+            color: (colors[e.key] ?? AppColors.player).withValues(alpha: 0.85),
+            strokeWidth: 3,
+          ),
+      ],
+    ),
     MarkerLayer(
       markers: [
-        for (final (i, p) in pings.indexed)
-          Marker(
-            key: Key('history_${i + 1}'),
-            point: p.fix.point.toLatLng(),
-            width: 26,
-            height: 26,
-            child: Container(
-              decoration: BoxDecoration(
-                color: p.kind == PingKind.speedhunt
-                    ? AppColors.speedhunt
-                    : color,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '${i + 1}',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+        for (final e in paths.entries)
+          for (final (i, a) in pathArrows(e.value).indexed)
+            Marker(
+              key: Key('arrow_${e.key}_$i'),
+              point: a.at.toLatLng(),
+              width: 18,
+              height: 18,
+              child: Transform.rotate(
+                angle: a.bearingRad,
+                child: Icon(
+                  Icons.navigation,
+                  size: 18,
+                  color: colors[e.key] ?? AppColors.player,
+                  shadows: const [Shadow(blurRadius: 3, color: Colors.black54)],
                 ),
               ),
             ),
-          ),
       ],
-    );
+    ),
+  ];
+}
+
+class _NumberDot extends StatelessWidget {
+  const _NumberDot({
+    required this.text,
+    required this.color,
+    required this.ring,
+    this.wide = false,
+  });
+
+  final String text;
+  final Color color;
+  final Color ring;
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: color,
+      shape: wide ? BoxShape.rectangle : BoxShape.circle,
+      borderRadius: wide ? BorderRadius.circular(14) : null,
+      border: Border.all(color: ring, width: 2.5),
+      boxShadow: const [BoxShadow(blurRadius: 3, color: Colors.black38)],
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
 
 /// This device's own live position.
 MarkerLayer selfLayer(LocationFix fix) => MarkerLayer(

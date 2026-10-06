@@ -106,11 +106,23 @@ class PingRecord {
     required this.playerId,
     required this.kind,
     required this.fix,
+    this.slotId,
   });
 
   final String playerId;
   final PingKind kind;
   final LocationFix fix;
+
+  /// The [PingSlot.id] it was sent for, e.g. `speedhunt_<ms>_2`.
+  final String? slotId;
+
+  /// Position within its speedhunt (1-based) for the ⚡1/⚡2/⚡3 labels
+  /// (R-HUNT-07); null for regular pings.
+  int? get speedhuntNumber {
+    final id = slotId;
+    if (kind != PingKind.speedhunt || id == null) return null;
+    return int.tryParse(id.substring(id.lastIndexOf('_') + 1));
+  }
 }
 
 /// Pings per player, chronological – basis for the numbered history.
