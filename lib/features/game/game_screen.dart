@@ -573,10 +573,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final members = ref.watch(membersProvider).value ?? const <Member>[];
     final me = _me(members);
     final names = {for (final m in members) m.id: m.name};
-    final huntersByColor = hunterColors([
-      for (final m in members)
-        if (m.isHunter) m.id,
-    ]);
     final playersByColor = playerColors([
       for (final m in members)
         if (m.isPlayer) m.id,
@@ -676,7 +672,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 if (e.key != widget.session.userId) e.key: e.value,
             },
             names: names,
-            colors: huntersByColor,
           ),
         );
       }
@@ -740,7 +735,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
           huntersLayer(
             positions: reveal.positions,
             names: names,
-            colors: huntersByColor,
             formatTime: timeFmt.format,
           ),
         );

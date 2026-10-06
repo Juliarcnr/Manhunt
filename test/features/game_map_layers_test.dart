@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/features/game/game_map_layers.dart';
+import 'package:manhunt/theme/app_theme.dart';
 
 void main() {
   final positions = {
@@ -39,13 +40,15 @@ void main() {
     testWidgets('live: location pin, hunter symbol before the name, no time', (
       tester,
     ) async {
-      await pumpLayer(
-        tester,
-        huntersLayer(positions: positions, names: names, colors: const {}),
-      );
+      await pumpLayer(tester, huntersLayer(positions: positions, names: names));
       expect(inPin(find.byIcon(Icons.location_on)), findsOneWidget);
       expect(inPin(find.byIcon(Icons.track_changes)), findsOneWidget);
       expect(inPin(find.text('Anna')), findsOneWidget);
+      // All hunters share the one hunter colour.
+      expect(
+        tester.widget<Icon>(inPin(find.byIcon(Icons.location_on))).color,
+        AppColors.hunter,
+      );
       expect(
         tester.getCenter(inPin(find.byIcon(Icons.track_changes))).dx,
         lessThan(tester.getCenter(inPin(find.text('Anna'))).dx),
@@ -60,12 +63,48 @@ void main() {
         huntersLayer(
           positions: positions,
           names: names,
-          colors: const {},
           formatTime: (t) => '${t.hour}:${t.minute}',
         ),
       );
       expect(inPin(find.text('Anna · 14:32')), findsOneWidget);
       expect(inPin(find.byIcon(Icons.track_changes)), findsOneWidget);
+    });
+  });
+
+  group('speedhunt pings (R-HUNT-07)', () {
+    PingRecord sh(String player, int n, int minute) => PingRecord(
+      playerId: player,
+      kind: PingKind.speedhunt,
+      slotId: 'speedhunt_1_$n',
+      fix: LocationFix(
+        point: const GeoPoint(52.52, 13.405),
+        at: DateTime(2026, 10, 6, 14, minute),
+      ),
+    );
+    Finder pinIn(String key) => find.descendant(
+      of: find.byKey(Key(key)),
+      matching: find.byIcon(Icons.location_on),
+    );
+
+    testWidgets('only the latest per player gets a location pin', (
+      tester,
+    ) async {
+      await pumpLayer(
+        tester,
+        speedhuntPingsLayer(
+          pings: [sh('anna', 1, 30), sh('anna', 2, 35), sh('ben', 1, 20)],
+          colors: const {'anna': Colors.pink},
+        ),
+      );
+      expect(find.text('⚡1'), findsNWidgets(2));
+      expect(find.text('⚡2'), findsOneWidget);
+      expect(pinIn('speedhunt_anna_speedhunt_1_1'), findsNothing);
+      expect(pinIn('speedhunt_anna_speedhunt_1_2'), findsOneWidget);
+      expect(pinIn('speedhunt_ben_speedhunt_1_1'), findsOneWidget);
+      expect(
+        tester.widget<Icon>(pinIn('speedhunt_anna_speedhunt_1_2')).color,
+        Colors.pink,
+      );
     });
   });
 }

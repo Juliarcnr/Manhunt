@@ -146,6 +146,20 @@ PingRecord? lastRegularPing(List<PingRecord> pings) {
   return null;
 }
 
+/// Latest speedhunt ping per player – only these get a location pin on the
+/// map, older ones stay small badges (R-HUNT-07).
+Map<String, PingRecord> latestSpeedhuntPings(Iterable<PingRecord> pings) {
+  final latest = <String, PingRecord>{};
+  for (final p in pings) {
+    if (p.kind != PingKind.speedhunt) continue;
+    final current = latest[p.playerId];
+    if (current == null || p.fix.at.isAfter(current.fix.at)) {
+      latest[p.playerId] = p;
+    }
+  }
+  return latest;
+}
+
 /// Next ping of a running speedhunt as number (1-based) and time, or null if
 /// all its pings are done. Same for everyone, so it reveals no target
 /// (R-SPEED-04, R-SPEED-08).

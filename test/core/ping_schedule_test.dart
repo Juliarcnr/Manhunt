@@ -128,6 +128,27 @@ void main() {
     expect(lastRegularPing(const []), isNull);
   });
 
+  test(
+    'latestSpeedhuntPings: newest speedhunt ping per player (R-HUNT-07)',
+    () {
+      PingRecord p(String player, PingKind kind, int minute) => PingRecord(
+        playerId: player,
+        kind: kind,
+        fix: LocationFix(point: const GeoPoint(0, 0), at: at(minute)),
+      );
+      final a2 = p('a', PingKind.speedhunt, 35);
+      final b1 = p('b', PingKind.speedhunt, 20);
+      final latest = latestSpeedhuntPings([
+        a2,
+        p('a', PingKind.speedhunt, 30),
+        p('a', PingKind.regular, 40),
+        b1,
+      ]);
+      expect(latest, {'a': same(a2), 'b': same(b1)});
+      expect(latestSpeedhuntPings([p('a', PingKind.regular, 10)]), isEmpty);
+    },
+  );
+
   test('nextSpeedhuntPing counts down the speedhunt (R-SPEED-08)', () {
     final s = speedhunt(30); // pings at 30, 35, 40
     expect(nextSpeedhuntPing(s, at(29)), (number: 1, at: at(30)));

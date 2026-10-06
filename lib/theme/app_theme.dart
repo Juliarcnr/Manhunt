@@ -8,24 +8,14 @@ abstract final class AppColors {
   static const outline = Color(0xFF2C3242);
   static const textMuted = Color(0xFF9AA3B5);
 
-  /// Hunters: hot neon orange-red.
-  static const hunter = Color(0xFFFF4D2E);
+  /// Hunters: muted orange-red. On the map every hunter uses this one colour.
+  static const hunter = Color(0xFFDD573C);
 
   /// Players: electric teal.
   static const player = Color(0xFF1DE9B6);
 
-  /// One colour per hunter: warm tones, clearly apart from the players.
-  static const hunterPalette = [
-    Color(0xFFFF4D2E), // hunter red-orange
-    Color(0xFFFF9100), // orange
-    Color(0xFFE040FB), // magenta
-    Color(0xFFFF1744), // red
-    Color(0xFFFF6E40), // deep orange
-    Color(0xFFF50057), // pink-red
-  ];
-
-  /// One distinct colour per player on the hunters' map (field test feedback).
-  /// Avoids the hunter red and the speedhunt yellow.
+  /// One distinct colour per player on the map (field test feedback).
+  /// Avoids the hunter orange-red and the speedhunt yellow.
   static const playerPalette = [
     Color(0xFF1DE9B6), // teal
     Color(0xFF40C4FF), // light blue
@@ -34,7 +24,6 @@ abstract final class AppColors {
     Color(0xFFC6FF00), // lime
     Color(0xFF8C9EFF), // indigo
     Color(0xFFFFFFFF), // white
-    Color(0xFFFFAB91), // peach
     Color(0xFF64FFDA), // aqua
     Color(0xFFA1887F), // brown
   ];

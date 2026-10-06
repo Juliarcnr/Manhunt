@@ -46,18 +46,18 @@ MarkerLayer lastPingsLayer({
 );
 
 /// Live positions of hunters (R-HUNT-02) or a joker snapshot (R-PLAY-02):
-/// location pins with the hunter symbol before the name. Live positions
-/// carry no time; pass [formatTime] for a snapshot, whose age matters.
+/// location pins in the one hunter colour, with the hunter symbol before the
+/// name. Live positions carry no time; pass [formatTime] for a snapshot,
+/// whose age matters.
 MarkerLayer huntersLayer({
   required Map<String, LocationFix> positions,
   required Map<String, String> names,
-  required Map<String, Color> colors,
   String Function(DateTime)? formatTime,
 }) => _positionsLayer(
   keyPrefix: 'hunter',
   positions: positions,
   names: names,
-  colors: colors,
+  colors: const {},
   fallbackColor: AppColors.hunter,
   icon: Icons.location_on,
   labelIcon: Icons.track_changes,
@@ -113,12 +113,6 @@ MarkerLayer _positionsLayer({
   ],
 );
 
-/// Colour per hunter (by join order), in warm tones distinct from players.
-Map<String, Color> hunterColors(List<String> hunterIds) => {
-  for (final (i, id) in hunterIds.indexed)
-    id: AppColors.hunterPalette[i % AppColors.hunterPalette.length],
-};
-
 /// Pings of one player, numbered 1, 2, 3 … in their colour (R-PLAY-01,
 /// R-HUNT-04). A speedhunt ping gets a yellow ring; [keyPrefix] keeps marker
 /// keys unique when several players are shown.
@@ -147,30 +141,58 @@ MarkerLayer historyLayer(
 
 /// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt: dark
 /// badge (so the yellow bolt stays visible), ring in the player's colour
-/// (R-HUNT-07). Players in [skip] already show their full history.
+/// (R-HUNT-07). Each player's latest one also gets a location pin in their
+/// colour below the badge. Players in [skip] already show their full history.
 MarkerLayer speedhuntPingsLayer({
   required List<PingRecord> pings,
   required Map<String, Color> colors,
   Set<String> skip = const {},
-}) => MarkerLayer(
-  markers: [
-    for (final p in pings)
-      if (p.kind == PingKind.speedhunt && !skip.contains(p.playerId))
-        Marker(
-          key: Key('speedhunt_${p.playerId}_${p.slotId}'),
-          point: p.fix.point.toLatLng(),
-          width: 34,
-          height: 28,
-          child: _NumberDot(
-            text: '⚡${p.speedhuntNumber ?? ''}',
-            color: AppColors.surface,
-            textColor: Colors.white,
-            ring: colors[p.playerId] ?? AppColors.player,
-            wide: true,
+}) {
+  final latest = latestSpeedhuntPings(pings).values.toSet();
+  return MarkerLayer(
+    markers: [
+      for (final p in pings)
+        if (p.kind == PingKind.speedhunt && !skip.contains(p.playerId))
+          _speedhuntMarker(
+            p,
+            colors[p.playerId] ?? AppColors.player,
+            pin: latest.contains(p),
           ),
-        ),
-  ],
-);
+    ],
+  );
+}
+
+Marker _speedhuntMarker(PingRecord p, Color color, {required bool pin}) {
+  final badge = _NumberDot(
+    text: '⚡${p.speedhuntNumber ?? ''}',
+    color: AppColors.surface,
+    textColor: Colors.white,
+    ring: color,
+    wide: true,
+  );
+  return Marker(
+    key: Key('speedhunt_${p.playerId}_${p.slotId}'),
+    point: p.fix.point.toLatLng(),
+    width: 34,
+    height: pin ? 60 : 28,
+    // With a pin, its tip marks the position, like the other location pins.
+    alignment: pin ? Alignment.topCenter : Alignment.center,
+    child: pin
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(width: 34, height: 28, child: badge),
+              Icon(
+                Icons.location_on,
+                color: color,
+                size: 32,
+                shadows: const [Shadow(blurRadius: 4, color: Colors.black54)],
+              ),
+            ],
+          )
+        : badge,
+  );
+}
 
 /// Connects each selected player's pings in time order, with arrows in the
 /// walking direction (R-HUNT-05).
