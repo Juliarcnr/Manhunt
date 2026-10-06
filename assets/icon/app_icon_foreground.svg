@@ -15,4 +15,4 @@
   <filter id="glowSmall" x="-100%" y="-100%" width="300%" height="300%">
     <feGaussianBlur stdDeviation="10"/>
   </filter>
-</defs><path d="M218 744 L300 280 L404 280 L512 520 L620 280 L724 280 L806 744 L702 744 L652 452 L556 660 L468 660 L372 452 L322 744 Z" fill="#FF4D2E" filter="url(#glow)" opacity="0.55"/><path d="M218 744 L300 280 L404 280 L512 520 L620 280 L724 280 L806 744 L702 744 L652 452 L556 660 L468 660 L372 452 L322 744 Z" fill="url(#mGrad)" stroke="url(#mGrad)" stroke-width="10" stroke-linejoin="round"/><circle cx="512" cy="372" r="58" fill="#1DE9B6" filter="url(#glow)" opacity="0.8"/><circle cx="512" cy="372" r="38" fill="#1DE9B6"/></svg>
+</defs><path d="M218 744 L300 280 L404 280 L512 520 L620 280 L724 280 L806 744 L702 744 L652 452 L556 660 L468 660 L372 452 L322 744 Z" fill="#FF4D2E" filter="url(#glow)" opacity="0.55"/><path d="M218 744 L300 280 L404 280 L512 520 L620 280 L724 280 L806 744 L702 744 L652 452 L556 660 L468 660 L372 452 L322 744 Z" fill="url(#mGrad)" stroke="url(#mGrad)" stroke-width="10" stroke-linejoin="round"/></svg>
