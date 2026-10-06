@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
@@ -632,17 +633,21 @@ void main() {
     ) async {
       await seed(tester);
       await pumpAs(tester, 'alex');
-      for (final id in [
-        'hunters',
-        'lastPings',
-        'speedhunts',
-        'lines',
-        'player_kim',
-        'player_sam',
-      ]) {
+      for (final id in ['hunters', 'lastPings', 'player_kim', 'player_sam']) {
         expect(find.byKey(Key('filter_$id')), findsOneWidget, reason: id);
       }
       expect(find.byKey(const Key('filter_myPings')), findsNothing);
+      // No "lines" chip any more (the player chip does it, R-HUNT-05) and
+      // speedhunt chips only once there is a speedhunt (R-HUNT-07).
+      expect(find.byKey(const Key('filter_lines')), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('filter_speedhunt'),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('"last pings" can be switched off and on (R-HUNT-03)', (
@@ -731,50 +736,138 @@ void main() {
       expect(find.byKey(const Key('filterCheck_lastPings')), findsNothing);
     });
 
-    testWidgets('player chip shows the numbered history with arrows '
+    testWidgets('player chip cycles: history → with lines → off '
         '(R-HUNT-04, R-HUNT-05)', (tester) async {
       await seed(tester);
       await ping(tester, 'kim', 'regular_1', 52.501, 20);
       await ping(tester, 'kim', 'regular_2', 52.503, 40);
       await ping(tester, 'kim', 'regular_3', 52.506, 60);
       await pumpAs(tester, 'alex');
+      Finder lineIcon() => find.descendant(
+        of: find.byKey(const Key('filter_player_kim')),
+        matching: find.byIcon(Icons.timeline),
+      );
       expect(find.byKey(const Key('history_kim_1')), findsNothing);
 
+      // 1st tap: numbered points only.
       await tapFilter(tester, 'player_kim');
       expect(find.byKey(const Key('history_kim_1')), findsOneWidget);
       expect(find.byKey(const Key('history_kim_3')), findsOneWidget);
-      expect(find.byKey(const Key('arrow_kim_0')), findsOneWidget);
-      expect(find.byKey(const Key('arrow_kim_1')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_0')), findsNothing);
+      expect(lineIcon(), findsNothing);
       // The last ping is part of the history – no duplicate pin.
       expect(find.byKey(const Key('lastPing_kim')), findsNothing);
 
-      await tapFilter(tester, 'lines');
-      expect(find.byKey(const Key('arrow_kim_0')), findsNothing);
+      // 2nd tap: with lines and arrows; the chip shows a line icon.
+      await tapFilter(tester, 'player_kim');
       expect(find.byKey(const Key('history_kim_1')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_0')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_1')), findsOneWidget);
+      expect(lineIcon(), findsOneWidget);
 
+      // 3rd tap: off.
       await tapFilter(tester, 'player_kim');
       expect(find.byKey(const Key('history_kim_1')), findsNothing);
+      expect(find.byKey(const Key('arrow_kim_0')), findsNothing);
+      expect(lineIcon(), findsNothing);
+      expect(find.byKey(const Key('filterCheck_player_kim')), findsNothing);
       expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
     });
 
-    testWidgets('all speedhunt pings stay visible, numbered, toggleable '
-        '(R-HUNT-07)', (tester) async {
+    testWidgets('history numbers only regular pings, speedhunt pings stay '
+        'separate (R-HUNT-04, R-HUNT-07)', (tester) async {
       await seed(tester);
+      final sh = start.add(const Duration(minutes: 25)).millisecondsSinceEpoch;
+      await ping(
+        tester,
+        'kim',
+        'speedhunt_${sh}_1',
+        52.5011,
+        25,
+        kind: PingKind.speedhunt,
+      );
+      await ping(
+        tester,
+        'kim',
+        'speedhunt_${sh}_2',
+        52.5012,
+        30,
+        kind: PingKind.speedhunt,
+      );
+      await ping(tester, 'kim', 'regular_1', 52.503, 40);
+      await ping(tester, 'kim', 'regular_2', 52.506, 60);
+      await pumpAs(tester, 'alex');
+      await tapFilter(tester, 'player_kim');
+      await tapFilter(tester, 'player_kim');
+
+      Marker marker(String key) => tester
+          .widgetList<MarkerLayer>(find.byType(MarkerLayer))
+          .expand((l) => l.markers)
+          .singleWhere((m) => m.key == Key(key));
+      // Same numbers as on the player's phone: 1 and 2 are the regular pings.
+      expect(marker('history_kim_1').point.latitude, 52.503);
+      expect(marker('history_kim_2').point.latitude, 52.506);
+      expect(find.byKey(const Key('history_kim_3')), findsNothing);
+      // Lines connect the regular pings only: one arrow between 1 and 2.
+      expect(find.byKey(const Key('arrow_kim_0')), findsOneWidget);
+      expect(find.byKey(const Key('arrow_kim_1')), findsNothing);
+      // The speedhunt pings are still shown with their own numbering.
+      expect(find.text('⚡1'), findsOneWidget);
+      expect(find.text('⚡2 Kim'), findsOneWidget);
+    });
+
+    testWidgets('one chip per speedhunt with name and start time, '
+        'toggleable on its own (R-HUNT-07)', (tester) async {
+      await seed(tester);
+      final first = start.add(const Duration(minutes: 70));
+      final second = start.add(const Duration(minutes: 100));
       for (final (i, lat) in [52.501, 52.502, 52.503].indexed) {
         await ping(
           tester,
           'sam',
-          'speedhunt_1791228604799_${i + 1}',
+          'speedhunt_${first.millisecondsSinceEpoch}_${i + 1}',
           lat,
           70 + i * 5,
           kind: PingKind.speedhunt,
         );
       }
+      await ping(
+        tester,
+        'kim',
+        'speedhunt_${second.millisecondsSinceEpoch}_1',
+        52.507,
+        100,
+        kind: PingKind.speedhunt,
+      );
       await pumpAs(tester, 'alex');
+      final samChip = 'speedhunt_sam_${first.millisecondsSinceEpoch}';
+      final kimChip = 'speedhunt_kim_${second.millisecondsSinceEpoch}';
+      final hm = DateFormat.Hm('en');
+      expect(
+        find.descendant(
+          of: find.byKey(Key('filter_$samChip')),
+          matching: find.text('Sam ${hm.format(first.toLocal())}'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(Key('filter_$kimChip')),
+          matching: find.text('Kim ${hm.format(second.toLocal())}'),
+        ),
+        findsOneWidget,
+      );
+      // Oldest speedhunt first.
+      expect(
+        tester.getRect(find.byKey(Key('filter_$samChip'))).left,
+        lessThan(tester.getRect(find.byKey(Key('filter_$kimChip'))).left),
+      );
+
       expect(find.text('⚡1'), findsOneWidget);
       expect(find.text('⚡2'), findsOneWidget);
       // The latest one also carries the player's name.
       expect(find.text('⚡3 Sam'), findsOneWidget);
+      expect(find.text('⚡1 Kim'), findsOneWidget);
       // No yellow badge – the bolt would vanish on it.
       final badge = tester.widget<Container>(
         find.ancestor(of: find.text('⚡1'), matching: find.byType(Container)),
@@ -783,8 +876,52 @@ void main() {
         (badge.decoration! as BoxDecoration).color,
         isNot(AppColors.speedhunt),
       );
-      await tapFilter(tester, 'speedhunts');
+
+      // Sam's speedhunt off: Kim's stays.
+      await tapFilter(tester, samChip);
+      expect(find.text('⚡3 Sam'), findsNothing);
       expect(find.text('⚡1'), findsNothing);
+      expect(find.text('⚡1 Kim'), findsOneWidget);
+      await tapFilter(tester, samChip);
+      expect(find.text('⚡3 Sam'), findsOneWidget);
+    });
+
+    testWidgets('a new speedhunt ping switches its chip back on (R-HUNT-08)', (
+      tester,
+    ) async {
+      await seed(tester);
+      final sh = start.add(const Duration(minutes: 70)).millisecondsSinceEpoch;
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_${sh}_1',
+        52.501,
+        70,
+        kind: PingKind.speedhunt,
+      );
+      await pumpAs(tester, 'alex');
+      final chip = 'speedhunt_sam_$sh';
+      await tapFilter(tester, chip);
+      expect(find.byKey(Key('filterCheck_$chip')), findsNothing);
+      expect(find.text('⚡1 Sam'), findsNothing);
+
+      // A regular ping does not switch it on …
+      await ping(tester, 'sam', 'regular_4', 52.502, 80);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('filterCheck_$chip')), findsNothing);
+
+      // … the next ping of the speedhunt does.
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_${sh}_2',
+        52.503,
+        75,
+        kind: PingKind.speedhunt,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('filterCheck_$chip')), findsOneWidget);
+      expect(find.text('⚡2 Sam'), findsOneWidget);
     });
 
     testWidgets('player: own pings can be hidden (R-PLAY-01)', (tester) async {

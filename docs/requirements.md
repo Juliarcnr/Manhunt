@@ -94,14 +94,14 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 
 | ID | Anforderung |
 |---|---|
-| R-HUNT-01 | Filter-Buttons (Chips) in einer Leiste unter der Kopfzeile, mehrere gleichzeitig aktivierbar: Hunter, Letzte Pings, Speedhunts, Linien und ein Chip pro Spieler (in seiner Farbe) für dessen Ping-Historie. Spieler haben „Meine Pings“ und nach dem Einlösen je einen Chip pro Joker. Alle Chips dunkel; aktive Chips mit farbiger Umrandung und Haken. |
+| R-HUNT-01 | Filter-Buttons (Chips) in einer Leiste unter der Kopfzeile, mehrere gleichzeitig aktivierbar: Hunter, Letzte Pings, ein Chip pro Spieler (in seiner Farbe) für dessen Ping-Historie (R-HUNT-04/05) und ein Chip pro Speedhunt (R-HUNT-07). Spieler haben „Meine Pings“ und nach dem Einlösen je einen Chip pro Joker. Alle Chips dunkel; aktive Chips mit farbiger Umrandung und Haken. |
 | R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter als Standort-Pins, alle Hunter einheitlich in der (gedämpften) Hunter-Farbe Orange-Rot, Hunter-Symbol vor dem Namen, ohne Uhrzeit (live). |
 | R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**. Zählt nur normale Pings – Speedhunt-Pings gehören zum Filter „Speedhunts“ (R-HUNT-07). |
-| R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. |
-| R-HUNT-05 | Option: Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung. |
+| R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. Nur normale Pings – Speedhunt-Pings werden nicht mitgezählt, damit die Nummern mit denen auf dem Spielerhandy übereinstimmen (Feldtest 2026-10-06). |
+| R-HUNT-05 | Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung (nur normale Pings). Kein eigener Linien-Chip: Tippen auf den Spieler-Chip schaltet reihum Punkte → Punkte mit Linien → aus; bei Linien zeigt der Chip ein Linien-Symbol statt des Farbpunkts. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
-| R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers zeigt im Badge zusätzlich den Spielernamen („⚡2 Anna“) und hat einen Location-Pin in Spielerfarbe unter dem Badge. Sie lassen sich ein-/ausblenden – zusammen mit den Filtern für einzelne Spieler. |
-| R-HUNT-08 | Ist „Letzte Pings“ ausgeschaltet und kommen neue normale Pings rein, schaltet sich der Filter automatisch wieder ein (Speedhunt-Pings lösen das nicht aus). |
+| R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers zeigt im Badge zusätzlich den Spielernamen („⚡2 Anna“) und hat einen Location-Pin in Spielerfarbe unter dem Badge. Getrennt von der Spieler-Historie: ein Filter-Chip pro Speedhunt mit Blitz, Name und Startzeit („⚡ Sam 18:35“, Rand in Spielerfarbe), erscheint mit dem ersten Ping des Speedhunts, ist sofort an und einzeln ein-/ausschaltbar. |
+| R-HUNT-08 | Ist „Letzte Pings“ ausgeschaltet und kommen neue normale Pings rein, schaltet sich der Filter automatisch wieder ein (Speedhunt-Pings lösen das nicht aus). Ebenso schaltet ein neuer Speedhunt-Ping den Chip seines Speedhunts wieder ein, falls er aus war (R-HUNT-07). |
 
 ### Spieler-View
 

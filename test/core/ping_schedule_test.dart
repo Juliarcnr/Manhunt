@@ -204,6 +204,79 @@ void main() {
     );
   });
 
+  group('regularPings / speedhuntsFromPings (R-HUNT-04, R-HUNT-07)', () {
+    PingRecord p(String player, String slot, int minute) => PingRecord(
+      playerId: player,
+      kind: slot.startsWith('speedhunt')
+          ? PingKind.speedhunt
+          : PingKind.regular,
+      slotId: slot,
+      fix: LocationFix(point: const GeoPoint(0, 0), at: at(minute)),
+    );
+    final shA = at(30).millisecondsSinceEpoch;
+    final shB = at(50).millisecondsSinceEpoch;
+
+    test('regularPings drops speedhunt pings, keeps the order', () {
+      final r1 = p('a', 'regular_1', 20);
+      final r2 = p('a', 'regular_2', 40);
+      expect(regularPings([r1, p('a', 'speedhunt_${shA}_1', 30), r2]), [
+        same(r1),
+        same(r2),
+      ]);
+    });
+
+    test('one group per speedhunt, oldest first, pings by number', () {
+      final b1 = p('b', 'speedhunt_${shB}_1', 50);
+      final a1 = p('a', 'speedhunt_${shA}_1', 30);
+      final a2 = p('a', 'speedhunt_${shA}_2', 35);
+      final groups = speedhuntsFromPings([b1, a2, p('a', 'regular_1', 20), a1]);
+      expect(groups.map((g) => g.playerId), ['a', 'b']);
+      expect(groups.first.startedAt, at(30));
+      expect(groups.first.pings, [same(a1), same(a2)]);
+      expect(groups.last.pings, [same(b1)]);
+      expect(groups.first.id, 'a_$shA');
+    });
+
+    test('same player, two speedhunts → two groups; bad ids ignored', () {
+      final groups = speedhuntsFromPings([
+        p('a', 'speedhunt_${shA}_1', 30),
+        p('a', 'speedhunt_${shB}_1', 50),
+        p('a', 'speedhunt_broken', 55),
+      ]);
+      expect(groups.map((g) => g.startedAt), [at(30), at(50)]);
+      expect(speedhuntsFromPings([p('a', 'regular_1', 20)]), isEmpty);
+    });
+  });
+
+  group('speedhuntsWithNewPings (R-HUNT-08)', () {
+    PingRecord p(String player, String slot) => PingRecord(
+      playerId: player,
+      kind: slot.startsWith('speedhunt')
+          ? PingKind.speedhunt
+          : PingKind.regular,
+      slotId: slot,
+      fix: LocationFix(point: const GeoPoint(0, 0), at: at(30)),
+    );
+    final ms = at(30).millisecondsSinceEpoch;
+    final a1 = p('a', 'speedhunt_${ms}_1');
+
+    test('a new ping names its speedhunt', () {
+      expect(speedhuntsWithNewPings([a1], [a1, p('a', 'speedhunt_${ms}_2')]), {
+        'a_$ms',
+      });
+      // Brand-new speedhunt of another player.
+      expect(speedhuntsWithNewPings([a1], [a1, p('b', 'speedhunt_${ms}_1')]), {
+        'b_$ms',
+      });
+    });
+
+    test('regular pings, unchanged lists and the first load do not', () {
+      expect(speedhuntsWithNewPings([a1], [a1, p('a', 'regular_1')]), isEmpty);
+      expect(speedhuntsWithNewPings([a1], [a1]), isEmpty);
+      expect(speedhuntsWithNewPings(null, [a1]), isEmpty);
+    });
+  });
+
   test('nextSpeedhuntPing counts down the speedhunt (R-SPEED-08)', () {
     final s = speedhunt(30); // pings at 30, 35, 40
     expect(nextSpeedhuntPing(s, at(29)), (number: 1, at: at(30)));

@@ -113,48 +113,41 @@ MarkerLayer _positionsLayer({
   ],
 );
 
-/// Pings of one player, numbered 1, 2, 3 … in their colour (R-PLAY-01,
-/// R-HUNT-04). A speedhunt ping gets a yellow ring; [keyPrefix] keeps marker
-/// keys unique when several players are shown.
+/// Regular pings of one player, numbered 1, 2, 3 … in their colour
+/// (R-PLAY-01, R-HUNT-04). Speedhunt pings are left out – they have their own
+/// ⚡ numbering (R-HUNT-07), so the numbers match on every device.
+/// [keyPrefix] keeps marker keys unique when several players are shown.
 MarkerLayer historyLayer(
   List<PingRecord> pings, {
   required Color color,
   String keyPrefix = 'history',
 }) => MarkerLayer(
   markers: [
-    for (final (i, p) in pings.indexed)
+    for (final (i, p) in regularPings(pings).indexed)
       Marker(
         key: Key('${keyPrefix}_${i + 1}'),
         point: p.fix.point.toLatLng(),
         width: 28,
         height: 28,
-        child: _NumberDot(
-          text: '${i + 1}',
-          color: color,
-          ring: p.kind == PingKind.speedhunt
-              ? AppColors.speedhunt
-              : Colors.white,
-        ),
+        child: _NumberDot(text: '${i + 1}', color: color, ring: Colors.white),
       ),
   ],
 );
 
-/// All speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt: dark
-/// badge (so the yellow bolt stays visible), ring in the player's colour
+/// Speedhunt pings, labelled ⚡1/⚡2/⚡3 within their speedhunt: dark badge
+/// (so the yellow bolt stays visible), ring in the player's colour
 /// (R-HUNT-07). Each player's latest one also shows the name in the badge
-/// ("⚡2 Anna") and a location pin in their colour below it. Players in [skip]
-/// already show their full history.
+/// ("⚡2 Anna") and a location pin in their colour below it.
 MarkerLayer speedhuntPingsLayer({
   required List<PingRecord> pings,
   required Map<String, Color> colors,
   required Map<String, String> names,
-  Set<String> skip = const {},
 }) {
   final latest = latestSpeedhuntPings(pings).values.toSet();
   return MarkerLayer(
     markers: [
       for (final p in pings)
-        if (p.kind == PingKind.speedhunt && !skip.contains(p.playerId))
+        if (p.kind == PingKind.speedhunt)
           _speedhuntMarker(
             p,
             colors[p.playerId] ?? AppColors.player,
@@ -228,15 +221,16 @@ Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
   );
 }
 
-/// Connects each selected player's pings in time order, with arrows in the
-/// walking direction (R-HUNT-05).
+/// Connects each selected player's regular pings in time order, with arrows
+/// in the walking direction (R-HUNT-05).
 List<Widget> pathLayers(
   Map<String, List<PingRecord>> byPlayer,
   Map<String, Color> colors,
 ) {
   final paths = {
     for (final e in byPlayer.entries)
-      if (e.value.length > 1) e.key: [for (final p in e.value) p.fix.point],
+      if (regularPings(e.value) case final pings when pings.length > 1)
+        e.key: [for (final p in pings) p.fix.point],
   };
   if (paths.isEmpty) return const [];
   return [

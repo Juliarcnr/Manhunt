@@ -620,30 +620,37 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final filterItems = <FilterItem>[];
     if (isHunter) {
       final pings = ref.watch(allPingsProvider).value ?? const [];
-      // New regular pings switch "last pings" back on (R-HUNT-08).
+      // New regular pings switch "last pings" back on, new speedhunt pings
+      // their speedhunt's chip (R-HUNT-08).
       ref.listen(allPingsProvider, (previous, next) {
         final pings = next.value;
-        if (!_filters.lastPings &&
-            pings != null &&
-            hasNewRegularPing(previous?.value, pings)) {
-          setState(() => _filters = _filters.copyWith(lastPings: true));
+        if (pings == null) return;
+        var f = _filters;
+        if (!f.lastPings && hasNewRegularPing(previous?.value, pings)) {
+          f = f.copyWith(lastPings: true);
         }
+        final fresh = speedhuntsWithNewPings(previous?.value, pings);
+        if (f.hiddenSpeedhunts.any(fresh.contains)) {
+          f = f.copyWith(
+            hiddenSpeedhunts: f.hiddenSpeedhunts.difference(fresh),
+          );
+        }
+        if (!identical(f, _filters)) setState(() => _filters = f);
       });
       final hunters =
           ref.watch(hunterLocationsProvider).value ??
           const <String, LocationFix>{};
       final byPlayer = pingsByPlayer(pings);
       final selected = {
-        for (final id in filters.playerHistories)
+        for (final id in filters.playerHistories.keys)
           if (byPlayer.containsKey(id)) id,
       };
-      if (filters.lines) {
-        layers.addAll(
-          pathLayers({
-            for (final id in selected) id: byPlayer[id]!,
-          }, playersByColor),
-        );
-      }
+      layers.addAll(
+        pathLayers({
+          for (final id in selected)
+            if (filters.historyOf(id) == HistoryMode.lines) id: byPlayer[id]!,
+        }, playersByColor),
+      );
       for (final id in selected) {
         layers.add(
           historyLayer(
@@ -653,16 +660,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         );
       }
-      if (filters.speedhunts) {
-        layers.add(
-          speedhuntPingsLayer(
-            pings: pings,
-            colors: playersByColor,
-            names: names,
-            skip: selected,
-          ),
-        );
-      }
+      final speedhuntGroups = speedhuntsFromPings(pings);
+      layers.add(
+        speedhuntPingsLayer(
+          pings: [
+            for (final s in speedhuntGroups)
+              if (!filters.hiddenSpeedhunts.contains(s.id)) ...s.pings,
+          ],
+          colors: playersByColor,
+          names: names,
+        ),
+      );
       if (filters.lastPings) {
         layers.add(
           lastPingsLayer(
@@ -702,42 +710,41 @@ class _GameScreenState extends ConsumerState<GameScreen>
           selected: filters.lastPings,
           onChanged: (v) => set(filters.copyWith(lastPings: v)),
         ),
-        FilterItem(
-          id: 'speedhunts',
-          label: l10n.filterSpeedhunts,
-          icon: Icons.bolt,
-          color: AppColors.speedhunt,
-          selected: filters.speedhunts,
-          onChanged: (v) => set(filters.copyWith(speedhunts: v)),
-        ),
-        FilterItem(
-          id: 'lines',
-          label: l10n.filterLines,
-          icon: Icons.timeline,
-          selected: filters.lines,
-          onChanged: (v) => set(filters.copyWith(lines: v)),
-        ),
+        // Tap cycles: points → points with lines → off (R-HUNT-04, R-HUNT-05).
         for (final m in members)
           if (m.isPlayer)
             FilterItem(
               id: 'player_${m.id}',
               label: m.name,
+              icon: filters.historyOf(m.id) == HistoryMode.lines
+                  ? Icons.timeline
+                  : null,
               color: playersByColor[m.id] ?? AppColors.player,
-              selected: filters.playerHistories.contains(m.id),
-              onChanged: (_) => set(filters.togglePlayer(m.id)),
+              selected: filters.historyOf(m.id) != HistoryMode.off,
+              onChanged: (_) => set(filters.cyclePlayer(m.id)),
             ),
+        // One chip per speedhunt, e.g. "⚡ Sam 18:35" (R-HUNT-07).
+        for (final s in speedhuntGroups)
+          FilterItem(
+            id: 'speedhunt_${s.id}',
+            label: l10n.filterSpeedhunt(
+              names[s.playerId] ?? '?',
+              timeFmt.format(s.startedAt.toLocal()),
+            ),
+            icon: Icons.bolt,
+            color: playersByColor[s.playerId] ?? AppColors.player,
+            selected: !filters.hiddenSpeedhunts.contains(s.id),
+            onChanged: (_) => set(filters.toggleSpeedhunt(s.id)),
+          ),
       ]);
     } else if (isPlayer) {
       final mine = pingsByPlayer(
         ref.watch(myPingsProvider).value ?? const [],
       )[widget.session.userId];
       if (mine != null && filters.myPings) {
-        // Own speedhunt pings stay hidden (R-SPEED-04).
-        final regular = [
-          for (final p in mine)
-            if (p.kind == PingKind.regular) p,
-        ];
-        layers.add(historyLayer(regular, color: AppColors.player));
+        // Own speedhunt pings stay hidden (R-SPEED-04): the history only
+        // shows regular pings.
+        layers.add(historyLayer(mine, color: AppColors.player));
       }
       final reveal = _jokerReveal;
       if (reveal != null && filters.hunterJoker) {

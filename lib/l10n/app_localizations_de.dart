@@ -95,10 +95,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filterLastPings => 'Letzte Pings';
 
   @override
-  String get filterSpeedhunts => 'Speedhunts';
-
-  @override
-  String get filterLines => 'Linien';
+  String filterSpeedhunt(String name, String time) {
+    return '$name $time';
+  }
 
   @override
   String get filterMyPings => 'Meine Pings';

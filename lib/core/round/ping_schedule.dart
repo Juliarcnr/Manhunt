@@ -137,6 +137,13 @@ Map<String, List<PingRecord>> pingsByPlayer(Iterable<PingRecord> pings) {
   return map;
 }
 
+/// Only the regular pings – histories are numbered without speedhunt pings
+/// (R-HUNT-04, R-HUNT-07).
+List<PingRecord> regularPings(Iterable<PingRecord> pings) => [
+  for (final p in pings)
+    if (p.kind == PingKind.regular) p,
+];
+
 /// Latest regular ping of a chronological list, or null – the "last pings"
 /// filter ignores speedhunt pings (R-HUNT-03).
 PingRecord? lastRegularPing(List<PingRecord> pings) {
@@ -176,18 +183,78 @@ Map<String, PingRecord> latestSpeedhuntPings(Iterable<PingRecord> pings) {
   return latest;
 }
 
+/// Start (ms since epoch) and number of a speedhunt ping from its slot id
+/// `speedhunt_<ms>_<n>`, or null if the id cannot be parsed.
+(int, int)? _speedhuntSlot(PingRecord p) {
+  final parts = p.slotId?.split('_');
+  if (parts == null || parts.length != 3) return null;
+  final start = int.tryParse(parts[1]);
+  final number = int.tryParse(parts[2]);
+  return start == null || number == null ? null : (start, number);
+}
+
+/// One speedhunt as the hunters see it in the received pings: target, start
+/// and its pings in order – one filter chip each (R-HUNT-07).
+class SpeedhuntPings {
+  const SpeedhuntPings({
+    required this.playerId,
+    required this.startedAt,
+    required this.pings,
+  });
+
+  final String playerId;
+  final DateTime startedAt;
+  final List<PingRecord> pings;
+
+  /// Stable key, e.g. for the filter state.
+  String get id => '${playerId}_${startedAt.millisecondsSinceEpoch}';
+}
+
+/// Speedhunt pings grouped by speedhunt, oldest speedhunt first. A speedhunt
+/// shows up with its first ping – before that there is nothing to show.
+List<SpeedhuntPings> speedhuntsFromPings(Iterable<PingRecord> pings) {
+  final groups = <(String, int), List<PingRecord>>{};
+  for (final p in pings) {
+    if (p.kind != PingKind.speedhunt) continue;
+    final slot = _speedhuntSlot(p);
+    if (slot == null) continue;
+    (groups[(p.playerId, slot.$1)] ??= []).add(p);
+  }
+  final result = [
+    for (final MapEntry(key: (player, start), value: list) in groups.entries)
+      SpeedhuntPings(
+        playerId: player,
+        startedAt: DateTime.fromMillisecondsSinceEpoch(start, isUtc: true),
+        pings: list..sort(_compareSpeedhuntSlots),
+      ),
+  ];
+  result.sort((a, b) => a.startedAt.compareTo(b.startedAt));
+  return result;
+}
+
+/// Speedhunts ([SpeedhuntPings.id]) with a ping that [previous] did not
+/// have – switches their chip back on, like [hasNewRegularPing] does for
+/// "last pings" (R-HUNT-08). Without [previous] (first load) nothing counts.
+Set<String> speedhuntsWithNewPings(
+  List<PingRecord>? previous,
+  List<PingRecord> next,
+) {
+  if (previous == null) return const {};
+  String key(PingRecord p) => '${p.playerId}|${p.slotId}';
+  final known = {
+    for (final p in previous)
+      if (p.kind == PingKind.speedhunt) key(p),
+  };
+  return {
+    for (final s in speedhuntsFromPings(next))
+      if (s.pings.any((p) => !known.contains(key(p)))) s.id,
+  };
+}
+
 /// Compares two speedhunt pings by their slot id `speedhunt_<ms>_<n>`;
 /// falls back to the fix time if an id cannot be parsed.
 int _compareSpeedhuntSlots(PingRecord a, PingRecord b) {
-  (int, int)? order(PingRecord p) {
-    final parts = p.slotId?.split('_');
-    if (parts == null || parts.length != 3) return null;
-    final start = int.tryParse(parts[1]);
-    final number = int.tryParse(parts[2]);
-    return start == null || number == null ? null : (start, number);
-  }
-
-  final (oa, ob) = (order(a), order(b));
+  final (oa, ob) = (_speedhuntSlot(a), _speedhuntSlot(b));
   if (oa == null || ob == null) return a.fix.at.compareTo(b.fix.at);
   final byStart = oa.$1.compareTo(ob.$1);
   return byStart != 0 ? byStart : oa.$2.compareTo(ob.$2);
