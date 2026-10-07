@@ -22,6 +22,10 @@ Kommunikation mit der Projektinhaberin auf **Deutsch**. Code, Kommentare, Commit
   Nicht nur Einzelzugriffe testen, sondern **ganze Abläufe so, wie das Repository sie ausführt** (z.B. erst auflisten,
   dann löschen) – und zwar für jede Rolle (Host als Hunter/Spieler/unassigned, Spieler, Hunter). Fake-Firestore in
   den Dart-Tests prüft keine Regeln! (Lehre aus dem Lösch-Bug vom 2026-10-05.)
+- Geänderte `firestore.rules` müssen **vor bzw. mit dem App-Update deployt** werden, sonst lehnt der Server neue
+  Felder/Abläufe ab („Missing or insufficient permissions“). Bei jeder Regeländerung die Projektinhaberin aktiv an
+  `firebase.cmd deploy --only firestore:rules --project manhunt-54b5d` erinnern (Claude darf nicht selbst deployen).
+  (Lehre vom 2026-10-07: Gruppen mit Namen ließen sich nicht erstellen, weil die Regeln nicht deployt waren.)
 
 ## Umgebung
 - Windows-Rechner mit Flutter (`C:\Users\julia\develop\flutter`); iOS-Builds auf dem Mac der Projektinhaberin.
