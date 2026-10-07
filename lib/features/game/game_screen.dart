@@ -641,9 +641,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ref.watch(hunterLocationsProvider).value ??
           const <String, LocationFix>{};
       final byPlayer = pingsByPlayer(pings);
+      // Caught players lose their own chips; the "caught" chip shows all of
+      // them at once (R-HUNT-09).
       final selected = {
         for (final id in filters.playerHistories.keys)
-          if (byPlayer.containsKey(id)) id,
+          if (byPlayer.containsKey(id) && !caught.contains(id)) id,
+      };
+      final caughtShown = {
+        if (filters.caught)
+          for (final id in caught)
+            if (byPlayer.containsKey(id)) id,
       };
       layers.addAll(
         pathLayers({
@@ -651,7 +658,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             if (filters.historyOf(id) == HistoryMode.lines) id: byPlayer[id]!,
         }, playersByColor),
       );
-      for (final id in selected) {
+      for (final id in {...selected, ...caughtShown}) {
         layers.add(
           historyLayer(
             byPlayer[id]!,
@@ -665,7 +672,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
         speedhuntPingsLayer(
           pings: [
             for (final s in speedhuntGroups)
-              if (!filters.hiddenSpeedhunts.contains(s.id)) ...s.pings,
+              if (caught.contains(s.playerId)
+                  ? filters.caught
+                  : !filters.hiddenSpeedhunts.contains(s.id))
+                ...s.pings,
           ],
           colors: playersByColor,
           names: names,
@@ -678,7 +688,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             names: names,
             caught: caught,
             colors: playersByColor,
-            skip: selected,
+            skip: {...selected, ...caughtShown},
           ),
         );
       }
@@ -712,7 +722,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ),
         // Tap cycles: points → points with lines → off (R-HUNT-04, R-HUNT-05).
         for (final m in members)
-          if (m.isPlayer)
+          if (m.isPlayer && !m.caught)
             FilterItem(
               id: 'player_${m.id}',
               label: m.name,
@@ -723,19 +733,30 @@ class _GameScreenState extends ConsumerState<GameScreen>
               selected: filters.historyOf(m.id) != HistoryMode.off,
               onChanged: (_) => set(filters.cyclePlayer(m.id)),
             ),
+        // All caught players in one chip (R-HUNT-09).
+        if (caught.isNotEmpty)
+          FilterItem(
+            id: 'caught',
+            label: l10n.filterCaught,
+            icon: Icons.person_off,
+            color: AppColors.textMuted,
+            selected: filters.caught,
+            onChanged: (v) => set(filters.copyWith(caught: v)),
+          ),
         // One chip per speedhunt, e.g. "⚡ Sam 18:35" (R-HUNT-07).
         for (final s in speedhuntGroups)
-          FilterItem(
-            id: 'speedhunt_${s.id}',
-            label: l10n.filterSpeedhunt(
-              names[s.playerId] ?? '?',
-              timeFmt.format(s.startedAt.toLocal()),
+          if (!caught.contains(s.playerId))
+            FilterItem(
+              id: 'speedhunt_${s.id}',
+              label: l10n.filterSpeedhunt(
+                names[s.playerId] ?? '?',
+                timeFmt.format(s.startedAt.toLocal()),
+              ),
+              icon: Icons.bolt,
+              color: playersByColor[s.playerId] ?? AppColors.player,
+              selected: !filters.hiddenSpeedhunts.contains(s.id),
+              onChanged: (_) => set(filters.toggleSpeedhunt(s.id)),
             ),
-            icon: Icons.bolt,
-            color: playersByColor[s.playerId] ?? AppColors.player,
-            selected: !filters.hiddenSpeedhunts.contains(s.id),
-            onChanged: (_) => set(filters.toggleSpeedhunt(s.id)),
-          ),
       ]);
     } else if (isPlayer) {
       final mine = pingsByPlayer(

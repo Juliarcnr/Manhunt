@@ -924,6 +924,90 @@ void main() {
       expect(find.text('⚡2 Sam'), findsOneWidget);
     });
 
+    testWidgets('caught players lose their chips; one "caught" chip shows '
+        'their history and speedhunt pings (R-HUNT-09)', (tester) async {
+      await seed(tester);
+      final sh = start.add(const Duration(minutes: 70)).millisecondsSinceEpoch;
+      await ping(tester, 'sam', 'regular_1', 52.501, 20);
+      await ping(tester, 'sam', 'regular_2', 52.502, 40);
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_${sh}_1',
+        52.503,
+        70,
+        kind: PingKind.speedhunt,
+      );
+      await ping(tester, 'kim', 'regular_1', 52.506, 20);
+      await pumpAs(tester, 'alex');
+      expect(find.byKey(const Key('filter_caught')), findsNothing);
+      expect(find.byKey(Key('filter_speedhunt_sam_$sh')), findsOneWidget);
+      // Sam's history was on before the catch – it must not stay on.
+      await tapFilter(tester, 'player_sam');
+      expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
+
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(
+            playerId: 'sam',
+            at: start.add(const Duration(minutes: 80)),
+          ),
+        ),
+      );
+      await settle(tester);
+
+      expect(find.byKey(const Key('filter_player_sam')), findsNothing);
+      expect(find.byKey(Key('filter_speedhunt_sam_$sh')), findsNothing);
+      expect(find.byKey(const Key('filter_player_kim')), findsOneWidget);
+      // The chip starts off: no history, no speedhunt pings of Sam.
+      expect(find.byKey(const Key('filterCheck_caught')), findsNothing);
+      expect(find.byKey(const Key('history_sam_1')), findsNothing);
+      expect(find.text('⚡1 Sam'), findsNothing);
+
+      // Nothing switches it on by itself (unlike R-HUNT-08): not new regular
+      // pings, not a late speedhunt ping of Sam, not another catch.
+      await ping(tester, 'kim', 'regular_2', 52.507, 85);
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_${sh}_2',
+        52.504,
+        75,
+        kind: PingKind.speedhunt,
+      );
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(
+            playerId: 'kim',
+            at: start.add(const Duration(minutes: 90)),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(find.byKey(const Key('filterCheck_caught')), findsNothing);
+      expect(find.byKey(const Key('history_sam_1')), findsNothing);
+      expect(find.byKey(const Key('history_kim_1')), findsNothing);
+      expect(find.text('⚡2 Sam'), findsNothing);
+      expect(find.byKey(const Key('filter_player_kim')), findsNothing);
+
+      await tapFilter(tester, 'caught');
+      expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
+      expect(find.byKey(const Key('history_sam_2')), findsOneWidget);
+      expect(find.text('⚡1'), findsOneWidget);
+      expect(find.text('⚡2 Sam'), findsOneWidget);
+      // Kim is caught now too.
+      expect(find.byKey(const Key('history_kim_2')), findsOneWidget);
+      // The last ping is part of the history – no duplicate pin.
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+
+      await tapFilter(tester, 'caught');
+      expect(find.byKey(const Key('history_sam_1')), findsNothing);
+      expect(find.text('⚡2 Sam'), findsNothing);
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+    });
+
     testWidgets('player: own pings can be hidden (R-PLAY-01)', (tester) async {
       await seed(tester);
       await ping(tester, 'kim', 'regular_1', 52.505, 20);

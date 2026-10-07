@@ -19,6 +19,7 @@ class MapFilters {
     this.lastPings = true,
     this.playerHistories = const {},
     this.hiddenSpeedhunts = const {},
+    this.caught = false,
     this.myPings = true,
     this.hunterJoker = true,
     this.playerJoker = true,
@@ -36,6 +37,10 @@ class MapFilters {
   /// right away (R-HUNT-07).
   final Set<String> hiddenSpeedhunts;
 
+  /// Regular history and speedhunt pings of all caught players in one chip;
+  /// caught players lose their own chips (R-HUNT-09).
+  final bool caught;
+
   // Players (R-PLAY-01, R-PLAY-04). Joker filters only appear once used and
   // are on right after using a joker.
   final bool myPings;
@@ -50,6 +55,7 @@ class MapFilters {
     bool? lastPings,
     Map<String, HistoryMode>? playerHistories,
     Set<String>? hiddenSpeedhunts,
+    bool? caught,
     bool? myPings,
     bool? hunterJoker,
     bool? playerJoker,
@@ -58,6 +64,7 @@ class MapFilters {
     lastPings: lastPings ?? this.lastPings,
     playerHistories: playerHistories ?? this.playerHistories,
     hiddenSpeedhunts: hiddenSpeedhunts ?? this.hiddenSpeedhunts,
+    caught: caught ?? this.caught,
     myPings: myPings ?? this.myPings,
     hunterJoker: hunterJoker ?? this.hunterJoker,
     playerJoker: playerJoker ?? this.playerJoker,

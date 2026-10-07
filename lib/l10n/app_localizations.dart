@@ -254,6 +254,12 @@ abstract class AppLocalizations {
   /// **'Last pings'**
   String get filterLastPings;
 
+  /// No description provided for @filterCaught.
+  ///
+  /// In en, this message translates to:
+  /// **'Caught'**
+  String get filterCaught;
+
   /// No description provided for @filterSpeedhunt.
   ///
   /// In en, this message translates to:

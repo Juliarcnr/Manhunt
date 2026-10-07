@@ -90,7 +90,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Phase 5: Hintergrund-Standort (`LocationService.track`), automatische Pings + Hunter-Live (`RoundEngine`),
       Speedhunt, Joker, Catch-Buttons, Benachrichtigungen (Banner+Vibration / System-Notification), Basis-Kartenebenen
 - [x] Phase 6: Filterleiste (Hunter, Letzte Pings, Chip pro Spieler für die nummerierte Historie – Tippen schaltet
-      Punkte → Punkte mit Linien/Pfeilen → aus –, Chip pro Speedhunt „⚡ Name hh:mm“ mit ⚡1-3; Spieler: Meine Pings + Joker-Chips), Joker-Ergebnisse im Keystore (`JokerStore`, pro Runde),
+      Punkte → Punkte mit Linien/Pfeilen → aus –, Chip pro Speedhunt „⚡ Name hh:mm“ mit ⚡1-3, Gefangene gebündelt in einem Chip „Gefangen“; Spieler: Meine Pings + Joker-Chips), Joker-Ergebnisse im Keystore (`JokerStore`, pro Runde),
       Übersicht, Spieler-/Hunterfarben, kompakte Kopfzeile
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 

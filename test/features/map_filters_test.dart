@@ -27,4 +27,12 @@ void main() {
     expect(f.hiddenSpeedhunts, {'sam_1'});
     expect(f.toggleSpeedhunt('sam_1').hiddenSpeedhunts, isEmpty);
   });
+
+  test('"caught" chip starts off and keeps the other filters (R-HUNT-09)', () {
+    const f = MapFilters(hiddenSpeedhunts: {'sam_1'});
+    expect(f.caught, isFalse);
+    final on = f.copyWith(caught: true);
+    expect(on.caught, isTrue);
+    expect(on.hiddenSpeedhunts, {'sam_1'});
+  });
 }

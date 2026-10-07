@@ -29,6 +29,7 @@
   "overviewTitle": "Übersicht",
   "filterHunters": "Hunter",
   "filterLastPings": "Letzte Pings",
+  "filterCaught": "Gefangen",
   "filterSpeedhunt": "{name} {time}",
   "filterMyPings": "Meine Pings",
   "filterHunterJoker": "Hunter {time}",

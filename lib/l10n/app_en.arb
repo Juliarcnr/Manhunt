@@ -29,6 +29,7 @@
   "overviewTitle": "Overview",
   "filterHunters": "Hunters",
   "filterLastPings": "Last pings",
+  "filterCaught": "Caught",
   "filterSpeedhunt": "{name} {time}",
   "@filterSpeedhunt": {"placeholders": {"name": {"type": "String"}, "time": {"type": "String"}}},
   "filterMyPings": "My pings",
