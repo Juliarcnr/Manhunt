@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 
 /// Editable list of all game settings (R-SET-02 … R-SET-07).
 /// Used both when creating a group and when editing it later (R-SET-08).
+/// Without [onChanged] the form is read-only (R-SET-14).
 class SettingsForm extends StatelessWidget {
   const SettingsForm({
     super.key,
@@ -14,12 +15,14 @@ class SettingsForm extends StatelessWidget {
   });
 
   final GameSettings settings;
-  final ValueChanged<GameSettings> onChanged;
+  final ValueChanged<GameSettings>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final s = settings;
+    final readOnly = onChanged == null;
+    void change(GameSettings next) => onChanged?.call(next);
 
     Widget minutes({
       required String label,
@@ -35,8 +38,9 @@ class SettingsForm extends StatelessWidget {
       valueText: formatDuration(l10n, value),
       canDecrease: value.inMinutes - step >= min,
       canIncrease: value.inMinutes + step <= max,
-      onDecrease: () => onChanged(apply(value - Duration(minutes: step))),
-      onIncrease: () => onChanged(apply(value + Duration(minutes: step))),
+      onDecrease: () => change(apply(value - Duration(minutes: step))),
+      onIncrease: () => change(apply(value + Duration(minutes: step))),
+      readOnly: readOnly,
     );
 
     Widget count({
@@ -50,8 +54,9 @@ class SettingsForm extends StatelessWidget {
       valueText: '$value',
       canDecrease: value > min,
       canIncrease: value < max,
-      onDecrease: () => onChanged(apply(value - 1)),
-      onIncrease: () => onChanged(apply(value + 1)),
+      onDecrease: () => change(apply(value - 1)),
+      onIncrease: () => change(apply(value + 1)),
+      readOnly: readOnly,
     );
 
     return Column(
@@ -155,7 +160,9 @@ class SettingsForm extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textMuted),
               ),
               value: s.jokerEnabled,
-              onChanged: (v) => onChanged(s.copyWith(jokerEnabled: v)),
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(jokerEnabled: v)),
             ),
             SwitchListTile(
               key: const Key('playerJokerSwitch'),
@@ -166,7 +173,9 @@ class SettingsForm extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textMuted),
               ),
               value: s.playerJokerEnabled,
-              onChanged: (v) => onChanged(s.copyWith(playerJokerEnabled: v)),
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(playerJokerEnabled: v)),
             ),
           ],
         ),
@@ -238,6 +247,7 @@ class StepperTile extends StatelessWidget {
     required this.canIncrease,
     required this.onDecrease,
     required this.onIncrease,
+    this.readOnly = false,
   });
 
   final String label;
@@ -250,8 +260,16 @@ class StepperTile extends StatelessWidget {
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
+  /// Shows only the value, without +/− buttons (R-SET-14).
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
+    final value = Text(
+      valueText,
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontWeight: FontWeight.w700),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -271,24 +289,27 @@ class StepperTile extends StatelessWidget {
                     ],
                   ),
           ),
-          IconButton(
-            tooltip: '−',
-            onPressed: canDecrease ? onDecrease : null,
-            icon: const Icon(Icons.remove_circle_outline),
-          ),
-          SizedBox(
-            width: 92,
-            child: Text(
-              valueText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+          if (readOnly)
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, right: 12),
+                child: Center(widthFactor: 1, child: value),
+              ),
+            )
+          else ...[
+            IconButton(
+              tooltip: '−',
+              onPressed: canDecrease ? onDecrease : null,
+              icon: const Icon(Icons.remove_circle_outline),
             ),
-          ),
-          IconButton(
-            tooltip: '+',
-            onPressed: canIncrease ? onIncrease : null,
-            icon: const Icon(Icons.add_circle_outline),
-          ),
+            SizedBox(width: 92, child: value),
+            IconButton(
+              tooltip: '+',
+              onPressed: canIncrease ? onIncrease : null,
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ],
         ],
       ),
     );

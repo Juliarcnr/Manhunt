@@ -410,6 +410,12 @@ abstract class AppLocalizations {
   /// **'Game settings'**
   String get settingsTitle;
 
+  /// No description provided for @settingsReadOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the host can change the settings.'**
+  String get settingsReadOnlyHint;
+
   /// No description provided for @settingsSectionGame.
   ///
   /// In en, this message translates to:

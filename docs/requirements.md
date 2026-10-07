@@ -37,6 +37,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-11 | Einstellbar: ab wann (Minuten nach Spielstart) der erste Speedhunt erlaubt ist (Standard: 60 min). |
 | R-SET-12 | Einstellbar: ob es den Joker „Spieler-Standorte“ gibt (Standard: ja). Der Joker „Hunter-Standorte“ ist über R-SET-09 einzeln abschaltbar. |
 | R-SET-13 | Einstellbar: wie lange nach dem Auslösen eines Speedhunts der erste Speedhunt-Ping gesendet wird (Standard: 0 min = sofort, in 1-Minuten-Schritten bis 30 min). Der Wert wird beim Auslösen im Speedhunt festgehalten. |
+| R-SET-14 | Alle Mitglieder können die Einstellungen der Gruppe in der Lobby ansehen (schreibgeschützt, aktuell gehalten); bearbeiten kann sie nur der Host (vgl. R-SET-10). |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 

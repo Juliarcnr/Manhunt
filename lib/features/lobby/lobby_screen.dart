@@ -119,20 +119,21 @@ class LobbyScreen extends ConsumerWidget {
                 ),
           actions: [
             const HistoryButton(),
-            if (_isAdmin)
-              IconButton(
-                key: const Key('settingsButton'),
-                icon: const Icon(Icons.tune),
-                tooltip: l10n.settingsTitle,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => SettingsScreen(
-                      session: session,
-                      initial: game.settings,
-                    ),
+            // Everyone sees the settings, only the host edits (R-SET-14).
+            IconButton(
+              key: const Key('settingsButton'),
+              icon: const Icon(Icons.tune),
+              tooltip: l10n.settingsTitle,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SettingsScreen(
+                    session: session,
+                    initial: game.settings,
+                    readOnly: !_isAdmin,
                   ),
                 ),
               ),
+            ),
             PopupMenuButton<String>(
               key: const Key('lobbyMenu'),
               onSelected: (value) async {

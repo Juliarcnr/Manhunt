@@ -60,6 +60,7 @@
   "joinNotFound": "Keine Gruppe mit diesem Code gefunden",
 
   "settingsTitle": "Spieleinstellungen",
+  "settingsReadOnlyHint": "Nur der Host kann die Einstellungen ändern.",
   "settingsSectionGame": "Spiel",
   "settingsSectionPings": "Pings",
   "settingsSectionSpeedhunt": "Speedhunt",

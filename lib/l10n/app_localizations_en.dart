@@ -183,6 +183,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTitle => 'Game settings';
 
   @override
+  String get settingsReadOnlyHint => 'Only the host can change the settings.';
+
+  @override
   String get settingsSectionGame => 'Game';
 
   @override

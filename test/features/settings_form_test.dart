@@ -42,4 +42,29 @@ void main() {
       expect(earliest.dy, lessThan(delay.dy));
     });
   });
+
+  group('read-only form (R-SET-14)', () {
+    testWidgets('without onChanged there are no controls to edit', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: SettingsForm(settings: GameSettings(), onChanged: null),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.text('20 min'), findsOneWidget);
+      for (final key in ['jokerSwitch', 'playerJokerSwitch']) {
+        final tile = tester.widget<SwitchListTile>(find.byKey(Key(key)));
+        expect(tile.onChanged, isNull);
+      }
+    });
+  });
 }

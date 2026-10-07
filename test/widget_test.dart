@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/app.dart';
 import 'package:manhunt/core/groups/group_list.dart';
+import 'package:manhunt/data/game_repository.dart';
 import 'package:manhunt/data/session_store.dart';
 
 import 'helpers.dart';
@@ -404,6 +405,73 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Rename group'), findsNothing);
       expect(find.text('Leave group'), findsOneWidget);
+    });
+  });
+
+  group('everyone sees the settings, only the host edits (R-SET-14)', () {
+    Future<GroupSession> setUpGroup(
+      WidgetTester tester,
+      FakeFirebaseFirestore db,
+    ) async {
+      final admin = await tester.runAsync(
+        () => testSession('ABCDE-FGHJK', 'a'),
+      );
+      final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+      await tester.runAsync(() async {
+        await deviceRepo(db)
+            .createGame(admin!, name: 'Alex', settings: defaultSettings);
+        await deviceRepo(db).joinGame(me!, name: 'Kim');
+      });
+      return admin!;
+    }
+
+    testWidgets('guest sees the settings read-only and kept up to date', (
+      tester,
+    ) async {
+      final db = FakeFirebaseFirestore();
+      final admin = await setUpGroup(tester, db);
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+
+      await tester.tap(find.byKey(const Key('settingsButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Game settings'), findsOneWidget);
+      expect(find.byKey(const Key('settingsReadOnlyHint')), findsOneWidget);
+      expect(find.byKey(const Key('saveSettings')), findsNothing);
+      expect(find.byIcon(Icons.add_circle_outline), findsNothing);
+      expect(find.byIcon(Icons.remove_circle_outline), findsNothing);
+      final joker = tester.widget<SwitchListTile>(
+        find.byKey(const Key('jokerSwitch')),
+      );
+      expect(joker.onChanged, isNull);
+      expect(find.text('20 min'), findsOneWidget);
+
+      await tester.runAsync(
+        () => deviceRepo(db).updateSettings(
+          admin,
+          defaultSettings.copyWith(pingInterval: const Duration(minutes: 35)),
+        ),
+      );
+      await settleAsync(tester);
+      expect(find.text('35 min'), findsOneWidget);
+    });
+
+    testWidgets('host can edit the settings', (tester) async {
+      final db = FakeFirebaseFirestore();
+      final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+      await tester.runAsync(
+        () =>
+            deviceRepo(db)
+                .createGame(me!, name: 'Julia', settings: defaultSettings),
+      );
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+
+      await tester.tap(find.byKey(const Key('settingsButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('settingsReadOnlyHint')), findsNothing);
+      expect(find.byKey(const Key('saveSettings')), findsOneWidget);
+      expect(find.byIcon(Icons.add_circle_outline), findsWidgets);
     });
   });
 }
