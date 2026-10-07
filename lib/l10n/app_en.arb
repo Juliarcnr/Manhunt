@@ -159,6 +159,8 @@
 
   "gameNextPing": "Next ping in {time}",
   "@gameNextPing": {"placeholders": {"time": {"type": "String"}}},
+  "gameNextPings": "Next pings in {time}",
+  "@gameNextPings": {"placeholders": {"time": {"type": "String"}}},
   "gameCaughtSelf": "You were caught – your location is no longer shared.",
   "gameSpeedhuntNext": "Speedhunt active · ping {number}/{total} in {time}",
   "@gameSpeedhuntNext": {"placeholders": {"number": {"type": "int"}, "total": {"type": "int"}, "time": {"type": "String"}}},

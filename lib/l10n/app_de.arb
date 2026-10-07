@@ -146,6 +146,7 @@
   "historyAborted": "vorzeitig abgebrochen",
 
   "gameNextPing": "Nächster Ping in {time}",
+  "gameNextPings": "Nächste Pings in {time}",
   "gameCaughtSelf": "Du wurdest gefangen – dein Standort wird nicht mehr geteilt.",
   "gameSpeedhuntNext": "Speedhunt aktiv · Ping {number}/{total} in {time}",
   "gameYou": "Du",

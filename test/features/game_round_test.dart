@@ -121,6 +121,27 @@ void main() {
       expect(location.isTracking, isTrue);
     });
 
+    testWidgets('sees when the next pings arrive, above the filters '
+        '(R-HUNT-10)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      expect(find.text('Next pings in 10:00'), findsOneWidget);
+      expect(find.textContaining('Next ping in'), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('Next pings in 10:00')).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('filterBar'))).dy),
+      );
+    });
+
+    testWidgets('no "next pings" after the last regular ping (R-HUNT-10)', (
+      tester,
+    ) async {
+      now = start.add(settings.duration - const Duration(seconds: 1));
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      expect(find.textContaining('Next pings'), findsNothing);
+    });
+
     testWidgets('starting a speedhunt shows the banner for everyone', (
       tester,
     ) async {
@@ -522,8 +543,8 @@ void main() {
     });
 
     for (final who in ['kim', 'alex']) {
-      testWidgets('$who: below the filters the same gap as above them: header '
-          'for hunters, "next ping" for players (R-MAP-01)', (tester) async {
+      testWidgets('$who: below the filters the same gap as above them: '
+          '"next ping(s)" (R-MAP-01, R-HUNT-10)', (tester) async {
         now = start.add(const Duration(minutes: 72));
         await seed(tester);
         await tester.runAsync(
@@ -546,18 +567,16 @@ void main() {
               )
               .first,
         );
-        final above = who == 'alex'
-            ? tester.getRect(find.byType(AppBar)).bottom
-            : tester
-                  .getRect(
-                    find
-                        .ancestor(
-                          of: find.textContaining('Next ping'),
-                          matching: find.byType(Container),
-                        )
-                        .first,
+        final above = tester
+            .getRect(
+              find
+                  .ancestor(
+                    of: find.textContaining('Next ping'),
+                    matching: find.byType(Container),
                   )
-                  .bottom;
+                  .first,
+            )
+            .bottom;
         final gapAbove = chip.top - above;
         double gapTo(Finder below) => tester.getRect(below).top - chip.bottom;
 

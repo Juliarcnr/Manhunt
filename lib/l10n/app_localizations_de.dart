@@ -466,6 +466,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String gameNextPings(String time) {
+    return 'Nächste Pings in $time';
+  }
+
+  @override
   String get gameCaughtSelf =>
       'Du wurdest gefangen – dein Standort wird nicht mehr geteilt.';
 

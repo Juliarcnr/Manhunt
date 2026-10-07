@@ -902,6 +902,12 @@ abstract class AppLocalizations {
   /// **'Next ping in {time}'**
   String gameNextPing(String time);
 
+  /// No description provided for @gameNextPings.
+  ///
+  /// In en, this message translates to:
+  /// **'Next pings in {time}'**
+  String gameNextPings(String time);
+
   /// No description provided for @gameCaughtSelf.
   ///
   /// In en, this message translates to:

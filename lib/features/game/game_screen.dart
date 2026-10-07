@@ -831,15 +831,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final nextSlot = isPlayer && !(me?.caught ?? false) && engine != null
         ? nextPing(engine.visibleSlots, now)
         : null;
+    // Hunters: when the next regular pings of all players arrive (R-HUNT-10).
+    final nextRegular = isHunter ? clock?.nextRegularPing(now) : null;
     final infoLines = [
       if (nextSlot != null)
         l10n.gameNextPing(_formatCountdown(nextSlot.at.difference(now))),
+      if (nextRegular != null)
+        l10n.gameNextPings(_formatCountdown(nextRegular.difference(now))),
       if (me?.caught ?? false) l10n.gameCaughtSelf,
       if (phase == GamePhase.ended) l10n.gameTimeUpHint,
     ];
-    // Below the filters the same gap as above them: the info lines for
-    // players, the app bar (top inset of the overlay) otherwise.
-    final filterGap = isPlayer && infoLines.isNotEmpty ? 6.0 : 12.0;
+    // Below the filters the same gap as above them: the info lines if any,
+    // the app bar (top inset of the overlay) otherwise.
+    final filterGap = infoLines.isNotEmpty ? 6.0 : 12.0;
     final filterBar = [
       FilterBar(items: filterItems),
       if (filterItems.isNotEmpty) SizedBox(height: filterGap),
@@ -935,14 +939,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Players see "next ping in …" on top, above their filters.
-                if (!isPlayer) ...filterBar,
+                // "Next ping(s) in …" on top, above the filters.
                 for (final line in infoLines)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: _InfoChip(icon: Icons.schedule, text: line),
                   ),
-                if (isPlayer) ...filterBar,
+                ...filterBar,
                 if (engine != null)
                   ValueListenableBuilder(
                     valueListenable: engine.status,
