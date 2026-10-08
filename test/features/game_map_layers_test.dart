@@ -16,7 +16,7 @@ void main() {
   };
   const names = {'anna': 'Anna'};
 
-  Future<void> pumpLayer(WidgetTester tester, MarkerLayer layer) =>
+  Future<void> pumpLayer(WidgetTester tester, Widget layer) =>
       tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -126,6 +126,61 @@ void main() {
       final text = tester.getSize(find.text('⚡1 Al')).width;
       // Text plus padding and border – not the full marker width.
       expect(tester.getSize(badge).width, lessThan(text + 30));
+    });
+  });
+
+  group('live positions glide instead of jumping (R-MAP-04)', () {
+    LocationFix fix(double lat) => LocationFix(
+      point: GeoPoint(lat, 13.405),
+      at: DateTime(2026, 10, 6, 14, 32),
+    );
+    double latOf(WidgetTester tester, String key) => tester
+        .widgetList<MarkerLayer>(find.byType(MarkerLayer))
+        .expand((l) => l.markers)
+        .singleWhere((m) => m.key == Key(key))
+        .point
+        .latitude;
+
+    testWidgets('own dot moves smoothly to the next fix', (tester) async {
+      await pumpLayer(tester, selfLayer(fix(52.520)));
+      expect(latOf(tester, 'self'), 52.520);
+
+      await pumpLayer(tester, selfLayer(fix(52.521)));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(latOf(tester, 'self'), closeTo(52.5205, 1e-6));
+
+      // A new fix mid-move continues from where the dot is.
+      await pumpLayer(tester, selfLayer(fix(52.5215)));
+      await tester.pump();
+      expect(latOf(tester, 'self'), closeTo(52.5205, 1e-6));
+      await tester.pumpAndSettle();
+      expect(latOf(tester, 'self'), 52.5215);
+    });
+
+    testWidgets('hunters glide, joker snapshots do not move', (tester) async {
+      await pumpLayer(
+        tester,
+        huntersLayer(positions: {'anna': fix(52.520)}, names: names),
+      );
+      await pumpLayer(
+        tester,
+        huntersLayer(positions: {'anna': fix(52.522)}, names: names),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      final mid = latOf(tester, 'hunter_anna');
+      expect(mid, greaterThan(52.520));
+      expect(mid, lessThan(52.522));
+      await tester.pumpAndSettle();
+      expect(latOf(tester, 'hunter_anna'), 52.522);
+
+      expect(
+        huntersLayer(
+          positions: {'anna': fix(52.522)},
+          names: names,
+          formatTime: (t) => '',
+        ),
+        isA<MarkerLayer>(),
+      );
     });
   });
 }

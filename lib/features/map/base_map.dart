@@ -4,15 +4,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/models/geo_point.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 
 /// MapTiler key, injected at build time:
 /// `--dart-define-from-file=config/maptiler.json` (see CLAUDE.md).
 const mapTilerKey = String.fromEnvironment('MAPTILER_KEY');
 
-/// Normal (light) OSM street map from MapTiler (R-MAP-01, R-UI-03).
-const _tileUrl =
-    'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}{r}.png?key={key}';
+/// Normal (light) OSM street map by default (R-MAP-01, R-UI-03); satellite
+/// images with street names on request (R-MAP-03).
+enum MapStyle {
+  streets(
+    'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}{r}.png?key={key}',
+  ),
+  satellite(
+    'https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}{r}.jpg?key={key}',
+  );
+
+  const MapStyle(this.tileUrl);
+
+  final String tileUrl;
+}
+
+/// The map style chosen on this device – for all maps, until the app closes.
+final mapStyleProvider = NotifierProvider<MapStyleNotifier, MapStyle>(
+  MapStyleNotifier.new,
+);
+
+class MapStyleNotifier extends Notifier<MapStyle> {
+  @override
+  MapStyle build() => MapStyle.streets;
+
+  void toggle() =>
+      state = state == MapStyle.streets ? MapStyle.satellite : MapStyle.streets;
+}
+
+/// Switches between street map and satellite images (R-MAP-03).
+class MapStyleButton extends ConsumerWidget {
+  const MapStyleButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final satellite = ref.watch(mapStyleProvider) == MapStyle.satellite;
+    return FloatingActionButton.small(
+      key: const Key('mapStyleButton'),
+      heroTag: 'mapStyle',
+      tooltip: satellite ? l10n.mapStreets : l10n.mapSatellite,
+      backgroundColor: AppColors.surface,
+      onPressed: ref.read(mapStyleProvider.notifier).toggle,
+      child: Icon(satellite ? Icons.map_outlined : Icons.satellite_alt),
+    );
+  }
+}
 
 /// Whether map tiles are loaded from the network. Tests turn this off.
 final mapTilesEnabledProvider = Provider<bool>((ref) => true);
@@ -49,13 +93,16 @@ class BaseMap extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tiles = ref.watch(mapTilesEnabledProvider) && mapTilerKey.isNotEmpty;
+    final style = ref.watch(mapStyleProvider);
     return FlutterMap(
       mapController: controller,
       options: options,
       children: [
         if (tiles)
           TileLayer(
-            urlTemplate: _tileUrl,
+            // A new layer per style, so no tiles of the other style linger.
+            key: ValueKey(style),
+            urlTemplate: style.tileUrl,
             additionalOptions: const {'key': mapTilerKey},
             retinaMode: RetinaMode.isHighDensity(context),
             userAgentPackageName: 'play.manhunt.app',

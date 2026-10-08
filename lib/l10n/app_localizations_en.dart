@@ -98,6 +98,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get filterCaught => 'Caught';
 
   @override
+  String get filterSharedPings => 'Last players\' pings';
+
+  @override
   String filterSpeedhunt(String name, String time) {
     return '$name $time';
   }
@@ -250,6 +253,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Each player may see where all other players are once.';
 
   @override
+  String get settingsSharedPings => 'Regular pings to all players';
+
+  @override
+  String get settingsSharedPingsHint =>
+      'Players also see the latest regular ping of all other players (no history, no speedhunt pings). Replaces the joker “player positions”.';
+
+  @override
   String get settingsArea => 'Play area';
 
   @override
@@ -281,6 +291,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get areaMyLocation => 'My location';
+
+  @override
+  String get mapSatellite => 'Satellite view';
+
+  @override
+  String get mapStreets => 'Map view';
 
   @override
   String get areaLocationUnavailable =>
@@ -594,6 +610,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noticePingSent => 'Your location was sent to the hunters';
+
+  @override
+  String get noticePingSentAll => 'Your location was sent to everyone';
 
   @override
   String get catchTitle => 'Report catch';

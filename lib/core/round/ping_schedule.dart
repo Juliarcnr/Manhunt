@@ -153,6 +153,49 @@ PingRecord? lastRegularPing(List<PingRecord> pings) {
   return null;
 }
 
+/// Latest regular ping of each player (R-HUNT-03), leaving out [skip].
+Map<String, PingRecord> lastRegularPings(
+  Map<String, List<PingRecord>> byPlayer, {
+  Set<String> skip = const {},
+}) => {
+  for (final e in byPlayer.entries)
+    if (!skip.contains(e.key)) e.key: ?lastRegularPing(e.value),
+};
+
+/// Number of a regular ping from its slot id `regular_<n>`, or null.
+int? regularPingNumber(PingRecord p) {
+  final id = p.slotId;
+  if (p.kind != PingKind.regular || id == null) return null;
+  return int.tryParse(id.substring(id.lastIndexOf('_') + 1));
+}
+
+/// What players see under "last players' pings" with shared pings (R-PLAY-05):
+/// only each player's latest regular ping, no history. A [caught] player's
+/// pin stays (greyed out by the caller) until newer regular pings arrive.
+Map<String, PingRecord> sharedLastPings(
+  Map<String, List<PingRecord>> byPlayer, {
+  required Set<String> caught,
+  Set<String> skip = const {},
+}) {
+  final last = lastRegularPings(byPlayer);
+  // Newest ping of anyone – also of skipped players (e.g. the own device).
+  final newest = last.values.map(regularPingNumber).nonNulls.fold(0, _max);
+  return {
+    for (final e in last.entries)
+      if (!skip.contains(e.key) &&
+          (!caught.contains(e.key) ||
+              (regularPingNumber(e.value) ?? newest) >= newest))
+        e.key: e.value,
+  };
+}
+
+int _max(int a, int b) => a > b ? a : b;
+
+/// Players shown as caught on the map. Once the time is up, everyone counts
+/// as uncaught again, so all pings can be looked at together (R-HUNT-11).
+Set<String> caughtOnMap(Set<String> caught, GamePhase phase) =>
+    phase == GamePhase.ended ? const {} : caught;
+
 /// Whether [next] holds a regular ping that [previous] did not – switches the
 /// "last pings" filter back on (R-HUNT-08). Without [previous] (first load)
 /// nothing counts as new.

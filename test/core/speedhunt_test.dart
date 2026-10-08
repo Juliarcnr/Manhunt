@@ -160,4 +160,20 @@ void main() {
       expect(GameSettings.fromJson(legacy).speedhuntFirstDelay, Duration.zero);
     });
   });
+
+  test('players get a speedhunt chip with its first ping (R-SPEED-09)', () {
+    Speedhunt sh(int minute, {int delay = 0}) => Speedhunt(
+      targetId: '',
+      startedAt: at(minute),
+      pings: 3,
+      interval: const Duration(minutes: 5),
+      firstDelay: Duration(minutes: delay),
+    );
+    final later = sh(90);
+    final delayed = sh(60, delay: 2);
+    expect(speedhuntsWithFirstPing([later, delayed], at(61)), isEmpty);
+    expect(speedhuntsWithFirstPing([later, delayed], at(62)), [delayed]);
+    // Oldest first.
+    expect(speedhuntsWithFirstPing([later, delayed], at(90)), [delayed, later]);
+  });
 }

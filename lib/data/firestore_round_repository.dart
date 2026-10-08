@@ -70,6 +70,16 @@ class FirestoreRoundRepository implements RoundRepository {
   );
 
   @override
+  Stream<List<PingRecord>> watchSharedPings(GroupSession session) =>
+      _decodePings(
+        session,
+        // The kind filter is required by the security rules for players.
+        _game(session)
+            .collection('pings')
+            .where('kind', isEqualTo: PingKind.regular.name),
+      );
+
+  @override
   Future<void> updateHunterLocation(
     GroupSession session,
     LocationFix fix,

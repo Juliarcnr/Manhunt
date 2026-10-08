@@ -54,6 +54,18 @@ void main() {
       );
     });
 
+    test('regular pings to all players replace the player joker '
+        '(R-SET-15)', () {
+      const s = GameSettings();
+      expect(s.sharedPings, isFalse);
+      expect(s.playerJokerAvailable, isTrue);
+      const shared = GameSettings(sharedPings: true);
+      expect(shared.playerJokerAvailable, isFalse);
+      expect(GameSettings.fromJson(shared.toJson()).sharedPings, isTrue);
+      final legacy = s.toJson()..remove('sharedPings');
+      expect(GameSettings.fromJson(legacy).sharedPings, isFalse);
+    });
+
     test('json roundtrip', () {
       const s = GameSettings(hunterCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());

@@ -61,10 +61,53 @@ void main() {
       );
       expect(find.byType(IconButton), findsNothing);
       expect(find.text('20 min'), findsOneWidget);
-      for (final key in ['jokerSwitch', 'playerJokerSwitch']) {
+      for (final key in [
+        'jokerSwitch',
+        'playerJokerSwitch',
+        'sharedPingsSwitch',
+      ]) {
         final tile = tester.widget<SwitchListTile>(find.byKey(Key(key)));
         expect(tile.onChanged, isNull);
       }
+    });
+  });
+
+  group('player joker or pings to all players (R-SET-15)', () {
+    testWidgets('switching one on switches the other off', (tester) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => SingleChildScrollView(
+                child: SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      bool on(String key) =>
+          tester.widget<SwitchListTile>(find.byKey(Key(key))).value;
+      expect(find.text('Reguläre Pings an alle Spieler'), findsOneWidget);
+      expect(on('playerJokerSwitch'), isTrue);
+      expect(on('sharedPingsSwitch'), isFalse);
+
+      await tester.ensureVisible(find.byKey(const Key('sharedPingsSwitch')));
+      await tester.tap(find.byKey(const Key('sharedPingsSwitch')));
+      await tester.pumpAndSettle();
+      expect(settings.sharedPings, isTrue);
+      expect(on('playerJokerSwitch'), isFalse);
+
+      await tester.tap(find.byKey(const Key('playerJokerSwitch')));
+      await tester.pumpAndSettle();
+      expect(settings.playerJokerAvailable, isTrue);
+      expect(on('sharedPingsSwitch'), isFalse);
     });
   });
 }

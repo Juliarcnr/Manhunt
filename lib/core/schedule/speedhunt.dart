@@ -62,6 +62,14 @@ class Speedhunt {
   );
 }
 
+/// Speedhunts whose first ping is due by [now], oldest first. Players get one
+/// chip each – at the same moment the hunters' chip appears, and the same for
+/// every player, so it reveals no target (R-SPEED-09).
+List<Speedhunt> speedhuntsWithFirstPing(List<Speedhunt> all, DateTime now) => [
+  for (final s in all)
+    if (!s.startedAt.add(s.firstDelay).isAfter(now)) s,
+]..sort((a, b) => a.startedAt.compareTo(b.startedAt));
+
 enum SpeedhuntDenial {
   notHunting,
   tooEarly,

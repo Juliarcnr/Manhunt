@@ -146,6 +146,16 @@ final myPingsProvider = StreamProvider<List<PingRecord>>(
   ),
 );
 
+/// All players' regular pings – players only, and only when the regular pings
+/// go to everyone (R-SET-15); the rules reject it otherwise.
+final sharedPingsProvider = StreamProvider<List<PingRecord>>(
+  (ref) => _sessionStream(
+    ref,
+    const [],
+    ref.watch(roundRepositoryProvider).watchSharedPings,
+  ),
+);
+
 /// Hunters only.
 final hunterLocationsProvider = StreamProvider<Map<String, LocationFix>>(
   (ref) => _sessionStream(

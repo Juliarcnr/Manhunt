@@ -252,7 +252,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.noticeSpeedhunt,
         l10n.noticeSpeedhuntBody(speedhunt.pings, speedhunt.interval.inMinutes),
       ),
-      PingSentNotice() => (l10n.noticePingSent, null),
+      PingSentNotice() => (
+        widget.game.settings.sharedPings
+            ? l10n.noticePingSentAll
+            : l10n.noticePingSent,
+        null,
+      ),
     };
     final notifications = ref.read(notificationServiceProvider);
     if (_lifecycle == AppLifecycleState.resumed) {
@@ -466,7 +471,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       context,
       huntersEnabled: settings.jokerEnabled,
       huntersUsed: me.jokerUsed,
-      playersEnabled: settings.playerJokerEnabled,
+      playersEnabled: settings.playerJokerAvailable,
       playersUsed: me.playerJokerUsed,
     );
     if (!mounted) return;
@@ -516,7 +521,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   bool _jokersLeft(Member me) {
     final s = widget.game.settings;
     return (s.jokerEnabled && !me.jokerUsed) ||
-        (s.playerJokerEnabled && !me.playerJokerUsed);
+        (s.playerJokerAvailable && !me.playerJokerUsed);
   }
 
   /// R-PLAY-02: see the hunters once.
@@ -593,6 +598,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final now = widget.now();
     final phase = clock?.phaseAt(now) ?? GamePhase.notStarted;
     final running = activeSpeedhunt(speedhunts, now);
+    // Once the time is up, caught players are split up again (R-HUNT-11).
+    final caughtNow = caughtOnMap(caught, phase);
 
     final (title, color, until) = switch (phase) {
       GamePhase.notStarted => (
@@ -645,11 +652,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
       // them at once (R-HUNT-09).
       final selected = {
         for (final id in filters.playerHistories.keys)
-          if (byPlayer.containsKey(id) && !caught.contains(id)) id,
+          if (byPlayer.containsKey(id) && !caughtNow.contains(id)) id,
       };
       final caughtShown = {
         if (filters.caught)
-          for (final id in caught)
+          for (final id in caughtNow)
             if (byPlayer.containsKey(id)) id,
       };
       layers.addAll(
@@ -672,7 +679,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         speedhuntPingsLayer(
           pings: [
             for (final s in speedhuntGroups)
-              if (caught.contains(s.playerId)
+              if (caughtNow.contains(s.playerId)
                   ? filters.caught
                   : !filters.hiddenSpeedhunts.contains(s.id))
                 ...s.pings,
@@ -684,11 +691,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
       if (filters.lastPings) {
         layers.add(
           lastPingsLayer(
-            byPlayer: byPlayer,
+            // Shown histories contain the last ping; caught players appear
+            // only under "caught" (R-HUNT-03, R-HUNT-09).
+            pings: lastRegularPings(
+              byPlayer,
+              skip: {...selected, ...caughtNow},
+            ),
             names: names,
-            caught: caught,
             colors: playersByColor,
-            skip: {...selected, ...caughtShown},
           ),
         );
       }
@@ -722,7 +732,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ),
         // Tap cycles: points → points with lines → off (R-HUNT-04, R-HUNT-05).
         for (final m in members)
-          if (m.isPlayer && !m.caught)
+          if (m.isPlayer && !caughtNow.contains(m.id))
             FilterItem(
               id: 'player_${m.id}',
               label: m.name,
@@ -734,7 +744,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
               onChanged: (_) => set(filters.cyclePlayer(m.id)),
             ),
         // All caught players in one chip (R-HUNT-09).
-        if (caught.isNotEmpty)
+        if (caughtNow.isNotEmpty)
           FilterItem(
             id: 'caught',
             label: l10n.filterCaught,
@@ -745,7 +755,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         // One chip per speedhunt, e.g. "⚡ Sam 18:35" (R-HUNT-07).
         for (final s in speedhuntGroups)
-          if (!caught.contains(s.playerId))
+          if (!caughtNow.contains(s.playerId))
             FilterItem(
               id: 'speedhunt_${s.id}',
               label: l10n.filterSpeedhunt(
@@ -766,6 +776,34 @@ class _GameScreenState extends ConsumerState<GameScreen>
         // Own speedhunt pings stay hidden (R-SPEED-04): the history only
         // shows regular pings.
         layers.add(historyLayer(mine, color: AppColors.player));
+      }
+      // Regular pings to everyone (R-PLAY-05): only the latest ping of each
+      // other player, caught ones greyed out until newer pings arrive. The
+      // rules reject this stream without the setting.
+      final sharedPings = widget.game.settings.sharedPings;
+      if (sharedPings) {
+        ref.listen(sharedPingsProvider, (previous, next) {
+          final pings = next.value;
+          if (pings != null &&
+              !_filters.sharedPings &&
+              hasNewRegularPing(previous?.value, pings)) {
+            setState(() => _filters = _filters.copyWith(sharedPings: true));
+          }
+        });
+        if (filters.sharedPings) {
+          layers.add(
+            lastPingsLayer(
+              pings: sharedLastPings(
+                pingsByPlayer(ref.watch(sharedPingsProvider).value ?? const []),
+                caught: caughtNow,
+                skip: {widget.session.userId},
+              ),
+              names: names,
+              colors: playersByColor,
+              greyed: caughtNow,
+            ),
+          );
+        }
       }
       final reveal = _jokerReveal;
       if (reveal != null && filters.hunterJoker) {
@@ -800,6 +838,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
           selected: filters.myPings,
           onChanged: (v) => set(filters.copyWith(myPings: v)),
         ),
+        if (sharedPings)
+          FilterItem(
+            id: 'sharedPings',
+            label: l10n.filterSharedPings,
+            icon: Icons.location_on,
+            selected: filters.sharedPings,
+            onChanged: (v) => set(filters.copyWith(sharedPings: v)),
+          ),
         if (reveal != null)
           FilterItem(
             id: 'hunterJoker',
@@ -818,6 +864,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
             icon: Icons.groups_outlined,
             selected: filters.playerJoker,
             onChanged: (v) => set(filters.copyWith(playerJoker: v)),
+          ),
+        // Every player gets the same chip per speedhunt, with its first ping
+        // like the hunters – without name, so it reveals no target
+        // (R-SPEED-09, R-SPEED-04).
+        for (final s in speedhuntsWithFirstPing(speedhunts, now))
+          FilterItem.info(
+            id: 'speedhunt_${s.startedAt.millisecondsSinceEpoch}',
+            label: timeFmt.format(s.startedAt.toLocal()),
+            icon: Icons.bolt,
+            color: AppColors.speedhunt,
           ),
       ]);
       // Answer other players' joker requests (R-PLAY-03) – players only, the
@@ -977,6 +1033,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const MapStyleButton(),
+                const SizedBox(height: 8),
                 FloatingActionButton.small(
                   key: const Key('fitAreaButton'),
                   heroTag: 'fitArea',
@@ -1037,7 +1095,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                     ],
                     if (isPlayer && !me.caught) ...[
                       if (widget.game.settings.jokerEnabled ||
-                          widget.game.settings.playerJokerEnabled) ...[
+                          widget.game.settings.playerJokerAvailable) ...[
                         Expanded(
                           child: OutlinedButton.icon(
                             key: const Key('jokerButton'),

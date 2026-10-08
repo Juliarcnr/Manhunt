@@ -186,18 +186,25 @@ class _AreaEditorScreenState extends ConsumerState<AreaEditorScreen> {
           Positioned(
             right: 16,
             bottom: 16,
-            child: FloatingActionButton.small(
-              heroTag: 'myLocation',
-              tooltip: l10n.areaMyLocation,
-              backgroundColor: AppColors.surface,
-              onPressed: _locating ? null : _goToMyLocation,
-              child: _locating
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.my_location),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MapStyleButton(),
+                const SizedBox(height: 8),
+                FloatingActionButton.small(
+                  heroTag: 'myLocation',
+                  tooltip: l10n.areaMyLocation,
+                  backgroundColor: AppColors.surface,
+                  onPressed: _locating ? null : _goToMyLocation,
+                  child: _locating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location),
+                ),
+              ],
             ),
           ),
         ],

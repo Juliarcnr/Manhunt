@@ -16,6 +16,10 @@ abstract interface class RoundRepository {
   /// The player's own sent pings (R-PLAY-01).
   Stream<List<PingRecord>> watchMyPings(GroupSession session);
 
+  /// All players' regular pings – for players when the regular pings go to
+  /// everyone (R-SET-15, R-PLAY-05). Never speedhunt pings (R-SPEED-04).
+  Stream<List<PingRecord>> watchSharedPings(GroupSession session);
+
   /// Hunter shares their live position with the other hunters (R-HUNT-02).
   Future<void> updateHunterLocation(GroupSession session, LocationFix fix);
 

@@ -172,10 +172,34 @@ class SettingsForm extends StatelessWidget {
                 l10n.settingsPlayerJokerHint,
                 style: const TextStyle(color: AppColors.textMuted),
               ),
-              value: s.playerJokerEnabled,
+              // Either the joker or regular pings to everyone (R-SET-15).
+              value: s.playerJokerAvailable,
               onChanged: readOnly
                   ? null
-                  : (v) => change(s.copyWith(playerJokerEnabled: v)),
+                  : (v) => change(
+                      s.copyWith(
+                        playerJokerEnabled: v,
+                        sharedPings: v ? false : null,
+                      ),
+                    ),
+            ),
+            SwitchListTile(
+              key: const Key('sharedPingsSwitch'),
+              contentPadding: const EdgeInsets.only(right: 8),
+              title: Text(l10n.settingsSharedPings),
+              subtitle: Text(
+                l10n.settingsSharedPingsHint,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              value: s.sharedPings,
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(
+                      s.copyWith(
+                        sharedPings: v,
+                        playerJokerEnabled: v ? false : null,
+                      ),
+                    ),
             ),
           ],
         ),

@@ -284,4 +284,62 @@ void main() {
     expect(nextSpeedhuntPing(s, at(37)), (number: 3, at: at(40)));
     expect(nextSpeedhuntPing(s, at(40)), isNull);
   });
+
+  group('caught players & shared pings (R-HUNT-11, R-PLAY-05)', () {
+    PingRecord p(
+      String player,
+      String slot, {
+      PingKind kind = PingKind.regular,
+    }) => PingRecord(
+      playerId: player,
+      kind: kind,
+      slotId: slot,
+      fix: LocationFix(point: const GeoPoint(0, 0), at: start),
+    );
+
+    test('regularPingNumber reads the slot id', () {
+      expect(regularPingNumber(p('a', 'regular_12')), 12);
+      expect(
+        regularPingNumber(p('a', 'speedhunt_1_2', kind: PingKind.speedhunt)),
+        isNull,
+      );
+    });
+
+    test('lastRegularPings: latest regular ping per player, minus skipped', () {
+      final byPlayer = pingsByPlayer([
+        p('a', 'regular_1'),
+        p('a', 'regular_2'),
+        p('b', 'regular_1'),
+        p('c', 'speedhunt_1_1', kind: PingKind.speedhunt),
+      ]);
+      final last = lastRegularPings(byPlayer, skip: {'b'});
+      expect(last.keys, ['a']);
+      expect(last['a']!.slotId, 'regular_2');
+    });
+
+    test('a caught player stays until newer pings arrive', () {
+      final pings = [p('a', 'regular_1'), p('b', 'regular_1')];
+      // Caught after ping 1: still shown (greyed by the caller).
+      expect(
+        sharedLastPings(pingsByPlayer(pings), caught: {'b'}).keys,
+        unorderedEquals(['a', 'b']),
+      );
+      // Ping 2 of the others: the caught player's old pin disappears.
+      final later = pingsByPlayer([...pings, p('a', 'regular_2')]);
+      expect(sharedLastPings(later, caught: {'b'}).keys, ['a']);
+      // Uncaught players keep their last pin, even if a ping is missing.
+      expect(
+        sharedLastPings(later, caught: const {}).keys,
+        unorderedEquals(['a', 'b']),
+      );
+      expect(sharedLastPings(later, caught: const {}, skip: {'a'}).keys, ['b']);
+      // Newer pings of a skipped player (the own device) count as well.
+      expect(sharedLastPings(later, caught: {'b'}, skip: {'a'}), isEmpty);
+    });
+
+    test('after the time is up nobody counts as caught on the map', () {
+      expect(caughtOnMap({'a'}, GamePhase.hunting), {'a'});
+      expect(caughtOnMap({'a'}, GamePhase.ended), isEmpty);
+    });
+  });
 }

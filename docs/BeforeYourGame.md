@@ -6,7 +6,8 @@ Dauert 2–3 Minuten.
 ## 1. Vor dem Spiel – jedes Handy
 
 - [ ] **App aktuell:** Alle haben dieselbe Version der Manhunt-App installiert.
-- [ ] **Standort erlauben:** Beim ersten Start fragt die App nach dem Standort.
+- [ ] **Standort erlauben:** Direkt beim ersten Öffnen fragt die App nach dem Standort.
+  Falls versehentlich abgelehnt: *Einstellungen → Manhunt → Standort* (iPhone) bzw. *Apps → Manhunt → Berechtigungen*.
   - Android: „Bei Nutzung der App zulassen“ und **„Genauer Standort“** an.
   - iPhone: „Beim Verwenden der App erlauben“ (reicht aus) und **„Genauer Standort“** an.
 - [ ] **Benachrichtigungen erlauben** – sonst gibt es keine Meldung bei Catches, Speedhunts und eigenen Pings.
@@ -22,7 +23,8 @@ Dauert 2–3 Minuten.
 - [ ] **Uhrzeit automatisch:** *Datum & Uhrzeit → „Automatisch“* an (ist fast immer schon so). Die Ping-Zeiten
   richten sich nach der Uhr des Handys – eine von Hand verstellte Uhr verschiebt die eigenen Pings.
 - [ ] **Mobile Daten an**, kein Flugmodus.
-- [ ] **Akku voll laden**, für längere Spiele eine Powerbank mitnehmen. GPS im Dauerbetrieb braucht Strom.
+- [ ] **Akku voll laden**, für längere Spiele eine Powerbank mitnehmen. GPS im Dauerbetrieb braucht Strom (die App
+  fragt den Standort etwa sekündlich ab, damit der eigene Punkt flüssig wandert).
 
 ## 2. Während des Spiels
 
@@ -37,12 +39,14 @@ Dauert 2–3 Minuten.
 ## 3. Für den Host
 
 - [ ] Spielfeld einzeichnen (das können alle in der Lobby) und Einstellungen prüfen: Dauer, Vorlauf, Ping-Abstand,
-  Speedhunts (Anzahl, Pings, Abstand, frühester Zeitpunkt), Joker.
+  Speedhunts (Anzahl, Pings, Abstand, frühester Zeitpunkt), Joker – oder statt des Spieler-Jokers „Reguläre Pings
+  an alle Spieler“.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
 - [ ] Nach dem Spiel **„Spiel beenden“** drücken: Erst dann werden alle Standorte gelöscht. Vorher könnt ihr euch die
-  Pings gemeinsam auf der Karte anschauen. Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
+  Pings gemeinsam auf der Karte anschauen (nach Ablauf der Zeit haben auch Gefangene wieder ihre eigenen Chips). Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
 
 ## 4. Datenschutz in einem Satz
 
-Kein Konto, keine E-Mail; alle Standorte sind Ende-zu-Ende-verschlüsselt, Spieler sehen keine fremden Pings, und mit
+Kein Konto, keine E-Mail; alle Standorte sind Ende-zu-Ende-verschlüsselt, Spieler sehen keine fremden Pings (außer
+der Host stellt „Reguläre Pings an alle Spieler“ ein – dann nur den jeweils letzten), und mit
 „Spiel beenden“ werden sämtliche Standorte gelöscht. Details: [privacy.md](privacy.md).

@@ -59,6 +59,20 @@ void main() {
       expect(mine.single.kind, PingKind.regular);
     });
 
+    test('shared pings: all regular pings, no speedhunt pings (R-PLAY-05, '
+        'R-SPEED-04)', () async {
+      await rounds.sendPing(kim, slot, fix(52.5));
+      await rounds.sendPing(sam, slot, fix(52.6));
+      await rounds.sendPing(
+        sam,
+        PingSlot(id: 'speedhunt_1_1', kind: PingKind.speedhunt, at: t0),
+        fix(52.7),
+      );
+      final shared = await rounds.watchSharedPings(kim).first;
+      expect(shared.map((p) => p.playerId).toSet(), {'kim', 'sam'});
+      expect(shared.every((p) => p.kind == PingKind.regular), isTrue);
+    });
+
     test('same slot is stored once (idempotent)', () async {
       await rounds.sendPing(kim, slot, fix(52.5));
       await rounds.sendPing(kim, slot, fix(52.5));

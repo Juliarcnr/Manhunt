@@ -98,6 +98,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filterCaught => 'Gefangen';
 
   @override
+  String get filterSharedPings => 'Letzte Spieler-Pings';
+
+  @override
   String filterSpeedhunt(String name, String time) {
     return '$name $time';
   }
@@ -251,6 +254,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Jeder Spieler darf einmal sehen, wo alle anderen Spieler gerade sind.';
 
   @override
+  String get settingsSharedPings => 'Reguläre Pings an alle Spieler';
+
+  @override
+  String get settingsSharedPingsHint =>
+      'Auch die Spieler sehen den jeweils letzten regulären Ping aller anderen Spieler (keine Historie, keine Speedhunt-Pings). Ersetzt den Joker „Spieler-Standorte“.';
+
+  @override
   String get settingsArea => 'Spielfeld';
 
   @override
@@ -283,6 +293,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get areaMyLocation => 'Mein Standort';
+
+  @override
+  String get mapSatellite => 'Satellitenbild';
+
+  @override
+  String get mapStreets => 'Kartenansicht';
 
   @override
   String get areaLocationUnavailable =>
@@ -599,6 +615,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noticePingSent => 'Dein Standort wurde an die Hunter gesendet';
+
+  @override
+  String get noticePingSentAll => 'Dein Standort wurde an alle gesendet';
 
   @override
   String get catchTitle => 'Catch melden';

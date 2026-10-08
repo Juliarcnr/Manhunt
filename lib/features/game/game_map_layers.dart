@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import '../../core/geo/arrows.dart';
 import '../../core/round/ping_schedule.dart';
 import '../../theme/app_theme.dart';
+import '../map/animated_marker_layer.dart';
 import '../map/base_map.dart';
 
 /// Colour per player, stable for the round: by join order (R-HUNT-03).
@@ -12,57 +13,61 @@ Map<String, Color> playerColors(List<String> playerIds) => {
     id: AppColors.playerPalette[i % AppColors.playerPalette.length],
 };
 
-/// Last regular ping of every player as a location pin with the name above,
-/// in the player's own colour (R-HUNT-03). Speedhunt pings have their own
-/// filter (R-HUNT-07) and are left out; caught players are greyed out.
+/// Last regular ping of players (see [lastRegularPings], [sharedLastPings])
+/// as a location pin with the name above, in the player's own colour
+/// (R-HUNT-03, R-PLAY-05); [greyed] players (caught) in grey.
 MarkerLayer lastPingsLayer({
-  required Map<String, List<PingRecord>> byPlayer,
+  required Map<String, PingRecord> pings,
   required Map<String, String> names,
-  required Set<String> caught,
   required Map<String, Color> colors,
-
-  /// Players whose full history is shown – their last ping is part of it.
-  Set<String> skip = const {},
+  Set<String> greyed = const {},
 }) => MarkerLayer(
   markers: [
-    for (final entry in byPlayer.entries)
-      if (!skip.contains(entry.key))
-        if (lastRegularPing(entry.value) case final last?)
-          Marker(
-            key: Key('lastPing_${entry.key}'),
-            point: last.fix.point.toLatLng(),
-            width: 140,
-            height: 64,
-            alignment: Alignment.topCenter,
-            child: _NamedPin(
-              name: names[entry.key] ?? '?',
-              color: caught.contains(entry.key)
-                  ? AppColors.textMuted
-                  : colors[entry.key] ?? AppColors.player,
-              icon: Icons.location_on,
-            ),
-          ),
+    for (final MapEntry(key: id, value: last) in pings.entries)
+      Marker(
+        key: Key('lastPing_$id'),
+        point: last.fix.point.toLatLng(),
+        width: 140,
+        height: 64,
+        alignment: Alignment.topCenter,
+        child: _NamedPin(
+          name: names[id] ?? '?',
+          color: greyed.contains(id)
+              ? AppColors.textMuted
+              : colors[id] ?? AppColors.player,
+          icon: Icons.location_on,
+        ),
+      ),
   ],
 );
 
 /// Live positions of hunters (R-HUNT-02) or a joker snapshot (R-PLAY-02):
 /// location pins in the one hunter colour, with the hunter symbol before the
-/// name. Live positions carry no time; pass [formatTime] for a snapshot,
-/// whose age matters.
-MarkerLayer huntersLayer({
+/// name. Live positions carry no time and glide to each new position instead
+/// of jumping (R-MAP-04); pass [formatTime] for a snapshot, whose age matters.
+Widget huntersLayer({
   required Map<String, LocationFix> positions,
   required Map<String, String> names,
   String Function(DateTime)? formatTime,
-}) => _positionsLayer(
-  keyPrefix: 'hunter',
-  positions: positions,
-  names: names,
-  colors: const {},
-  fallbackColor: AppColors.hunter,
-  icon: Icons.location_on,
-  labelIcon: Icons.track_changes,
-  formatTime: formatTime,
-);
+}) {
+  final layer = _positionsLayer(
+    keyPrefix: 'hunter',
+    positions: positions,
+    names: names,
+    colors: const {},
+    fallbackColor: AppColors.hunter,
+    icon: Icons.location_on,
+    labelIcon: Icons.track_changes,
+    formatTime: formatTime,
+  );
+  if (formatTime != null) return layer;
+  return AnimatedMarkerLayer(
+    key: const Key('liveHunters'),
+    markers: layer.markers,
+    duration: const Duration(seconds: 2),
+    curve: Curves.easeInOut,
+  );
+}
 
 /// Other players' current positions from the player joker (R-PLAY-03).
 MarkerLayer playersLayer({
@@ -304,10 +309,13 @@ class _NumberDot extends StatelessWidget {
   );
 }
 
-/// This device's own live position.
-MarkerLayer selfLayer(LocationFix fix) => MarkerLayer(
+/// This device's own live position. It moves smoothly between the GPS
+/// updates (about one per second) instead of jumping (R-MAP-04).
+Widget selfLayer(LocationFix fix) => AnimatedMarkerLayer(
+  key: const Key('selfLayer'),
   markers: [
     Marker(
+      key: const Key('self'),
       point: fix.point.toLatLng(),
       width: 22,
       height: 22,

@@ -260,6 +260,12 @@ abstract class AppLocalizations {
   /// **'Caught'**
   String get filterCaught;
 
+  /// No description provided for @filterSharedPings.
+  ///
+  /// In en, this message translates to:
+  /// **'Last players\' pings'**
+  String get filterSharedPings;
+
   /// No description provided for @filterSpeedhunt.
   ///
   /// In en, this message translates to:
@@ -536,6 +542,18 @@ abstract class AppLocalizations {
   /// **'Each player may see where all other players are once.'**
   String get settingsPlayerJokerHint;
 
+  /// No description provided for @settingsSharedPings.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular pings to all players'**
+  String get settingsSharedPings;
+
+  /// No description provided for @settingsSharedPingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Players also see the latest regular ping of all other players (no history, no speedhunt pings). Replaces the joker “player positions”.'**
+  String get settingsSharedPingsHint;
+
   /// No description provided for @settingsArea.
   ///
   /// In en, this message translates to:
@@ -595,6 +613,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My location'**
   String get areaMyLocation;
+
+  /// No description provided for @mapSatellite.
+  ///
+  /// In en, this message translates to:
+  /// **'Satellite view'**
+  String get mapSatellite;
+
+  /// No description provided for @mapStreets.
+  ///
+  /// In en, this message translates to:
+  /// **'Map view'**
+  String get mapStreets;
 
   /// No description provided for @areaLocationUnavailable.
   ///
@@ -1123,6 +1153,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your location was sent to the hunters'**
   String get noticePingSent;
+
+  /// No description provided for @noticePingSentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location was sent to everyone'**
+  String get noticePingSentAll;
 
   /// No description provided for @catchTitle.
   ///

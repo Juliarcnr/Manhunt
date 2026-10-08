@@ -21,6 +21,7 @@ class MapFilters {
     this.hiddenSpeedhunts = const {},
     this.caught = false,
     this.myPings = true,
+    this.sharedPings = true,
     this.hunterJoker = true,
     this.playerJoker = true,
   });
@@ -44,6 +45,9 @@ class MapFilters {
   // Players (R-PLAY-01, R-PLAY-04). Joker filters only appear once used and
   // are on right after using a joker.
   final bool myPings;
+
+  /// "Last players' pings" when the regular pings go to everyone (R-PLAY-05).
+  final bool sharedPings;
   final bool hunterJoker;
   final bool playerJoker;
 
@@ -57,6 +61,7 @@ class MapFilters {
     Set<String>? hiddenSpeedhunts,
     bool? caught,
     bool? myPings,
+    bool? sharedPings,
     bool? hunterJoker,
     bool? playerJoker,
   }) => MapFilters(
@@ -66,6 +71,7 @@ class MapFilters {
     hiddenSpeedhunts: hiddenSpeedhunts ?? this.hiddenSpeedhunts,
     caught: caught ?? this.caught,
     myPings: myPings ?? this.myPings,
+    sharedPings: sharedPings ?? this.sharedPings,
     hunterJoker: hunterJoker ?? this.hunterJoker,
     playerJoker: playerJoker ?? this.playerJoker,
   );

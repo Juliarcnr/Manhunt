@@ -38,6 +38,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-12 | Einstellbar: ob es den Joker „Spieler-Standorte“ gibt (Standard: ja). Der Joker „Hunter-Standorte“ ist über R-SET-09 einzeln abschaltbar. |
 | R-SET-13 | Einstellbar: wie lange nach dem Auslösen eines Speedhunts der erste Speedhunt-Ping gesendet wird (Standard: 0 min = sofort, in 1-Minuten-Schritten bis 30 min). Der Wert wird beim Auslösen im Speedhunt festgehalten. |
 | R-SET-14 | Alle Mitglieder können die Einstellungen der Gruppe in der Lobby ansehen (schreibgeschützt, aktuell gehalten); bearbeiten kann sie nur der Host (vgl. R-SET-10). |
+| R-SET-15 | Einstellbar: „Reguläre Pings an alle Spieler“ (Standard: aus). Dann gehen die regulären Pings nicht nur an die Hunter, sondern an alle Spieler (R-PLAY-05); Speedhunt-Pings weiterhin nur an die Hunter. Schließt den Joker „Spieler-Standorte“ aus: Einschalten des einen schaltet den anderen ab. (2026-10-08) |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -51,6 +52,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle. |
 | R-LOBBY-07 | Geht ein Handy verloren, tritt man der Gruppe einfach neu bei (keine Wiederherstellung nötig). |
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
+| R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
 | R-LOBBY-09 | Der Host kann Mitglieder aus der Gruppe entfernen – in der Lobby (Symbol neben der Person) und während einer Runde (Übersicht), jeweils mit Rückfrage. Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 
 ### Mehrere Gruppen
@@ -83,6 +85,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SPEED-08 | Während eines Speedhunts zeigt das Banner allen (Huntern und Spielern) den Countdown zum nächsten Speedhunt-Ping, z.B. „Speedhunt aktiv · Ping 2/3 in 03:12“. Da alle dasselbe sehen, verrät das kein Ziel. |
 | R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der eigenen Historie. |
 | R-SPEED-05 | Im Haupt-View (Karte) ist für alle (Hunter und Spieler) sichtbar, ob gerade ein Speedhunt läuft. |
+| R-SPEED-09 | Auch Spieler bekommen zu jedem Speedhunt einen Chip mit Blitz und Startzeit („⚡ 18:35“) – alle Spieler denselben, ob Ziel oder nicht, und zum selben Zeitpunkt wie bei den Huntern (mit dem ersten Speedhunt-Ping). Der Chip ist ein reiner Hinweis ohne Kartenebene und nicht schaltbar, damit er kein Ziel verrät (R-SPEED-04). (2026-10-08) |
 
 ## 6. Haupt-View: Karte
 
@@ -90,6 +93,8 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-MAP-01 | Hunter und Spieler sehen im Haupt-View immer die Karte (OpenStreetMap) mit dem Spielgebiet. Die Kopfzeile zeigt nur Phase und Countdown (z.B. „DIE JAGD LÄUFT 1:23:45“), damit möglichst viel Karte sichtbar bleibt; darunter nur kleine Hinweise (nächster Ping, GPS-Status, Speedhunt). Bei Spielern steht „Nächster Ping in …“ ganz oben, über den Filtern. Unter den Filtern (GPS-Status, Speedhunt-Banner) derselbe Abstand wie über ihnen (Kopfzeile bzw. „Nächster Ping“). |
 | R-MAP-02 | Die Karte ist immer nach Norden ausgerichtet: zoomen und verschieben ja, drehen nein (alle Karten). |
+| R-MAP-03 | Ein Kartenknopf schaltet zwischen normaler Karte und Satellitenbild (mit Straßennamen) um – im Spiel und im Spielfeld-Editor. Standard bleibt die helle Karte (R-UI-03); die Wahl gilt auf dem Gerät, bis die App geschlossen wird. (2026-10-08) |
+| R-MAP-04 | Live-Standorte bewegen sich flüssig statt zu springen: Der eigene Punkt bekommt etwa jede Sekunde eine neue Position und gleitet dazwischen; die Live-Pins der anderen Hunter gleiten zur jeweils neuen Position. (2026-10-08) |
 
 ### Hunter-View
 
@@ -97,14 +102,15 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-HUNT-01 | Filter-Buttons (Chips) in einer Leiste unter der Kopfzeile, mehrere gleichzeitig aktivierbar: Hunter, Letzte Pings, ein Chip pro Spieler (in seiner Farbe) für dessen Ping-Historie (R-HUNT-04/05) und ein Chip pro Speedhunt (R-HUNT-07); gefangene Spieler verlieren ihre Chips und landen gesammelt im Chip „Gefangen“ (R-HUNT-09). Spieler haben „Meine Pings“ und nach dem Einlösen je einen Chip pro Joker. Alle Chips dunkel; aktive Chips mit farbiger Umrandung und Haken. |
 | R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter als Standort-Pins, alle Hunter einheitlich in der (gedämpften) Hunter-Farbe Orange-Rot, Hunter-Symbol vor dem Namen, ohne Uhrzeit (live). |
-| R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**. Zählt nur normale Pings – Speedhunt-Pings gehören zum Filter „Speedhunts“ (R-HUNT-07). |
+| R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**. Zählt nur normale Pings – Speedhunt-Pings gehören zum Filter „Speedhunts“ (R-HUNT-07). Gefangene Spieler erscheinen hier nicht mehr, nur noch im Chip „Gefangen“ (R-HUNT-09; bis Spielende, R-HUNT-11). |
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. Nur normale Pings – Speedhunt-Pings werden nicht mitgezählt, damit die Nummern mit denen auf dem Spielerhandy übereinstimmen (Feldtest 2026-10-06). |
 | R-HUNT-05 | Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung (nur normale Pings). Kein eigener Linien-Chip: Tippen auf den Spieler-Chip schaltet reihum Punkte → Punkte mit Linien → aus; bei Linien zeigt der Chip ein Linien-Symbol statt des Farbpunkts. |
 | R-HUNT-06 | Hunter können einen Speedhunt für einen Spieler auslösen (solange verfügbar). |
 | R-HUNT-07 | Speedhunt-Pings bleiben für die Hunter alle sichtbar, nummeriert (⚡1/⚡2/⚡3 auf dunklem Grund, Rand in Spielerfarbe); der jeweils neueste Speedhunt-Ping jedes Spielers zeigt im Badge zusätzlich den Spielernamen („⚡2 Anna“) und hat einen Location-Pin in Spielerfarbe unter dem Badge. Getrennt von der Spieler-Historie: ein Filter-Chip pro Speedhunt mit Blitz, Name und Startzeit („⚡ Sam 18:35“, Rand in Spielerfarbe), erscheint mit dem ersten Ping des Speedhunts, ist sofort an und einzeln ein-/ausschaltbar. |
 | R-HUNT-08 | Ist „Letzte Pings“ ausgeschaltet und kommen neue normale Pings rein, schaltet sich der Filter automatisch wieder ein (Speedhunt-Pings lösen das nicht aus). Ebenso schaltet ein neuer Speedhunt-Ping den Chip seines Speedhunts wieder ein, falls er aus war (R-HUNT-07). |
-| R-HUNT-09 | Wird ein Spieler gefangen, verschwinden sein Spieler-Chip und seine Speedhunt-Chips. Stattdessen gibt es (ab dem ersten Catch) einen Chip „Gefangen“, anfangs aus und nur per Tippen einschaltbar – er geht nie von selbst an (anders als R-HUNT-08). Eingeschaltet zeigt er die normale nummerierte Ping-Historie aller Gefangenen (in ihren Farben) und alle ihre Speedhunt-Pings. |
+| R-HUNT-09 | Wird ein Spieler gefangen, verschwinden sein Spieler-Chip und seine Speedhunt-Chips. Stattdessen gibt es (ab dem ersten Catch) einen Chip „Gefangen“, anfangs aus und nur per Tippen einschaltbar – er geht nie von selbst an (anders als R-HUNT-08). Eingeschaltet zeigt er die normale nummerierte Ping-Historie aller Gefangenen (in ihren Farben) und alle ihre Speedhunt-Pings. Ihr letzter Ping verschwindet sofort aus „Letzte Pings“ (geändert 2026-10-08; vorher grau). Nach Ablauf der Spielzeit siehe R-HUNT-11. |
 | R-HUNT-10 | Hunter sehen wie die Spieler über den Filtern einen Countdown bis zu den nächsten regulären Pings („Nächste Pings in 04:12“). Nach dem letzten regulären Ping der Runde verschwindet er. |
+| R-HUNT-11 | Ist die Spielzeit abgelaufen, die Runde aber noch nicht vom Host beendet, werden Gefangene wieder wie alle anderen angezeigt: kein Chip „Gefangen“, wieder eigene Spieler- und Speedhunt-Chips, letzter Ping wieder unter „Letzte Pings“ in Spielerfarbe – zum gemeinsamen Anschauen nach dem Spiel. (2026-10-08) |
 
 ### Spieler-View
 
@@ -112,8 +118,9 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-PLAY-01 | Eigene Standort-Historie (gesendete Pings) kann angezeigt werden. |
 | R-PLAY-02 | Joker „Hunter-Standorte“: einmal pro Spieler und Runde die aktuellen Hunter-Standorte abfragen, angezeigt als Pins wie bei R-HUNT-02, aber mit Uhrzeit der Position („Alex · 14:32“) (nur wenn R-SET-09 aktiv). |
-| R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins, jeder Spieler in eigener Farbe, klar unterscheidbar vom Hunter-Orange-Rot (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. |
+| R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins, jeder Spieler in eigener Farbe, klar unterscheidbar vom Hunter-Orange-Rot (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. Nicht zusammen mit R-SET-15. |
 | R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter einheitlich im Hunter-Orange-Rot, Spieler in ihren Spielerfarben). Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
+| R-PLAY-05 | Mit R-SET-15 haben Spieler den Chip „Letzte Spieler-Pings“: jeweils nur den letzten regulären Ping jedes anderen Spielers (eigene unter „Meine Pings“), keine Historie, keine Speedhunt-Pings. Gefangene Spieler grau, bis es neuere reguläre Pings gibt – dann verschwindet ihr Pin. Neue Pings schalten den Chip wieder ein (wie R-HUNT-08). (2026-10-08) |
 
 ## 7. Benachrichtigungen
 
@@ -121,7 +128,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 |---|---|
 | R-NOTIF-01 | In-App-Benachrichtigungen (Banner), das Handy vibriert dabei. |
 | R-NOTIF-02 | Benachrichtigung an alle, wenn jemand gefangen wurde. |
-| R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort bei einem regulären Ping an die Hunter gesendet wurde (nicht bei Speedhunt-Pings, siehe R-SPEED-04). |
+| R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort bei einem regulären Ping an die Hunter gesendet wurde (nicht bei Speedhunt-Pings, siehe R-SPEED-04). Mit R-SET-15 lautet sie „… an alle gesendet“. |
 | R-NOTIF-04 | Benachrichtigung, wenn ein Speedhunt gestartet wurde (ohne das Ziel an Spieler zu verraten). |
 | R-NOTIF-05 | Ton richtet sich nach den Handy-Einstellungen: Ist das Handy laut, gibt es zusätzlich zur Vibration einen Benachrichtigungston; ist es stumm/lautlos, nur Vibration. Bei geöffneter App gibt es kein zusätzliches System-Pop-up (nur das Banner in der App). |
 
@@ -157,7 +164,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-PLAT-02 | Sprachen: Deutsch und Englisch. |
 | R-UI-01 | Moderne, „coole“ Optik. |
 | R-UI-02 | Dark Mode als Standard für die App-Oberfläche. |
-| R-UI-03 | Die Karte selbst bleibt eine normale (helle) OpenStreetMap. |
+| R-UI-03 | Die Karte selbst bleibt eine normale (helle) OpenStreetMap; Satellitenbild nur auf Knopfdruck (R-MAP-03). |
 | R-UI-04 | App-Icon: stylisches „M“ (Verlauf Gelb→Hunter-Orange→Rot) auf dunklem Grund, ohne weitere Elemente. Android adaptiv inkl. Monochrom (Themed Icons). |
 
 ## 11. Datenschutz

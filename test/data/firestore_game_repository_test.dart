@@ -115,6 +115,15 @@ void main() {
       expect(game!.settings.pingInterval, const Duration(minutes: 30));
     });
 
+    test('"pings to all players" is also stored in plain text for the rules '
+        '(R-SET-15)', () async {
+      await createDefault();
+      expect((await gameDoc().get()).data()!['sharedPings'], isFalse);
+      await repo.updateSettings(admin, const GameSettings(sharedPings: true));
+      expect((await gameDoc().get()).data()!['sharedPings'], isTrue);
+      expect((await repo.watchGame(admin).first)!.settings.sharedPings, isTrue);
+    });
+
     test('any member can edit the play area (R-SET-10)', () async {
       await createDefault();
       await repo.joinGame(guest, name: 'Kim');

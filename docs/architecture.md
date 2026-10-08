@@ -53,9 +53,9 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, startAt, createdAt, expiresAt | name, settings; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings (Klartext-Kopie aus den Einstellungen für die Regeln, R-SET-15), startAt, createdAt, expiresAt | name, settings; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
-| `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene | Standort | ✔ |
+| `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`) | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker | Standort | ✔ |
 | `games/{groupId}/events/{auto}` | type (catch/speedhunt), createdAt, `data` – Speedhunt-Event **ohne** Ziel | Inhalt | ✔ |
 | `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar | – | ✔ |
@@ -92,10 +92,14 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Phase 6: Filterleiste (Hunter, Letzte Pings, Chip pro Spieler für die nummerierte Historie – Tippen schaltet
       Punkte → Punkte mit Linien/Pfeilen → aus –, Chip pro Speedhunt „⚡ Name hh:mm“ mit ⚡1-3, Gefangene gebündelt in einem Chip „Gefangen“; Spieler: Meine Pings + Joker-Chips), Joker-Ergebnisse im Keystore (`JokerStore`, pro Runde),
       Übersicht, Spieler-/Hunterfarben, kompakte Kopfzeile
+- [x] Feldtest-Wünsche 2026-10-08: Gefangene nur im Chip „Gefangen“, nach Spielende wieder aufgeteilt (R-HUNT-11),
+      Satellitenbild (R-MAP-03), Speedhunt-Chips für Spieler (R-SPEED-09), „Reguläre Pings an alle“ (R-SET-15,
+      R-PLAY-05), flüssiger Live-Standort (R-MAP-04)
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise
-- Kacheln: `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}{r}.png?key=…`, Key per
+- Kacheln: `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}{r}.png?key=…`, Satellit (R-MAP-03):
+  `…/maps/hybrid/256/{z}/{x}/{y}{r}.jpg` (Satellit + Straßennamen); Wahl in `mapStyleProvider`, Knopf `MapStyleButton`. Key per
   `--dart-define-from-file=config/maptiler.json` (`MAPTILER_KEY`). Ohne Key (z.B. in Tests) zeigt `BaseMap`
   nur eine graue Fläche – kein Netzwerk in Tests.
 - Attribution „© MapTiler © OpenStreetMap contributors“ ist Pflicht und in `BaseMap` fest eingebaut.
@@ -104,13 +108,16 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Taps auf die Karte kommen erst nach dem Doppeltipp-Timeout; in Widget-Tests nach `tapAt` ~400 ms pumpen.
 
 ## Runde auf dem Gerät (Phase 5)
+- Standort-Stream: Android `intervalDuration` 1 s, iOS ohne `distanceFilter` → ca. 1 Fix/s; der eigene Punkt und die
+  Live-Pins der Hunter gleiten per `AnimatedMarkerLayer` (lib/features/map) zur neuen Position (R-MAP-04). Uploads
+  bleiben gedrosselt (Hunter alle 15 s, Pings nach Zeitplan).
 - `RoundEngine` (lib/state) gehört dem `GameScreen`: trackt nur in Vorlauf/Jagd und nur für Hunter bzw. nicht
   gefangene Spieler; tickt alle 5 s. Spieler: `duePings` → `sendPing` (Doc-ID `{uid}_{slotId}` ⇒ idempotent,
   die Regeln verbieten Überschreiben; >3 min verspätete Pings werden verworfen). Hunter: Live-Position alle 15 s.
 - Benachrichtigungen: `NoticeTracker` meldet nur *neue* Catches/Speedhunts (erster Snapshot = Basis).
   Vordergrund → In-App-Banner + `HapticFeedback.vibrate`, Hintergrund → `NotificationService` (System, vibriert).
 - Hunter-only-Streams (`allPingsProvider`, `hunterLocationsProvider`) nur bei Hunter-Rolle beobachten,
-  `jokerRequestsProvider` nur bei Spieler-Rolle.
+  `jokerRequestsProvider` nur bei Spieler-Rolle, `sharedPingsProvider` nur bei Spieler-Rolle mit `sharedPings`.
 - Spieler-Joker: Anfrage (`requestPlayerPositions`) → `RoundEngine.updateJokerRequests` auf den anderen
   Spieler-Handys beantwortet frische Anfragen (< 2 min) mit dem aktuellen Standort (`jokerAnswers`).
 

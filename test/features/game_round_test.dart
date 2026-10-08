@@ -17,6 +17,7 @@ import 'package:manhunt/data/joker_store.dart';
 import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
 import 'package:manhunt/features/game/game_screen.dart';
+import 'package:manhunt/features/map/base_map.dart';
 import 'package:manhunt/l10n/app_localizations.dart';
 import 'package:manhunt/theme/app_theme.dart';
 
@@ -1024,7 +1025,227 @@ void main() {
       await tapFilter(tester, 'caught');
       expect(find.byKey(const Key('history_sam_1')), findsNothing);
       expect(find.text('⚡2 Sam'), findsNothing);
+      // Caught players appear only under "caught", not under "last pings".
+      expect(find.byKey(const Key('filterCheck_lastPings')), findsOneWidget);
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+    });
+
+    testWidgets('a caught player\'s ping leaves "last pings" right away '
+        '(R-HUNT-03, R-HUNT-09)', (tester) async {
+      await seed(tester);
+      await ping(tester, 'sam', 'regular_1', 52.501, 20);
+      await ping(tester, 'kim', 'regular_1', 52.506, 20);
+      await pumpAs(tester, 'alex');
       expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(playerId: 'sam', at: now),
+        ),
+      );
+      await settle(tester);
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+      expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
+    });
+
+    testWidgets('time up, not ended yet: caught players are split up again '
+        '(R-HUNT-11)', (tester) async {
+      final sh = start.add(const Duration(minutes: 70)).millisecondsSinceEpoch;
+      await seed(tester);
+      await ping(tester, 'sam', 'regular_1', 52.501, 20);
+      await ping(
+        tester,
+        'sam',
+        'speedhunt_${sh}_1',
+        52.503,
+        70,
+        kind: PingKind.speedhunt,
+      );
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(
+            playerId: 'sam',
+            at: start.add(const Duration(minutes: 80)),
+          ),
+        ),
+      );
+      now = start.add(settings.duration + const Duration(minutes: 5));
+      await pumpAs(tester, 'alex');
+
+      expect(find.byKey(const Key('filter_caught')), findsNothing);
+      expect(find.byKey(const Key('filter_player_sam')), findsOneWidget);
+      expect(find.byKey(Key('filter_speedhunt_sam_$sh')), findsOneWidget);
+      expect(find.text('⚡1 Sam'), findsOneWidget);
+      // Back under "last pings", in Sam's colour, not grey.
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+      final pin = tester.widget<Icon>(
+        find.descendant(
+          of: find.byKey(const Key('lastPing_sam')),
+          matching: find.byIcon(Icons.location_on),
+        ),
+      );
+      expect(pin.color, isNot(AppColors.textMuted));
+      await tapFilter(tester, 'player_sam');
+      expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
+    });
+
+    group('speedhunt chips for players (R-SPEED-09)', () {
+      Future<int> startSpeedhunt(
+        WidgetTester tester, {
+        Duration delay = Duration.zero,
+      }) async {
+        final startedAt = start.add(const Duration(minutes: 70));
+        await tester.runAsync(
+          () async => FirestoreRoundRepository(db).startSpeedhunt(
+            await testSession(code, 'alex'),
+            Speedhunt.fromSettings(
+              targetId: 'sam',
+              startedAt: startedAt,
+              settings: settings.copyWith(speedhuntFirstDelay: delay),
+            ),
+          ),
+        );
+        return startedAt.millisecondsSinceEpoch;
+      }
+
+      for (final who in ['kim', 'sam']) {
+        testWidgets('$who sees "⚡ time", target or not', (tester) async {
+          now = start.add(const Duration(minutes: 72));
+          await seed(tester);
+          final sh = await startSpeedhunt(tester);
+          await pumpAs(tester, who);
+          final chip = find.byKey(Key('filter_speedhunt_$sh'));
+          expect(chip, findsOneWidget);
+          final time = DateFormat.Hm('en')
+              .format(DateTime.fromMillisecondsSinceEpoch(sh));
+          expect(
+            find.descendant(of: chip, matching: find.text(time)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: chip, matching: find.byIcon(Icons.bolt)),
+            findsOneWidget,
+          );
+          // No name, nothing to switch.
+          expect(
+            find.descendant(of: chip, matching: find.textContaining('Sam')),
+            findsNothing,
+          );
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          expect(find.byKey(Key('filterCheck_speedhunt_$sh')), findsNothing);
+        });
+      }
+
+      testWidgets('appears with the first ping, like for the hunters', (
+        tester,
+      ) async {
+        now = start.add(const Duration(minutes: 71));
+        await seed(tester);
+        final sh = await startSpeedhunt(
+          tester,
+          delay: const Duration(minutes: 2),
+        );
+        await pumpAs(tester, 'kim');
+        expect(find.byKey(Key('filter_speedhunt_$sh')), findsNothing);
+        now = start.add(const Duration(minutes: 72));
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.byKey(Key('filter_speedhunt_$sh')), findsOneWidget);
+      });
+    });
+
+    group('regular pings to all players (R-PLAY-05)', () {
+      const shared = GameSettings(area: area, sharedPings: true);
+
+      testWidgets('without the setting players get no such chip', (
+        tester,
+      ) async {
+        await seed(tester);
+        await pumpAs(tester, 'kim');
+        expect(find.byKey(const Key('filter_sharedPings')), findsNothing);
+      });
+
+      testWidgets('players see only the latest regular ping of the others; '
+          'caught ones grey until newer pings', (tester) async {
+        await seed(tester);
+        await ping(tester, 'kim', 'regular_1', 52.506, 20);
+        await ping(tester, 'sam', 'regular_1', 52.501, 20);
+        await ping(tester, 'sam', 'regular_2', 52.502, 40);
+        await ping(
+          tester,
+          'sam',
+          'speedhunt_1791228604799_1',
+          52.509,
+          45,
+          kind: PingKind.speedhunt,
+        );
+        await pumpAs(tester, 'kim', gameSettings: shared);
+        expect(
+          find.byKey(const Key('filterCheck_sharedPings')),
+          findsOneWidget,
+        );
+        Marker marker(String key) => tester
+            .widgetList<MarkerLayer>(find.byType(MarkerLayer))
+            .expand((l) => l.markers)
+            .singleWhere((m) => m.key == Key(key));
+        // Latest regular ping only – no history, no speedhunt ping.
+        expect(marker('lastPing_sam').point.latitude, 52.502);
+        expect(find.text('⚡1 Sam'), findsNothing);
+        // The own ping is under "my pings".
+        expect(find.byKey(const Key('lastPing_kim')), findsNothing);
+
+        await tester.runAsync(
+          () async => FirestoreGameRepository(db).recordCatch(
+            await testSession(code, 'sam'),
+            CatchRecord(playerId: 'sam', at: now),
+          ),
+        );
+        await settle(tester);
+        final pin = tester.widget<Icon>(
+          find.descendant(
+            of: find.byKey(const Key('lastPing_sam')),
+            matching: find.byIcon(Icons.location_on),
+          ),
+        );
+        expect(pin.color, AppColors.textMuted);
+
+        // Can be switched off; new pings switch it back on (like R-HUNT-08).
+        await tapFilter(tester, 'sharedPings');
+        expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+        await ping(tester, 'kim', 'regular_3', 52.507, 60);
+        await settle(tester);
+        expect(
+          find.byKey(const Key('filterCheck_sharedPings')),
+          findsOneWidget,
+        );
+        // Newer pings exist: the caught player's old pin is gone.
+        expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+      });
+
+      testWidgets('replaces the player joker (R-SET-15)', (tester) async {
+        await seed(tester);
+        await pumpAs(tester, 'kim', gameSettings: shared);
+        await tester.tap(find.byKey(const Key('jokerButton')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('joker_players')), findsNothing);
+        expect(find.byKey(const Key('joker_hunters')), findsOneWidget);
+      });
+    });
+
+    testWidgets('map can switch to satellite images and back (R-MAP-03)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      expect(find.byIcon(Icons.satellite_alt), findsOneWidget);
+      await tester.tap(find.byKey(const Key('mapStyleButton')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.map_outlined), findsOneWidget);
+      expect(MapStyle.satellite.tileUrl, contains('/hybrid/'));
+      await tester.tap(find.byKey(const Key('mapStyleButton')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.satellite_alt), findsOneWidget);
     });
 
     testWidgets('player: own pings can be hidden (R-PLAY-01)', (tester) async {

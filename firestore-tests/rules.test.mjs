@@ -470,6 +470,92 @@ describe('running round (phase 5)', () => {
   });
 });
 
+describe('regular pings to all players (R-SET-15, R-PLAY-05)', () => {
+  const pingsOf = (uid, kind = 'regular') =>
+    getDocs(query(collection(as(uid), 'games', GID, 'pings'), where('kind', '==', kind)));
+  const sendPings = async () => {
+    for (const uid of ['kim', 'sam']) {
+      await assertSucceeds(
+        setDoc(doc(as(uid), 'games', GID, 'pings', `${uid}_regular_1`), {
+          uid, kind: 'regular', slot: 'regular_1', createdAt: serverTimestamp(), data: 'enc',
+        }),
+      );
+    }
+    await assertSucceeds(
+      setDoc(doc(as('sam'), 'games', GID, 'pings', 'sam_speedhunt_1_1'), {
+        uid: 'sam', kind: 'speedhunt', slot: 'speedhunt_1_1', createdAt: serverTimestamp(), data: 'enc',
+      }),
+    );
+  };
+  // Like FirestoreGameRepository.updateSettings in the lobby.
+  const saveSettings = (sharedPings) =>
+    updateDoc(doc(as('admin'), 'games', GID), { settings: 'enc2', sharedPings, expiresAt: inDays(180) });
+
+  test('create with the flag; it must be a bool', async () => {
+    const game = {
+      adminUid: 'x', status: 'lobby', settings: 'enc', sharedPings: true,
+      startAt: null, createdAt: serverTimestamp(), expiresAt: new Date(),
+    };
+    await assertSucceeds(setDoc(doc(as('x'), 'games', 'g2'), game));
+    await assertFails(setDoc(doc(as('x'), 'games', 'g3'), { ...game, sharedPings: 'yes' }));
+  });
+
+  test('host saves it as hunter, player or unassigned; members cannot', async () => {
+    for (const role of ['unassigned', 'hunter', 'player']) {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+      );
+      await assertSucceeds(saveSettings(true));
+      await assertSucceeds(saveSettings(false));
+    }
+    await assertFails(
+      updateDoc(doc(as('kim'), 'games', GID), { sharedPings: true, expiresAt: inDays(180) }),
+    );
+    await assertFails(saveSettings('yes'));
+  });
+
+  test('switched on: players read all regular pings, never speedhunt pings', async () => {
+    await assertSucceeds(saveSettings(true));
+    await startRound();
+    await sendPings();
+    for (const uid of ['kim', 'sam']) {
+      const snap = await assertSucceeds(pingsOf(uid));
+      assert.equal(snap.size, 2);
+      await assertFails(pingsOf(uid, 'speedhunt'));
+      await assertFails(getDocs(collection(as(uid), 'games', GID, 'pings')));
+    }
+    await assertFails(getDoc(doc(as('kim'), 'games', GID, 'pings', 'sam_speedhunt_1_1')));
+    await assertSucceeds(getDoc(doc(as('kim'), 'games', GID, 'pings', 'sam_regular_1')));
+    // Hunters still read everything; caught players keep reading.
+    await assertSucceeds(getDocs(collection(as('admin'), 'games', GID, 'pings')));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'sam'), { caught: true }),
+    );
+    await assertSucceeds(pingsOf('sam'));
+    // Unassigned members and strangers do not.
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'members', 'lee'), {
+        name: 'enc', role: 'unassigned', caught: false, jokerUsed: false, joinedAt: new Date(),
+      }),
+    );
+    await assertFails(pingsOf('lee'));
+    await assertFails(pingsOf('stranger'));
+  });
+
+  test('switched off (or missing): players read only their own pings', async () => {
+    await startRound();
+    await sendPings();
+    await assertFails(pingsOf('kim'));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID), { sharedPings: false }),
+    );
+    await assertFails(pingsOf('kim'));
+    await assertSucceeds(
+      getDocs(query(collection(as('kim'), 'games', GID, 'pings'), where('uid', '==', 'kim'))),
+    );
+  });
+});
+
 describe('player joker (R-PLAY-03)', () => {
   beforeEach(startRound);
 

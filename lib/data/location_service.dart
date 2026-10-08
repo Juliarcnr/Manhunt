@@ -85,7 +85,9 @@ class GeolocatorLocationService implements LocationService {
         // No distance filter: also deliver updates while standing still, so a
         // fresh position is available at every ping.
         distanceFilter: 0,
-        intervalDuration: const Duration(seconds: 10),
+        // About one fix per second keeps the own dot moving smoothly
+        // (R-MAP-04). GPS is on anyway; uploads stay throttled by the engine.
+        intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: ForegroundNotificationConfig(
           notificationTitle: notice.title,
           notificationText: notice.text,
@@ -101,7 +103,9 @@ class GeolocatorLocationService implements LocationService {
       return AppleSettings(
         accuracy: LocationAccuracy.best,
         activityType: ActivityType.fitness,
-        distanceFilter: 5,
+        // Every update (about one per second) for a smoothly moving own dot
+        // (R-MAP-04); uploads stay throttled by the engine.
+        distanceFilter: 0,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
         allowBackgroundLocationUpdates: true,

@@ -1,6 +1,7 @@
 import 'geo_point.dart';
 
-/// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11, R-SET-12, R-SET-13).
+/// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
+/// R-SET-12, R-SET-13, R-SET-15).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -14,6 +15,7 @@ class GameSettings {
     this.hunterCount = 1,
     this.jokerEnabled = true,
     this.playerJokerEnabled = true,
+    this.sharedPings = false,
     this.area = const [],
   });
 
@@ -38,6 +40,13 @@ class GameSettings {
   /// Joker "player positions": each player may see all other players once
   /// (R-PLAY-03, R-SET-12).
   final bool playerJokerEnabled;
+
+  /// Regular pings go to all players, not only to the hunters (R-SET-15).
+  /// Replaces the joker "player positions".
+  final bool sharedPings;
+
+  /// The joker "player positions" is only offered without [sharedPings].
+  bool get playerJokerAvailable => playerJokerEnabled && !sharedPings;
 
   /// Polygon of the play area; empty until drawn.
   final List<GeoPoint> area;
@@ -81,6 +90,7 @@ class GameSettings {
     int? hunterCount,
     bool? jokerEnabled,
     bool? playerJokerEnabled,
+    bool? sharedPings,
     List<GeoPoint>? area,
   }) => GameSettings(
     duration: duration ?? this.duration,
@@ -94,6 +104,7 @@ class GameSettings {
     hunterCount: hunterCount ?? this.hunterCount,
     jokerEnabled: jokerEnabled ?? this.jokerEnabled,
     playerJokerEnabled: playerJokerEnabled ?? this.playerJokerEnabled,
+    sharedPings: sharedPings ?? this.sharedPings,
     area: area ?? this.area,
   );
 
@@ -109,6 +120,7 @@ class GameSettings {
     'hunterCount': hunterCount,
     'jokerEnabled': jokerEnabled,
     'playerJokerEnabled': playerJokerEnabled,
+    'sharedPings': sharedPings,
     'area': [for (final p in area) p.toJson()],
   };
 
@@ -128,6 +140,7 @@ class GameSettings {
     hunterCount: json['hunterCount']! as int,
     jokerEnabled: json['jokerEnabled'] as bool? ?? true,
     playerJokerEnabled: json['playerJokerEnabled'] as bool? ?? true,
+    sharedPings: json['sharedPings'] as bool? ?? false,
     area: [
       for (final p in json['area']! as List<Object?>)
         GeoPoint.fromJson(p! as Map<String, Object?>),

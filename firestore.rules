@@ -79,9 +79,11 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(
-             ['adminUid', 'status', 'name', 'settings', 'area', 'startAt', 'createdAt', 'expiresAt'])
+             ['adminUid', 'status', 'name', 'settings', 'area', 'sharedPings', 'startAt', 'createdAt', 'expiresAt'])
         // Group name (R-GROUPS-04) is optional and encrypted.
         && request.resource.data.get('name', '') is string
+        // "Regular pings to all players" (R-SET-15), plain for the ping rules.
+        && request.resource.data.get('sharedPings', false) is bool
         && request.resource.data.adminUid == request.auth.uid
         && request.resource.data.status == 'lobby'
         && request.resource.data.settings is string
@@ -91,6 +93,7 @@ service cloud.firestore {
           && request.resource.data.adminUid == resource.data.adminUid
           && request.resource.data.status in ['lobby', 'running']
           && request.resource.data.get('name', '') is string
+          && request.resource.data.get('sharedPings', false) is bool
           && validExpiry())
         // Any member opening the group extends its lifetime (R-PRIV-05).
         || (isMember(gid) && onlyChanges(['expiresAt']) && validExpiry())
@@ -158,10 +161,14 @@ service cloud.firestore {
       }
 
       // Location pings of players (R-PING-01). Hunters read all, players
-      // only their own (R-HUNT-03, R-PLAY-01). One doc per slot, never edited.
+      // only their own (R-HUNT-03, R-PLAY-01) – or, if the host lets the
+      // regular pings go to everyone, all regular ones; never speedhunt pings
+      // (R-SET-15, R-SPEED-04). One doc per slot, never edited.
       match /pings/{pingId} {
         allow read: if isHunter(gid)
-          || (isMember(gid) && resource.data.uid == request.auth.uid);
+          || (isMember(gid) && resource.data.uid == request.auth.uid)
+          || (isPlayer(gid) && game(gid).get('sharedPings', false) == true
+            && resource.data.kind == 'regular');
         allow create: if isRunning(gid) && isPlayer(gid)
           && request.resource.data.keys().hasOnly(['uid', 'kind', 'slot', 'createdAt', 'data'])
           && request.resource.data.uid == request.auth.uid

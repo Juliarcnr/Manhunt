@@ -167,6 +167,8 @@ class FirestoreGameRepository implements GameRepository {
 
   /// The play area is stored separately from the other settings so every
   /// member may edit it (R-SET-10) while the rest stays host-only.
+  /// `sharedPings` is also kept in plain text: the security rules need it to
+  /// let players read the regular pings (R-SET-15).
   Future<Map<String, Object?>> _encodeSettings(
     GroupSession session,
     GameSettings settings, {
@@ -175,6 +177,7 @@ class FirestoreGameRepository implements GameRepository {
     'settings': await session.crypto.encryptJson(
       settings.copyWith(area: const []).toJson(),
     ),
+    'sharedPings': settings.sharedPings,
     if (withArea) 'area': await _encodeArea(session, settings.area),
   };
 
