@@ -280,10 +280,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void _notify(GameNotice notice) {
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
-    final names = {
-      for (final m in ref.read(membersProvider).value ?? const <Member>[])
-        m.id: m.name,
-    };
+    final members = ref.read(membersProvider).value;
+    final names = {for (final m in members ?? const <Member>[]) m.id: m.name};
+    // Players also get their own ⚡ pings (R-SPEED-09); tell them that this
+    // does not mean the speedhunt is on them (R-NOTIF-06).
+    final isPlayer = !(_me(members)?.isHunter ?? true);
     final (title, body) = switch (notice) {
       CatchNotice(:final record) => (
         l10n.noticeCaught(names[record.playerId] ?? '?'),
@@ -291,7 +292,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
       SpeedhuntNotice(:final speedhunt) => (
         l10n.noticeSpeedhunt,
-        l10n.noticeSpeedhuntBody(speedhunt.pings, speedhunt.interval.inMinutes),
+        [
+          l10n.noticeSpeedhuntBody(
+            speedhunt.pings,
+            speedhunt.interval.inMinutes,
+          ),
+          if (isPlayer) l10n.noticeSpeedhuntPlayerHint,
+        ].join(' '),
       ),
       PingSentNotice() => (
         widget.game.settings.sharedPings
@@ -311,7 +318,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       );
       _bannerTimer?.cancel();
       setState(() => _banner = (title: title, body: body));
-      _bannerTimer = Timer(const Duration(seconds: 5), () {
+      _bannerTimer = Timer(noticeBannerDuration(notice), () {
         if (mounted) setState(() => _banner = null);
       });
     } else {
@@ -434,29 +441,32 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Future<void> _reportCatchAsHunter(List<Member> members) async {
     final playerId = await showHunterCatchDialog(context, members: members);
     if (playerId == null) return;
-    await _run(
-      () => ref
-          .read(gameRepositoryProvider)
-          .recordCatch(
-            widget.session,
-            CatchRecord(playerId: playerId, at: widget.now().toUtc()),
-          ),
-    );
+    await _run(() => _recordCatch(playerId));
   }
 
   Future<void> _reportSelfCatch() async {
     if (!await showSelfCatchDialog(context)) return;
-    await _run(
-      () => ref
-          .read(gameRepositoryProvider)
-          .recordCatch(
-            widget.session,
-            CatchRecord(
-              playerId: widget.session.userId,
-              at: widget.now().toUtc(),
-            ),
+    await _run(() => _recordCatch(widget.session.userId));
+  }
+
+  /// A catch of the speedhunt target ends the speedhunt (R-SPEED-10). Hunters
+  /// and the caught player may look up the target; the catch names the
+  /// speedhunt so everyone else learns it ended.
+  Future<void> _recordCatch(String playerId) async {
+    final at = widget.now().toUtc();
+    final onTarget = await ref
+        .read(roundRepositoryProvider)
+        .speedhuntsOn(widget.session, playerId);
+    await ref
+        .read(gameRepositoryProvider)
+        .recordCatch(
+          widget.session,
+          CatchRecord(
+            playerId: playerId,
+            at: at,
+            endsSpeedhunt: speedhuntEndedByCatch(onTarget, at),
           ),
-    );
+        );
   }
 
   /// [members]: players in the order and with the [names] hunters see them

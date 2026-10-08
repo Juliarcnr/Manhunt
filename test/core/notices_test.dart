@@ -45,4 +45,17 @@ void main() {
       );
     });
   });
+
+  group('noticeBannerDuration (R-NOTIF-06)', () {
+    test('speedhunt banner stays 10 s longer than the others', () {
+      expect(
+        noticeBannerDuration(SpeedhuntNotice(sh(10))),
+        const Duration(seconds: 15),
+      );
+      expect(
+        noticeBannerDuration(CatchNotice(c('kim', 5))),
+        const Duration(seconds: 5),
+      );
+    });
+  });
 }

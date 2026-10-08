@@ -76,6 +76,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 ## Bestätigte Regeln (Julia, 2026-10-04)
 - Speedhunt: erster Ping sofort beim Auslösen, dann alle `speedhuntInterval`.
 - Höchstens ein Speedhunt gleichzeitig; nur auf nicht gefangene Spieler.
+- Wird das Ziel während des Speedhunts gefangen, endet er sofort (R-SPEED-10): Der Melder (Hunter oder Ziel selbst, beide
+  kennen das Ziel) schreibt den Speedhunt-Start ins verschlüsselte Catch-Event (`CatchRecord.endsSpeedhunt`); alle
+  Geräte setzen daraus `Speedhunt.endedAt` (`applyCatches` in den Providern) → keine weiteren Pings/⚡-Pings, Banner aus.
 - Joker: einmal pro Spieler und Spiel; per Einstellung abschaltbar (`jokerEnabled`).
 - Reguläre Pings: bei `n × pingInterval` nach Start, kein Ping exakt bei Spielende.
 

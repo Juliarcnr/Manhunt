@@ -174,6 +174,8 @@ void main() {
       expect(find.text('Speedhunt active · ping 2/3 in 05:00'), findsOneWidget);
       expect(find.text('Speedhunt (1)'), findsOneWidget);
       expect(find.text('Speedhunt started!'), findsOneWidget); // notice
+      // Hunters know the target, so no "whom is unclear" hint (R-NOTIF-06).
+      expect(find.textContaining('Nobody knows whom'), findsNothing);
       // App open: sound via the system (follows mute switch), no pop-up
       // (R-NOTIF-05).
       expect(notifications.shown.single.title, 'Speedhunt started!');
@@ -253,6 +255,73 @@ void main() {
                 .first,
       );
       expect(members!.firstWhere((m) => m.id == 'sam').caught, isTrue);
+    });
+
+    testWidgets('catching the speedhunt target ends the speedhunt '
+        '(R-SPEED-10)', (tester) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 70)),
+            settings: settings,
+          ),
+        ),
+      );
+      await pumpAs(tester, 'alex');
+      expect(find.byKey(const Key('speedhuntBanner')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('catchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('catchPlayer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sam').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirmCatch')));
+      await settle(tester);
+
+      expect(find.byKey(const Key('speedhuntBanner')), findsNothing);
+      final catches = await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .watchCatches(await testSession(code, 'kim'))
+                .first,
+      );
+      expect(
+        catches!.single.endsSpeedhunt,
+        start.add(const Duration(minutes: 70)),
+      );
+    });
+
+    testWidgets('catching someone else keeps the speedhunt (R-SPEED-10)', (
+      tester,
+    ) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 70)),
+            settings: settings,
+          ),
+        ),
+      );
+      await pumpAs(tester, 'alex');
+      await tester.tap(find.byKey(const Key('catchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('catchPlayer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kim').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirmCatch')));
+      await settle(tester);
+
+      expect(find.byKey(const Key('speedhuntBanner')), findsOneWidget);
     });
 
     testWidgets('each player has an own pin colour (R-HUNT-03)', (
@@ -551,6 +620,63 @@ void main() {
       await pumpAs(tester, 'kim');
       expect(find.text('Speedhunt active · ping 2/3 in 03:00'), findsOneWidget);
       expect(find.textContaining('Sam'), findsNothing);
+    });
+
+    testWidgets('players see the speedhunt end when its target is caught '
+        '(R-SPEED-10)', (tester) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      final startedAt = start.add(const Duration(minutes: 70));
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: startedAt,
+            settings: settings,
+          ),
+        ),
+      );
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('speedhuntBanner')), findsOneWidget);
+
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'sam'),
+          CatchRecord(playerId: 'sam', at: now, endsSpeedhunt: startedAt),
+        ),
+      );
+      await settle(tester);
+      expect(find.byKey(const Key('speedhuntBanner')), findsNothing);
+    });
+
+    testWidgets('player banner explains the ⚡ pings and stays 15 s '
+        '(R-NOTIF-06)', (tester) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      await settle(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 71)),
+            settings: settings,
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(find.text('Speedhunt started!'), findsOneWidget);
+      expect(find.textContaining('Nobody knows whom'), findsOneWidget);
+      expect(
+        notifications.shown.last.body,
+        contains("that doesn't mean it's you"),
+      );
+      await tester.pump(const Duration(seconds: 14));
+      expect(find.text('Speedhunt started!'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Speedhunt started!'), findsNothing);
     });
 
     for (final who in ['kim', 'alex']) {

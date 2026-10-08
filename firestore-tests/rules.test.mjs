@@ -468,6 +468,42 @@ describe('running round (phase 5)', () => {
         getDocs(query(collection(as('sam'), 'games', GID, 'speedhuntTargets'), where('uid', '==', 'sam'))),
       );
     });
+
+    // The catch flow as the app runs it (R-SPEED-10): look up the speedhunts
+    // on the caught player, read their events, then record the catch.
+    const catchFlow = async (reporter, caught) => {
+      const db = as(reporter);
+      const targets = await getDocs(
+        query(collection(db, 'games', GID, 'speedhuntTargets'), where('uid', '==', caught)),
+      );
+      for (const t of targets.docs) await getDoc(doc(db, 'games', GID, 'events', t.id));
+      const batch = writeBatch(db);
+      batch.set(doc(collection(db, 'games', GID, 'events')), {
+        type: 'catch', createdAt: serverTimestamp(), data: 'enc',
+      });
+      batch.update(doc(db, 'games', GID, 'members', caught), { caught: true });
+      await batch.commit();
+      return targets.size;
+    };
+    const startOnKim = async () => {
+      await setDoc(doc(as('admin'), 'games', GID, 'events', 's1'), event());
+      await setDoc(doc(as('admin'), 'games', GID, 'speedhuntTargets', 's1'), target('kim'));
+    };
+
+    test('hunter catching the target finds the speedhunt (R-SPEED-10)', async () => {
+      await startOnKim();
+      assert.equal(await assertSucceeds(catchFlow('admin', 'kim')), 1);
+    });
+
+    test('target reporting themself finds the speedhunt (R-SPEED-10)', async () => {
+      await startOnKim();
+      assert.equal(await assertSucceeds(catchFlow('kim', 'kim')), 1);
+    });
+
+    test('another player reporting themself sees no speedhunt (R-SPEED-10)', async () => {
+      await startOnKim();
+      assert.equal(await assertSucceeds(catchFlow('sam', 'sam')), 0);
+    });
   });
 });
 

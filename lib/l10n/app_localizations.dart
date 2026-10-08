@@ -1172,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'A player will be located {pings}× every {minutes} min.'**
   String noticeSpeedhuntBody(int pings, int minutes);
 
+  /// No description provided for @noticeSpeedhuntPlayerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody knows whom it\'s on. You\'ll still see your own ⚡ pings – that doesn\'t mean it\'s you.'**
+  String get noticeSpeedhuntPlayerHint;
+
   /// No description provided for @noticePingSent.
   ///
   /// In en, this message translates to:

@@ -631,6 +631,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get noticeSpeedhuntPlayerHint =>
+      'Auf wen er geht, ist unklar. Du siehst trotzdem deine eigenen ⚡-Pings – das heißt nicht, dass er dich betrifft.';
+
+  @override
   String get noticePingSent => 'Dein Standort wurde an die Hunter gesendet';
 
   @override

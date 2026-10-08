@@ -3,19 +3,33 @@ import '../models/member.dart';
 /// One catch during a round (R-HIST-01): who and when – deliberately not by
 /// whom (R-CATCH-03). Reported by a hunter or the player themself (R-CATCH-01).
 class CatchRecord {
-  const CatchRecord({required this.playerId, required this.at});
+  const CatchRecord({
+    required this.playerId,
+    required this.at,
+    this.endsSpeedhunt,
+  });
 
   final String playerId;
   final DateTime at;
 
+  /// Start of the speedhunt on this player that the catch ends (R-SPEED-10).
+  /// Set by whoever reports the catch – only they know the target.
+  final DateTime? endsSpeedhunt;
+
   Map<String, Object?> toJson() => {
     'playerId': playerId,
     'at': at.toUtc().toIso8601String(),
+    if (endsSpeedhunt case final start?)
+      'endsSpeedhunt': start.toUtc().toIso8601String(),
   };
 
   factory CatchRecord.fromJson(Map<String, Object?> json) => CatchRecord(
     playerId: json['playerId']! as String,
     at: DateTime.parse(json['at']! as String),
+    endsSpeedhunt: switch (json['endsSpeedhunt']) {
+      final String start => DateTime.parse(start),
+      _ => null,
+    },
   );
 }
 

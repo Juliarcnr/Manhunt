@@ -242,19 +242,37 @@ class FirestoreRoundRepository implements RoundRepository {
           .collection('speedhuntTargets')
           .where('uid', isEqualTo: session.userId)
           .snapshots()
-          .asyncMap((targets) async {
-            final result = <Speedhunt>[];
-            for (final t in targets.docs) {
-              final event = await _game(session)
-                  .collection('events')
-                  .doc(t.id)
-                  .get();
-              final data = event.data();
-              if (data == null) continue;
-              result.add(
-                await _decodeSpeedhunt(session, data, targetId: session.userId),
-              );
-            }
-            return result;
-          });
+          .asyncMap((targets) => _speedhuntsOf(session, targets));
+
+  @override
+  Future<List<Speedhunt>> speedhuntsOn(
+    GroupSession session,
+    String playerId,
+  ) async => _speedhuntsOf(
+    session,
+    await _game(session)
+        .collection('speedhuntTargets')
+        .where('uid', isEqualTo: playerId)
+        .get(),
+  );
+
+  Future<List<Speedhunt>> _speedhuntsOf(
+    GroupSession session,
+    QuerySnapshot<Map<String, dynamic>> targets,
+  ) async {
+    final result = <Speedhunt>[];
+    for (final t in targets.docs) {
+      final event = await _game(session).collection('events').doc(t.id).get();
+      final data = event.data();
+      if (data == null) continue;
+      result.add(
+        await _decodeSpeedhunt(
+          session,
+          data,
+          targetId: t.data()['uid'] as String,
+        ),
+      );
+    }
+    return result;
+  }
 }

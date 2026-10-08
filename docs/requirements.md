@@ -87,6 +87,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der nummerierten eigenen Historie. Die ⚡-Pings nach R-SPEED-09 bekommen alle Spieler gleich und verraten daher nichts. |
 | R-SPEED-05 | Im Haupt-View (Karte) ist für alle (Hunter und Spieler) sichtbar, ob gerade ein Speedhunt läuft. |
 | R-SPEED-09 | Jeder (nicht gefangene) Spieler bekommt zu jedem Speedhunt-Ping-Zeitpunkt – also dann, wenn die Hunter den Ping des Ziels erhalten – seinen **eigenen** Standort als Speedhunt-Ping angezeigt (⚡1, ⚡2, ⚡3), egal ob er das Ziel ist. Dazu ein Chip pro Speedhunt mit Blitz und Startzeit („⚡ 18:35“), der mit dem ersten Ping erscheint und die Pings ein-/ausblendet; jeder neue Ping des Speedhunts schaltet seinen Chip wieder ein und zeigt alle seine Pings. Bei Nicht-Zielen bleibt der Standort nur auf dem Gerät (wird nicht gesendet); da alle dasselbe sehen, verrät es kein Ziel (R-SPEED-04). (2026-10-08, geändert am selben Tag: vorher reiner Info-Chip) |
+| R-SPEED-10 | Wird das Ziel eines laufenden Speedhunts gefangen, wird der Speedhunt sofort beendet: keine weiteren Speedhunt-Pings (auch keine ⚡-Pings nach R-SPEED-09), das Banner „Speedhunt aktiv“ verschwindet. Bereits gesendete Pings bleiben sichtbar; der Speedhunt zählt weiter als verbraucht. Da das Ende mit einem Catch zusammenfällt, ist danach erkennbar, wen er betraf – der Spieler ist dann aber ohnehin raus. (2026-10-08) |
 
 ## 6. Haupt-View: Karte
 
@@ -142,6 +143,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-NOTIF-03 | Benachrichtigung an einen Spieler, wenn sein Standort bei einem regulären Ping an die Hunter gesendet wurde (nicht bei Speedhunt-Pings, siehe R-SPEED-04). Mit R-SET-15 lautet sie „… an alle gesendet“. |
 | R-NOTIF-04 | Benachrichtigung, wenn ein Speedhunt gestartet wurde (ohne das Ziel an Spieler zu verraten). |
 | R-NOTIF-05 | Ton richtet sich nach den Handy-Einstellungen: Ist das Handy laut, gibt es zusätzlich zur Vibration einen Benachrichtigungston; ist es stumm/lautlos, nur Vibration. Bei geöffneter App gibt es kein zusätzliches System-Pop-up (nur das Banner in der App). |
+| R-NOTIF-06 | Das In-App-Banner „Speedhunt gestartet!“ bleibt 15 s sichtbar (andere Banner 5 s). Spieler lesen darin zusätzlich, dass unklar ist, auf wen der Speedhunt geht, und dass ihre eigenen ⚡-Pings (R-SPEED-09) trotzdem angezeigt werden, also nicht bedeuten, dass er sie betrifft. (2026-10-08) |
 
 ## 8. Catch
 

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/member.dart';
+import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/core/schedule/game_clock.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
 
@@ -175,5 +177,77 @@ void main() {
     expect(speedhuntsWithFirstPing([later, delayed], at(62)), [delayed]);
     // Oldest first.
     expect(speedhuntsWithFirstPing([later, delayed], at(90)), [delayed, later]);
+  });
+
+  group('catching the target ends the speedhunt (R-SPEED-10)', () {
+    final sh = Speedhunt.fromSettings(
+      targetId: 'p',
+      startedAt: at(30),
+      settings: settings,
+    );
+
+    test('no pings from the catch on, inactive right away', () {
+      final ended = sh.endAt(at(37));
+      expect(ended.pingTimes(), [at(30), at(35)]);
+      expect(ended.endsAt, at(37));
+      expect(ended.isActiveAt(at(36)), isTrue);
+      expect(ended.isActiveAt(at(37)), isFalse);
+    });
+
+    test('a catch at a ping time drops that ping', () {
+      expect(sh.endAt(at(35)).pingTimes(), [at(30)]);
+    });
+
+    test('a catch after the end changes nothing', () {
+      final ended = sh.endAt(at(50));
+      expect(ended.pingTimes(), sh.pingTimes());
+      expect(ended.endsAt, at(40));
+    });
+
+    test('caught before the first ping: no chip for players', () {
+      final delayed = Speedhunt(
+        targetId: '',
+        startedAt: at(30),
+        pings: 3,
+        interval: const Duration(minutes: 5),
+        firstDelay: const Duration(minutes: 2),
+      ).endAt(at(31));
+      expect(delayed.pingTimes(), isEmpty);
+      expect(speedhuntsWithFirstPing([delayed], at(45)), isEmpty);
+    });
+
+    test('only the running speedhunt on the caught player is ended', () {
+      expect(speedhuntEndedByCatch([sh], at(33)), sh.startedAt);
+      expect(speedhuntEndedByCatch([sh], at(41)), isNull);
+      expect(speedhuntEndedByCatch([], at(33)), isNull);
+    });
+
+    test('catches mark the speedhunt they end; others stay', () {
+      final other = Speedhunt.fromSettings(
+        targetId: '',
+        startedAt: at(60),
+        settings: settings,
+      );
+      final result = applyCatches(
+        [sh, other],
+        [
+          CatchRecord(playerId: 'x', at: at(32)),
+          CatchRecord(playerId: 'p', at: at(37), endsSpeedhunt: at(30)),
+        ],
+      );
+      expect(result[0].endedAt, at(37));
+      expect(result[1].endedAt, isNull);
+      expect(activeSpeedhunt(result, at(38)), isNull);
+    });
+
+    test('stored in the catch; older catches without it end nothing', () {
+      final c = CatchRecord(playerId: 'p', at: at(37), endsSpeedhunt: at(30));
+      expect(CatchRecord.fromJson(c.toJson()).endsSpeedhunt, at(30));
+      expect(
+        CatchRecord.fromJson(CatchRecord(playerId: 'p', at: at(37)).toJson())
+            .endsSpeedhunt,
+        isNull,
+      );
+    });
   });
 }

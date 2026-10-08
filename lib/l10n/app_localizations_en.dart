@@ -626,6 +626,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get noticeSpeedhuntPlayerHint =>
+      'Nobody knows whom it\'s on. You\'ll still see your own ⚡ pings – that doesn\'t mean it\'s you.';
+
+  @override
   String get noticePingSent => 'Your location was sent to the hunters';
 
   @override

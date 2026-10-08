@@ -194,6 +194,7 @@
   "noticeCaught": "{player} wurde gefangen",
   "noticeSpeedhunt": "Speedhunt gestartet!",
   "noticeSpeedhuntBody": "Ein Spieler wird {pings}× im Abstand von {minutes} min geortet.",
+  "noticeSpeedhuntPlayerHint": "Auf wen er geht, ist unklar. Du siehst trotzdem deine eigenen ⚡-Pings – das heißt nicht, dass er dich betrifft.",
   "noticePingSent": "Dein Standort wurde an die Hunter gesendet",
   "noticePingSentAll": "Dein Standort wurde an alle gesendet",
 

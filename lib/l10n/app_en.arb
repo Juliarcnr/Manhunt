@@ -217,6 +217,7 @@
   "noticeSpeedhunt": "Speedhunt started!",
   "noticeSpeedhuntBody": "A player will be located {pings}× every {minutes} min.",
   "@noticeSpeedhuntBody": {"placeholders": {"pings": {"type": "int"}, "minutes": {"type": "int"}}},
+  "noticeSpeedhuntPlayerHint": "Nobody knows whom it's on. You'll still see your own ⚡ pings – that doesn't mean it's you.",
   "noticePingSent": "Your location was sent to the hunters",
   "noticePingSentAll": "Your location was sent to everyone",
 

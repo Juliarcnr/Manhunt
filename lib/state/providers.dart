@@ -110,8 +110,7 @@ final catchesProvider = StreamProvider<List<CatchRecord>>(
   ),
 );
 
-/// Public speedhunts without target (everyone).
-final speedhuntsProvider = StreamProvider<List<Speedhunt>>(
+final _storedSpeedhuntsProvider = StreamProvider<List<Speedhunt>>(
   (ref) => _sessionStream(
     ref,
     const [],
@@ -119,13 +118,32 @@ final speedhuntsProvider = StreamProvider<List<Speedhunt>>(
   ),
 );
 
-/// Speedhunts targeting this device's player.
-final speedhuntsOnMeProvider = StreamProvider<List<Speedhunt>>(
+final _storedSpeedhuntsOnMeProvider = StreamProvider<List<Speedhunt>>(
   (ref) => _sessionStream(
     ref,
     const [],
     ref.watch(roundRepositoryProvider).watchSpeedhuntsOnMe,
   ),
+);
+
+/// Public speedhunts without target (everyone), ended by catches
+/// (R-SPEED-10).
+final speedhuntsProvider = Provider<AsyncValue<List<Speedhunt>>>(
+  (ref) => ref
+      .watch(_storedSpeedhuntsProvider)
+      .whenData(
+        (all) => applyCatches(all, ref.watch(catchesProvider).value ?? []),
+      ),
+);
+
+/// Speedhunts targeting this device's player, ended by catches
+/// (R-SPEED-10).
+final speedhuntsOnMeProvider = Provider<AsyncValue<List<Speedhunt>>>(
+  (ref) => ref
+      .watch(_storedSpeedhuntsOnMeProvider)
+      .whenData(
+        (all) => applyCatches(all, ref.watch(catchesProvider).value ?? []),
+      ),
 );
 
 /// Hunters only.

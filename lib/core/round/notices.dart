@@ -25,6 +25,13 @@ class PingSentNotice extends GameNotice {
   final PingKind kind;
 }
 
+/// How long the in-app banner for [notice] stays visible. A speedhunt notice
+/// carries more text and matters more, so it stays longer (R-NOTIF-06).
+Duration noticeBannerDuration(GameNotice notice) => switch (notice) {
+  SpeedhuntNotice() => const Duration(seconds: 15),
+  _ => const Duration(seconds: 5),
+};
+
 /// Turns snapshots of catches/speedhunts into notices for *new* entries only.
 /// The first snapshot after opening the app is the baseline and produces
 /// nothing, so old events are not announced again.

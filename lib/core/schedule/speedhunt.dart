@@ -1,3 +1,4 @@
+import '../history/round_summary.dart';
 import '../models/game_settings.dart';
 import '../models/member.dart';
 import 'game_clock.dart';
@@ -10,6 +11,7 @@ class Speedhunt {
     required this.pings,
     required this.interval,
     this.firstDelay = Duration.zero,
+    this.endedAt,
   });
 
   factory Speedhunt.fromSettings({
@@ -33,17 +35,39 @@ class Speedhunt {
   /// time, so all devices agree even if the settings change afterwards.
   final Duration firstDelay;
 
+  /// Set when the target was caught during the speedhunt: it ends right then,
+  /// without further pings (R-SPEED-10). Derived from the catch, never stored
+  /// with the speedhunt.
+  final DateTime? endedAt;
+
+  Speedhunt endAt(DateTime at) => Speedhunt(
+    targetId: targetId,
+    startedAt: startedAt,
+    pings: pings,
+    interval: interval,
+    firstDelay: firstDelay,
+    endedAt: at,
+  );
+
   /// First ping after [firstDelay] (default: immediately), then one every
-  /// [interval] (R-SPEED-03).
-  List<DateTime> pingTimes() => [
-    for (var i = 0; i < pings; i++) startedAt.add(firstDelay + interval * i),
-  ];
+  /// [interval] (R-SPEED-03). None from [endedAt] on (R-SPEED-10).
+  List<DateTime> pingTimes() =>
+      [for (var i = 0; i < pings; i++) startedAt.add(firstDelay + interval * i)]
+          .where((t) => endedAt == null || t.isBefore(endedAt!))
+          .toList();
 
-  DateTime get endsAt => startedAt.add(firstDelay + interval * (pings - 1));
+  DateTime get endsAt {
+    final planned = startedAt.add(firstDelay + interval * (pings - 1));
+    final ended = endedAt;
+    return ended != null && ended.isBefore(planned) ? ended : planned;
+  }
 
-  /// Active from trigger until the last ping has been sent.
+  /// Active from trigger until the last ping has been sent or the target was
+  /// caught (R-SPEED-10).
   bool isActiveAt(DateTime now) =>
-      !now.isBefore(startedAt) && !now.isAfter(endsAt);
+      !now.isBefore(startedAt) &&
+      !now.isAfter(endsAt) &&
+      (endedAt == null || now.isBefore(endedAt!));
 
   Map<String, Object?> toJson() => {
     'targetId': targetId,
@@ -62,12 +86,35 @@ class Speedhunt {
   );
 }
 
+/// [all] with [Speedhunt.endedAt] set where a catch ended them (R-SPEED-10).
+/// Only whoever reports a catch knows the target, so the catch names the
+/// speedhunt it ends ([CatchRecord.endsSpeedhunt]).
+List<Speedhunt> applyCatches(List<Speedhunt> all, List<CatchRecord> catches) {
+  final endedAt = <DateTime, DateTime>{
+    for (final c in catches)
+      if (c.endsSpeedhunt case final start?) start.toUtc(): c.at,
+  };
+  return [
+    for (final s in all)
+      if (endedAt[s.startedAt.toUtc()] case final at?) s.endAt(at) else s,
+  ];
+}
+
+/// Start of the speedhunt among [onTarget] (all on the caught player) that a
+/// catch at [at] ends, or null if none is running then (R-SPEED-10).
+DateTime? speedhuntEndedByCatch(List<Speedhunt> onTarget, DateTime at) {
+  for (final s in onTarget) {
+    if (s.isActiveAt(at)) return s.startedAt;
+  }
+  return null;
+}
+
 /// Speedhunts whose first ping is due by [now], oldest first. Players get one
 /// chip each – at the same moment the hunters' chip appears, and the same for
 /// every player, so it reveals no target (R-SPEED-09).
 List<Speedhunt> speedhuntsWithFirstPing(List<Speedhunt> all, DateTime now) => [
   for (final s in all)
-    if (!s.startedAt.add(s.firstDelay).isAfter(now)) s,
+    if (s.pingTimes() case [final first, ...] when !first.isAfter(now)) s,
 ]..sort((a, b) => a.startedAt.compareTo(b.startedAt));
 
 enum SpeedhuntDenial {

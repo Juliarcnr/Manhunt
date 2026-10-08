@@ -13,7 +13,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Spielfeld & Einstellungen | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Anonyme Spielernummern der Runde (R-ANON-01): Zuordnung UID → „Spieler n“ | Firestore `games/{id}.aliases` | nein (verschlüsselt) | beim Beenden der Runde |
 | Schalter „Reguläre Pings an alle Spieler“ (R-SET-15) | Firestore `games/{id}.sharedPings` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; verrät nur die Spielvariante) | mit Gruppe |
-| Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings) | **beim Beenden der Runde** |
+| Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse (ein Catch vermerkt ggf. den Start des Speedhunts, den er beendet – R-SPEED-10) | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings) | **beim Beenden der Runde** |
 | Antworten auf den Spieler-Joker (aktueller Standort der anderen Spieler) | Firestore | **nein** (AES-GCM); nur der fragende Spieler darf sie lesen | beim Beenden der Runde |
 | Metadaten der Runde: wer wann gepingt hat (uid, Ping-Nr.), Ziel-uid eines Speedhunts, wer einen Joker wann benutzt hat | Firestore | ja (nötig für die Sicherheitsregeln; nur anonyme IDs, keine Orte) | beim Beenden der Runde (Joker-Zeitpunkte bleiben bis zur nächsten Runde) |
 | Rundenübersicht (Runde, Datum, Dauer, Teams, Catches mit Zeit und Hunter) | Firestore `history` | nein (verschlüsselt), nur Zeitpunkt des Rundenendes lesbar | mit Gruppe (keine Standorte enthalten) |

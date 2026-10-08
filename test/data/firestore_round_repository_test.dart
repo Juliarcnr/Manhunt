@@ -181,6 +181,32 @@ void main() {
       expect(onKim.single.pingTimes(), sh.pingTimes());
       expect(await rounds.watchSpeedhuntsOnMe(sam).first, isEmpty);
     });
+
+    test('a catch of the target ends the speedhunt for everyone '
+        '(R-SPEED-10)', () async {
+      await rounds.startSpeedhunt(hunter, sh);
+      // Hunter and the caught player themself can find the speedhunt.
+      final onKim = await rounds.speedhuntsOn(hunter, 'kim');
+      expect(onKim.single.targetId, 'kim');
+      expect((await rounds.speedhuntsOn(kim, 'kim')).single.startedAt, t0);
+      expect(await rounds.speedhuntsOn(hunter, 'sam'), isEmpty);
+
+      final caughtAt = t0.add(const Duration(minutes: 7));
+      await games.recordCatch(
+        hunter,
+        CatchRecord(
+          playerId: 'kim',
+          at: caughtAt,
+          endsSpeedhunt: speedhuntEndedByCatch(onKim, caughtAt),
+        ),
+      );
+      final ended = applyCatches(
+        await rounds.watchSpeedhunts(sam).first,
+        await games.watchCatches(sam).first,
+      );
+      expect(ended.single.endedAt, caughtAt);
+      expect(ended.single.pingTimes(), sh.pingTimes().take(2));
+    });
   });
 
   group('catches (R-CATCH-01, R-CATCH-02, R-NOTIF-02)', () {
