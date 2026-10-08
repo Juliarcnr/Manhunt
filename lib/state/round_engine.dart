@@ -91,6 +91,12 @@ class RoundEngine {
   GameInfo? _game;
   Member? _me;
   List<Speedhunt> _speedhuntsOnMe = const [];
+  List<Speedhunt> _speedhunts = const [];
+
+  /// The own position at every speedhunt ping time, by slot id – recorded on
+  /// every active player's device, target or not, so the ⚡ pings reveal no
+  /// target (R-SPEED-09). Stays on the device.
+  final speedhuntSnapshots = ValueNotifier<Map<String, LocationFix>>(const {});
 
   StreamSubscription<LocationFix>? _tracking;
   Timer? _timer;
@@ -169,15 +175,26 @@ class RoundEngine {
     log.value = lines.length > 80 ? lines.sublist(lines.length - 80) : lines;
   }
 
+  /// [speedhunts] are all public speedhunts (without target), for the own
+  /// ⚡ pings of every player (R-SPEED-09).
   void update({
     required GameInfo? game,
     required Member? me,
     required List<Speedhunt> speedhuntsOnMe,
+    List<Speedhunt> speedhunts = const [],
   }) {
     _game = game;
     _me = me;
     _speedhuntsOnMe = speedhuntsOnMe;
+    _speedhunts = speedhunts;
     _sync();
+  }
+
+  /// Snapshots saved on the device before an app restart; they are not
+  /// recorded again.
+  void restoreSpeedhuntSnapshots(Map<String, LocationFix> saved) {
+    if (saved.isEmpty) return;
+    speedhuntSnapshots.value = {...saved, ...speedhuntSnapshots.value};
   }
 
   /// After the user granted the permission (e.g. in the system settings).
@@ -282,6 +299,7 @@ class RoundEngine {
       await _refreshIfStreamSilent();
       if (me.isPlayer) {
         await _sendDuePings();
+        await _recordSpeedhuntSnapshots();
         await _answerJokerRequests();
       } else if (me.isHunter) {
         final fix = _lastFix;
@@ -373,6 +391,30 @@ class RoundEngine {
     }
   }
 
+  /// At every speedhunt ping time – the moment the hunters get the target's
+  /// ping – keep the own position as a ⚡ ping (R-SPEED-09). Same on every
+  /// player's device, so it reveals no target; nothing is sent or logged.
+  Future<void> _recordSpeedhuntSnapshots() async {
+    final clock = _clock;
+    if (clock == null) return;
+    final slots = [
+      for (final s in playerPingSlots(
+        clock: clock,
+        speedhuntsOnMe: _speedhunts,
+      ))
+        if (s.kind == PingKind.speedhunt) s,
+    ];
+    final recorded = speedhuntSnapshots.value;
+    final due = duePings(slots, now: _now(), sentIds: recorded.keys.toSet());
+    if (due.isEmpty) return;
+    final fix = await _fixForPing();
+    if (fix == null) return; // retry on the next tick (within the grace period)
+    speedhuntSnapshots.value = {
+      ...speedhuntSnapshots.value,
+      for (final slot in due) slot.id: fix,
+    };
+  }
+
   Future<void> _uploadHunterLocation(LocationFix fix) async {
     final last = _lastUpload;
     if (last != null && _now().difference(last) < hunterUploadInterval) return;
@@ -417,6 +459,7 @@ class RoundEngine {
     _stop();
     await _pingsSent.close();
     position.dispose();
+    speedhuntSnapshots.dispose();
     log.dispose();
     status.dispose();
   }

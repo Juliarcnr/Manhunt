@@ -118,6 +118,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Vordergrund → In-App-Banner + `HapticFeedback.vibrate`, Hintergrund → `NotificationService` (System, vibriert).
 - Hunter-only-Streams (`allPingsProvider`, `hunterLocationsProvider`) nur bei Hunter-Rolle beobachten,
   `jokerRequestsProvider` nur bei Spieler-Rolle, `sharedPingsProvider` nur bei Spieler-Rolle mit `sharedPings`.
+- Eigene ⚡-Pings (R-SPEED-09): `RoundEngine.speedhuntSnapshots` hält auf jedem aktiven Spielerhandy zu jedem
+  Speedhunt-Ping-Zeitpunkt (aus den öffentlichen Speedhunts) den eigenen Standort fest – nur lokal, gespeichert mit
+  den Joker-Ergebnissen (`JokerStore`), nach Neustart per `restoreSpeedhuntSnapshots` zurück.
 - Spieler-Joker: Anfrage (`requestPlayerPositions`) → `RoundEngine.updateJokerRequests` auf den anderen
   Spieler-Handys beantwortet frische Anfragen (< 2 min) mit dem aktuellen Standort (`jokerAnswers`).
 

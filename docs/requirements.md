@@ -83,9 +83,9 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SPEED-06 | Es läuft höchstens ein Speedhunt gleichzeitig; Ziel kann nur ein nicht gefangener Spieler sein. |
 | R-SPEED-07 | Der erste Speedhunt ist frühestens nach der eingestellten Zeit ab Spielstart möglich (R-SET-11). |
 | R-SPEED-08 | Während eines Speedhunts zeigt das Banner allen (Huntern und Spielern) den Countdown zum nächsten Speedhunt-Ping, z.B. „Speedhunt aktiv · Ping 2/3 in 03:12“. Da alle dasselbe sehen, verrät das kein Ziel. |
-| R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der eigenen Historie. |
+| R-SPEED-04 | Spieler erfahren, **dass** ein Speedhunt läuft, aber nicht, **wen** er betrifft – auch der betroffene Spieler nicht: keine Benachrichtigung über seine Speedhunt-Pings, kein Einfluss auf „Nächster Ping“/„letzter Ping“, Speedhunt-Pings nicht in der nummerierten eigenen Historie. Die ⚡-Pings nach R-SPEED-09 bekommen alle Spieler gleich und verraten daher nichts. |
 | R-SPEED-05 | Im Haupt-View (Karte) ist für alle (Hunter und Spieler) sichtbar, ob gerade ein Speedhunt läuft. |
-| R-SPEED-09 | Auch Spieler bekommen zu jedem Speedhunt einen Chip mit Blitz und Startzeit („⚡ 18:35“) – alle Spieler denselben, ob Ziel oder nicht, und zum selben Zeitpunkt wie bei den Huntern (mit dem ersten Speedhunt-Ping). Der Chip ist ein reiner Hinweis ohne Kartenebene und nicht schaltbar, damit er kein Ziel verrät (R-SPEED-04). (2026-10-08) |
+| R-SPEED-09 | Jeder (nicht gefangene) Spieler bekommt zu jedem Speedhunt-Ping-Zeitpunkt – also dann, wenn die Hunter den Ping des Ziels erhalten – seinen **eigenen** Standort als Speedhunt-Ping angezeigt (⚡1, ⚡2, ⚡3), egal ob er das Ziel ist. Dazu ein Chip pro Speedhunt mit Blitz und Startzeit („⚡ 18:35“), der mit dem ersten Ping erscheint und die Pings ein-/ausblendet; jeder neue Ping des Speedhunts schaltet seinen Chip wieder ein und zeigt alle seine Pings. Bei Nicht-Zielen bleibt der Standort nur auf dem Gerät (wird nicht gesendet); da alle dasselbe sehen, verrät es kein Ziel (R-SPEED-04). (2026-10-08, geändert am selben Tag: vorher reiner Info-Chip) |
 
 ## 6. Haupt-View: Karte
 

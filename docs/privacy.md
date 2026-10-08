@@ -48,5 +48,9 @@ Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt des Jokers bzw. die Kennung der
 wieder einblenden kann (R-PLAY-04). Sie gehören zu genau einer Runde, werden in der nächsten Runde nicht mehr
 angezeigt und beim nächsten Joker überschrieben; sie verlassen das Gerät nicht.
 
+Ebenso bleiben die eigenen ⚡-Pings (R-SPEED-09) **nur auf dem Gerät** (Schlüsselspeicher, pro Runde): Zu jedem
+Speedhunt-Ping-Zeitpunkt merkt sich jedes Spielerhandy seinen Standort, um ihn anzuzeigen. Gesendet wird nur der
+Ping des tatsächlichen Ziels (an die Hunter, wie bisher).
+
 Im Spielfeld-Editor wird der eigene Standort einmal beim Öffnen und auf Knopfdruck abgefragt, um die Karte
 dorthin zu bewegen. Er bleibt auf dem Gerät und wird weder gespeichert noch gesendet.

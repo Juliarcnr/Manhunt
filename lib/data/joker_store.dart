@@ -4,10 +4,16 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/round/ping_schedule.dart';
 
-/// Joker results of the current round, kept on this device so they can be
-/// shown again any time – also after an app restart (R-PLAY-04).
+/// Joker results and own ⚡ pings of the current round, kept on this device so
+/// they can be shown again any time – also after an app restart (R-PLAY-04,
+/// R-SPEED-09).
 class SavedJokers {
-  const SavedJokers({required this.roundStart, this.hunters, this.players});
+  const SavedJokers({
+    required this.roundStart,
+    this.hunters,
+    this.players,
+    this.speedhuntPings = const {},
+  });
 
   /// Results belong to one round; another round start means "nothing saved".
   final DateTime roundStart;
@@ -20,13 +26,18 @@ class SavedJokers {
   /// player until the round ends.
   final ({DateTime at, String requestId})? players;
 
+  /// Own position at each speedhunt ping time, by slot id (R-SPEED-09).
+  final Map<String, LocationFix> speedhuntPings;
+
   SavedJokers copyWith({
     ({DateTime at, Map<String, LocationFix> positions})? hunters,
     ({DateTime at, String requestId})? players,
+    Map<String, LocationFix>? speedhuntPings,
   }) => SavedJokers(
     roundStart: roundStart,
     hunters: hunters ?? this.hunters,
     players: players ?? this.players,
+    speedhuntPings: speedhuntPings ?? this.speedhuntPings,
   );
 
   Map<String, Object?> toJson() => {
@@ -43,12 +54,21 @@ class SavedJokers {
         'at': p.at.toUtc().toIso8601String(),
         'requestId': p.requestId,
       },
+    if (speedhuntPings.isNotEmpty)
+      'speedhuntPings': {
+        for (final e in speedhuntPings.entries) e.key: e.value.toJson(),
+      },
   };
 
   factory SavedJokers.fromJson(Map<String, Object?> json) {
     final h = json['hunters'] as Map<String, Object?>?;
     final p = json['players'] as Map<String, Object?>?;
+    final s = json['speedhuntPings'] as Map<String, Object?>? ?? const {};
     return SavedJokers(
+      speedhuntPings: {
+        for (final e in s.entries)
+          e.key: LocationFix.fromJson(e.value! as Map<String, Object?>),
+      },
       roundStart: DateTime.parse(json['roundStart']! as String),
       hunters: h == null
           ? null

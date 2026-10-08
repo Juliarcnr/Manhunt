@@ -1109,13 +1109,23 @@ void main() {
         return startedAt.millisecondsSinceEpoch;
       }
 
+      /// Lets the engine tick (every 5 s) at the current [now].
+      Future<void> tick(WidgetTester tester) async {
+        await tester.pump(const Duration(seconds: 5));
+        await settle(tester);
+      }
+
       for (final who in ['kim', 'sam']) {
-        testWidgets('$who sees "⚡ time", target or not', (tester) async {
-          now = start.add(const Duration(minutes: 72));
+        testWidgets('$who sees own ⚡ pings under "⚡ time", target or not; '
+            'hidden until the next ping switches the chip on', (tester) async {
+          now = start.add(const Duration(minutes: 70, seconds: 30));
+          location.position = const GeoPoint(52.505, 13.405);
           await seed(tester);
           final sh = await startSpeedhunt(tester);
           await pumpAs(tester, who);
-          final chip = find.byKey(Key('filter_speedhunt_$sh'));
+          await tick(tester);
+          final id = '${who}_$sh';
+          final chip = find.byKey(Key('filter_speedhunt_$id'));
           expect(chip, findsOneWidget);
           final time = DateFormat.Hm('en')
               .format(DateTime.fromMillisecondsSinceEpoch(sh));
@@ -1123,35 +1133,60 @@ void main() {
             find.descendant(of: chip, matching: find.text(time)),
             findsOneWidget,
           );
-          expect(
-            find.descendant(of: chip, matching: find.byIcon(Icons.bolt)),
-            findsOneWidget,
-          );
-          // No name, nothing to switch.
+          // No target name on the chip.
           expect(
             find.descendant(of: chip, matching: find.textContaining('Sam')),
             findsNothing,
           );
-          await tester.tap(chip);
-          await tester.pumpAndSettle();
-          expect(find.byKey(Key('filterCheck_speedhunt_$sh')), findsNothing);
+          final name = who == 'kim' ? 'Kim' : 'Sam';
+          expect(find.text('⚡1 $name'), findsOneWidget);
+          expect(find.byKey(Key('filterCheck_speedhunt_$id')), findsOneWidget);
+
+          // Hidden with the chip …
+          await tapFilter(tester, 'speedhunt_$id');
+          expect(find.text('⚡1 $name'), findsNothing);
+          expect(find.byKey(Key('filterCheck_speedhunt_$id')), findsNothing);
+
+          // … until the next ping: chip on, all its pings shown again.
+          now = start.add(const Duration(minutes: 75, seconds: 1));
+          location.position = const GeoPoint(52.507, 13.405);
+          await tick(tester);
+          expect(find.byKey(Key('filterCheck_speedhunt_$id')), findsOneWidget);
+          expect(find.text('⚡1'), findsOneWidget);
+          expect(find.text('⚡2 $name'), findsOneWidget);
         });
       }
 
-      testWidgets('appears with the first ping, like for the hunters', (
-        tester,
-      ) async {
+      testWidgets('chip appears with the first ping, like for the hunters; '
+          'own ⚡ pings survive an app restart', (tester) async {
         now = start.add(const Duration(minutes: 71));
+        location.position = const GeoPoint(52.505, 13.405);
         await seed(tester);
         final sh = await startSpeedhunt(
           tester,
           delay: const Duration(minutes: 2),
         );
         await pumpAs(tester, 'kim');
-        expect(find.byKey(Key('filter_speedhunt_$sh')), findsNothing);
+        expect(find.byKey(Key('filter_speedhunt_kim_$sh')), findsNothing);
         now = start.add(const Duration(minutes: 72));
-        await tester.pump(const Duration(seconds: 1));
-        expect(find.byKey(Key('filter_speedhunt_$sh')), findsOneWidget);
+        await tick(tester);
+        expect(find.byKey(Key('filter_speedhunt_kim_$sh')), findsOneWidget);
+        expect(find.text('⚡1 Kim'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox());
+        location.position = null; // no new position needed
+        await pumpAs(tester, 'kim');
+        expect(find.text('⚡1 Kim'), findsOneWidget);
+      });
+
+      testWidgets('hunters still see only the target\'s pings', (tester) async {
+        now = start.add(const Duration(minutes: 70, seconds: 30));
+        location.position = const GeoPoint(52.505, 13.405);
+        await seed(tester);
+        await startSpeedhunt(tester);
+        await pumpAs(tester, 'alex');
+        await tick(tester);
+        expect(find.textContaining('⚡1'), findsNothing);
       });
     });
 
@@ -1221,6 +1256,28 @@ void main() {
         );
         // Newer pings exist: the caught player's old pin is gone.
         expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+      });
+
+      testWidgets('switched off: another player\'s new ping switches the '
+          'chip back on and shows it (R-PLAY-05)', (tester) async {
+        await seed(tester);
+        await ping(tester, 'sam', 'regular_1', 52.501, 20);
+        await pumpAs(tester, 'kim', gameSettings: shared);
+        await tapFilter(tester, 'sharedPings');
+        expect(find.byKey(const Key('filterCheck_sharedPings')), findsNothing);
+        expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+
+        await ping(tester, 'sam', 'regular_2', 52.502, 40);
+        await settle(tester);
+        expect(
+          find.byKey(const Key('filterCheck_sharedPings')),
+          findsOneWidget,
+        );
+        final sam = tester
+            .widgetList<MarkerLayer>(find.byType(MarkerLayer))
+            .expand((l) => l.markers)
+            .singleWhere((m) => m.key == const Key('lastPing_sam'));
+        expect(sam.point.latitude, 52.502);
       });
 
       testWidgets('replaces the player joker (R-SET-15)', (tester) async {

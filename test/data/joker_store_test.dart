@@ -30,6 +30,23 @@ void main() {
       expect(back.players!.requestId, 'r1');
     });
 
+    test('own ⚡ pings are kept too (R-SPEED-09)', () async {
+      final store = MemoryJokerStore();
+      final fix = LocationFix(point: const GeoPoint(52.6, 13.4), at: at);
+      await store.save(
+        'g1',
+        SavedJokers(roundStart: round)
+            .copyWith(speedhuntPings: {'speedhunt_1_1': fix}),
+      );
+      final back = await store.load('g1', round);
+      expect(
+        back!.speedhuntPings['speedhunt_1_1']!.point,
+        const GeoPoint(52.6, 13.4),
+      );
+      // Saved before the field existed: none.
+      expect(SavedJokers.fromJson(jokers.toJson()).speedhuntPings, isEmpty);
+    });
+
     test('another round → nothing', () async {
       final store = MemoryJokerStore();
       await store.save('g1', jokers);

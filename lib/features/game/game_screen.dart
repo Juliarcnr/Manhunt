@@ -132,9 +132,47 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ) {
           final list = next.value;
           if (list != null) _notices.onSpeedhunts(list).forEach(_notify);
+          _feedEngine();
         }, fireImmediately: true),
       );
+    engine.speedhuntSnapshots.addListener(_onSpeedhuntSnapshots);
     _feedEngine();
+  }
+
+  /// The player's own ⚡ pings (R-SPEED-09) as ping records, oldest first.
+  List<PingRecord> _ownSpeedhuntPings() => [
+    for (final e
+        in _engine?.speedhuntSnapshots.value.entries ??
+            const <MapEntry<String, LocationFix>>[])
+      PingRecord(
+        playerId: widget.session.userId,
+        kind: PingKind.speedhunt,
+        slotId: e.key,
+        fix: e.value,
+      ),
+  ];
+
+  /// Filter id of a speedhunt on this device, as [SpeedhuntPings.id].
+  String _ownSpeedhuntId(Speedhunt s) =>
+      '${widget.session.userId}_${s.startedAt.millisecondsSinceEpoch}';
+
+  List<PingRecord> _knownSpeedhuntPings = const [];
+
+  /// A new own ⚡ ping switches its speedhunt's chip back on (R-SPEED-09,
+  /// like R-HUNT-08) and is kept on the device.
+  void _onSpeedhuntSnapshots() {
+    final pings = _ownSpeedhuntPings();
+    final fresh = speedhuntsWithNewPings(_knownSpeedhuntPings, pings);
+    _knownSpeedhuntPings = pings;
+    if (!mounted) return;
+    setState(() {
+      if (_filters.hiddenSpeedhunts.any(fresh.contains)) {
+        _filters = _filters.copyWith(
+          hiddenSpeedhunts: _filters.hiddenSpeedhunts.difference(fresh),
+        );
+      }
+    });
+    unawaited(_saveJokers());
   }
 
   void _showLog() {
@@ -199,6 +237,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     game: widget.game,
     me: _me(ref.read(membersProvider).value),
     speedhuntsOnMe: ref.read(speedhuntsOnMeProvider).value ?? const [],
+    speedhunts: ref.read(speedhuntsProvider).value ?? const [],
   );
 
   @override
@@ -216,6 +255,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _engine?.speedhuntSnapshots.removeListener(_onSpeedhuntSnapshots);
     _ticker?.cancel();
     _map.dispose();
     _bannerTimer?.cancel();
@@ -485,8 +525,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     }
   }
 
-  /// Joker results are kept on the device, so they can be shown again later
-  /// – also after an app restart (R-PLAY-04).
+  /// Joker results and own ⚡ pings are kept on the device, so they can be
+  /// shown again later – also after an app restart (R-PLAY-04, R-SPEED-09).
   Future<void> _saveJokers() async {
     final startAt = widget.game.startAt;
     if (startAt == null) return;
@@ -498,6 +538,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             roundStart: startAt,
             hunters: _jokerReveal,
             players: _playerReveal,
+            speedhuntPings: _engine?.speedhuntSnapshots.value ?? const {},
           ),
         );
   }
@@ -514,6 +555,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       _jokerReveal ??= saved.hunters;
       _playerReveal ??= saved.players;
     });
+    _engine?.restoreSpeedhuntSnapshots(saved.speedhuntPings);
   }
 
   DateTime? _jokersLoadedFor;
@@ -805,6 +847,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
           );
         }
       }
+      // Own position at every speedhunt ping time, ⚡1/⚡2/⚡3 – on every
+      // player's phone, target or not (R-SPEED-09).
+      layers.add(
+        speedhuntPingsLayer(
+          pings: [
+            for (final s in speedhuntsFromPings(_ownSpeedhuntPings()))
+              if (!filters.hiddenSpeedhunts.contains(s.id)) ...s.pings,
+          ],
+          colors: {widget.session.userId: AppColors.player},
+          names: names,
+        ),
+      );
       final reveal = _jokerReveal;
       if (reveal != null && filters.hunterJoker) {
         layers.add(
@@ -867,14 +921,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         // Every player gets the same chip per speedhunt, with its first ping
         // like the hunters – without name, so it reveals no target
-        // (R-SPEED-09, R-SPEED-04).
+        // (R-SPEED-09, R-SPEED-04). It switches the own ⚡ pings.
         for (final s in speedhuntsWithFirstPing(speedhunts, now))
-          FilterItem.info(
-            id: 'speedhunt_${s.startedAt.millisecondsSinceEpoch}',
-            label: timeFmt.format(s.startedAt.toLocal()),
-            icon: Icons.bolt,
-            color: AppColors.speedhunt,
-          ),
+          if (_ownSpeedhuntId(s) case final id)
+            FilterItem(
+              id: 'speedhunt_$id',
+              label: timeFmt.format(s.startedAt.toLocal()),
+              icon: Icons.bolt,
+              color: AppColors.speedhunt,
+              selected: !filters.hiddenSpeedhunts.contains(id),
+              onChanged: (_) => set(filters.toggleSpeedhunt(id)),
+            ),
       ]);
       // Answer other players' joker requests (R-PLAY-03) – players only, the
       // rules hide requests from hunters.

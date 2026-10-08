@@ -203,6 +203,78 @@ void main() {
       },
     );
 
+    group('own ⚡ pings on every player, target or not (R-SPEED-09)', () {
+      Speedhunt sh(String target) => Speedhunt.fromSettings(
+        targetId: target,
+        startedAt: at(25),
+        settings: const GameSettings(),
+      );
+
+      for (final target in ['kim', '']) {
+        test(target.isEmpty ? 'not the target' : 'the target', () async {
+          engine.update(
+            game: game(),
+            me: player,
+            speedhuntsOnMe: [if (target.isNotEmpty) sh(target)],
+            speedhunts: [sh('')], // public: without target
+          );
+          location.emit(fix(52.5));
+          await flush();
+          now = at(24);
+          await engine.tick();
+          expect(engine.speedhuntSnapshots.value, isEmpty);
+          for (final (m, lat) in [(25, 52.5), (30, 52.6)]) {
+            now = at(m);
+            location.emit(fix(lat));
+            await flush();
+            await engine.tick();
+            await flush();
+          }
+          final ms = at(25).millisecondsSinceEpoch;
+          final snaps = engine.speedhuntSnapshots.value;
+          expect(snaps.keys, ['speedhunt_${ms}_1', 'speedhunt_${ms}_2']);
+          expect(snaps['speedhunt_${ms}_2']!.point.lat, 52.6);
+          // Only the target sends anything to the hunters.
+          final pings = await rounds.watchAllPings(hunterSession).first;
+          expect(pings, hasLength(target.isEmpty ? 0 : 2));
+          expect(sent, isEmpty);
+        });
+      }
+
+      test('restored after a restart, not recorded again', () async {
+        final ms = at(25).millisecondsSinceEpoch;
+        final saved = LocationFix(
+          point: const GeoPoint(52.1, 13.4),
+          at: at(25),
+        );
+        engine
+          ..restoreSpeedhuntSnapshots({'speedhunt_${ms}_1': saved})
+          ..update(
+            game: game(),
+            me: player,
+            speedhuntsOnMe: [],
+            speedhunts: [sh('')],
+          );
+        location.emit(fix(52.5));
+        await flush();
+        now = at(26);
+        await engine.tick();
+        expect(engine.speedhuntSnapshots.value['speedhunt_${ms}_1'], saved);
+      });
+
+      test('caught players record nothing', () async {
+        engine.update(
+          game: game(),
+          me: player.copyWith(caught: true),
+          speedhuntsOnMe: [],
+          speedhunts: [sh('')],
+        );
+        now = at(25);
+        await engine.tick();
+        expect(engine.speedhuntSnapshots.value, isEmpty);
+      });
+    });
+
     test('next pings are exposed for the countdown', () {
       expect(engine.mySlots.map((s) => s.at), [at(20), at(40)]);
     });
