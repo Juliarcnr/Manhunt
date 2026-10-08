@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +15,32 @@ import 'lobby/lobby_screen.dart';
 
 /// Root widget: picks group overview, lobby or game based on the open group
 /// and its status.
-class SessionGate extends ConsumerWidget {
+class SessionGate extends ConsumerStatefulWidget {
   const SessionGate({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SessionGate> createState() => _SessionGateState();
+}
+
+class _SessionGateState extends ConsumerState<SessionGate> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_requestPermissions());
+  }
+
+  /// Asks for location and notification permission right when the app opens
+  /// (R-PERM-01): iOS lists "Location" in the app's settings only after the
+  /// first request, and the checklist should be done before the game starts.
+  /// Location first, then notifications: Android drops a permission dialog
+  /// requested while another one is open.
+  Future<void> _requestPermissions() async {
+    await ref.read(locationServiceProvider).ensurePermission();
+    await ref.read(notificationServiceProvider).init();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Keeps name and host flag in the group overview current (R-GROUPS-03).
     ref.listen(gameProvider, (_, next) {
       final game = next.value;

@@ -58,6 +58,7 @@ class FakeLocationService implements LocationService {
 
   GeoPoint? position;
   var permissionGranted = true;
+  var permissionRequests = 0;
   var currentCalls = 0;
   var trackCalls = 0;
   final _fixes = StreamController<LocationFix>.broadcast();
@@ -73,7 +74,10 @@ class FakeLocationService implements LocationService {
   void fail(Object error) => _errors.add(error);
 
   @override
-  Future<bool> ensurePermission() async => permissionGranted;
+  Future<bool> ensurePermission() async {
+    permissionRequests++;
+    return permissionGranted;
+  }
 
   @override
   Future<GeoPoint?> currentPosition() async {

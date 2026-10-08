@@ -210,6 +210,59 @@ void main() {
     expect(find.byKey(const Key('startButton')), findsNothing);
   });
 
+  testWidgets('first app start asks for location permission (R-PERM-01)', (
+    tester,
+  ) async {
+    final location = FakeLocationService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: deviceOverrides(
+          db: FakeFirebaseFirestore(),
+          userId: 'me',
+          location: location,
+        ),
+        child: const ManhuntApp(locale: Locale('en')),
+      ),
+    );
+    // Asked right away, already on the group overview (no group yet).
+    expect(location.permissionRequests, 1);
+    await tester.pumpAndSettle();
+    expect(location.permissionRequests, 1);
+  });
+
+  testWidgets('lobby updates do not ask for permission again (R-PERM-01)', (
+    tester,
+  ) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    await tester.runAsync(
+      () =>
+          deviceRepo(db)
+              .createGame(me!, name: 'Julia', settings: defaultSettings),
+    );
+    final location = FakeLocationService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: deviceOverrides(
+          db: db,
+          userId: 'me',
+          store: MemorySessionStore.withGroup('ABCDE-FGHJK'),
+          location: location,
+        ),
+        child: const ManhuntApp(locale: Locale('en')),
+      ),
+    );
+    await settleAsync(tester);
+
+    expect(find.text('Lobby'), findsOneWidget);
+    expect(location.permissionRequests, 1);
+    // Rebuilds (member updates) do not ask again.
+    await tester.runAsync(() => deviceRepo(db).renameGroup(me!, 'Crew'));
+    await settleAsync(tester);
+    expect(find.text('Crew'), findsOneWidget);
+    expect(location.permissionRequests, 1);
+  });
+
   testWidgets('host removes a member in the lobby (R-LOBBY-09)', (
     tester,
   ) async {
