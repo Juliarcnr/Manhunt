@@ -302,6 +302,18 @@ abstract class AppLocalizations {
   /// **'{free} of {total} free'**
   String overviewStillFree(int free, int total);
 
+  /// No description provided for @playerAlias.
+  ///
+  /// In en, this message translates to:
+  /// **'Player {number}'**
+  String playerAlias(int number);
+
+  /// No description provided for @overviewMyAlias.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunters see you as {alias}'**
+  String overviewMyAlias(String alias);
+
   /// No description provided for @commonCancel.
   ///
   /// In en, this message translates to:
@@ -553,6 +565,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Players also see the latest regular ping of all other players (no history, no speedhunt pings). Replaces the joker “player positions”.'**
   String get settingsSharedPingsHint;
+
+  /// No description provided for @settingsAnonymousPlayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous players'**
+  String get settingsAnonymousPlayers;
+
+  /// No description provided for @settingsAnonymousPlayersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunters see “Player 1”, “Player 2” … instead of names – until the time is up. Players still see the real names.'**
+  String get settingsAnonymousPlayersHint;
 
   /// No description provided for @settingsArea.
   ///

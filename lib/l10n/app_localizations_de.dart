@@ -127,6 +127,16 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String playerAlias(int number) {
+    return 'Spieler $number';
+  }
+
+  @override
+  String overviewMyAlias(String alias) {
+    return 'Für die Hunter bist du $alias';
+  }
+
+  @override
   String get commonCancel => 'Abbrechen';
 
   @override
@@ -259,6 +269,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSharedPingsHint =>
       'Auch die Spieler sehen den jeweils letzten regulären Ping aller anderen Spieler (keine Historie, keine Speedhunt-Pings). Ersetzt den Joker „Spieler-Standorte“.';
+
+  @override
+  String get settingsAnonymousPlayers => 'Anonyme Spieler';
+
+  @override
+  String get settingsAnonymousPlayersHint =>
+      'Hunter sehen statt der Namen nur „Spieler 1“, „Spieler 2“ … – bis die Zeit abgelaufen ist. Spieler sehen weiterhin die echten Namen.';
 
   @override
   String get settingsArea => 'Spielfeld';

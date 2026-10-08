@@ -66,6 +66,16 @@ void main() {
       expect(GameSettings.fromJson(legacy).sharedPings, isFalse);
     });
 
+    test('anonymous players are on by default, also for older groups '
+        '(R-SET-16)', () {
+      const s = GameSettings();
+      expect(s.anonymousPlayers, isTrue);
+      const named = GameSettings(anonymousPlayers: false);
+      expect(GameSettings.fromJson(named.toJson()).anonymousPlayers, isFalse);
+      final legacy = s.toJson()..remove('anonymousPlayers');
+      expect(GameSettings.fromJson(legacy).anonymousPlayers, isTrue);
+    });
+
     test('json roundtrip', () {
       const s = GameSettings(hunterCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());

@@ -110,4 +110,35 @@ void main() {
       expect(on('sharedPingsSwitch'), isFalse);
     });
   });
+
+  group('anonymous players (R-SET-16)', () {
+    testWidgets('on by default, can be switched off', (tester) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => SingleChildScrollView(
+                child: SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      const key = Key('anonymousPlayersSwitch');
+      expect(find.text('Anonyme Spieler'), findsOneWidget);
+      expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isTrue);
+      await tester.ensureVisible(find.byKey(key));
+      await tester.tap(find.byKey(key));
+      await tester.pumpAndSettle();
+      expect(settings.anonymousPlayers, isFalse);
+      expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isFalse);
+    });
+  });
 }

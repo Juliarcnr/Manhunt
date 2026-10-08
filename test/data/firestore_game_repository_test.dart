@@ -186,6 +186,59 @@ void main() {
     });
   });
 
+  group('anonymous players (R-ANON-01, R-SET-16)', () {
+    Future<void> startWith(GameSettings settings) async {
+      await repo.createGame(admin, name: 'Julia', settings: settings);
+      for (final id in ['kim', 'sam', 'tom']) {
+        await repo.joinGame(await testSession(code, id), name: id);
+      }
+      final members = await repo.watchMembers(admin).first;
+      await repo.setRoles(admin, [
+        for (final m in members)
+          m.copyWith(role: m.id == 'admin' ? Role.hunter : Role.player),
+      ]);
+      await repo.startGame(admin);
+    }
+
+    test(
+      'start numbers the players 1 … n, encrypted; hunters get none',
+      () async {
+        await startWith(const GameSettings());
+        final aliases = (await repo.watchGame(admin).first)!.aliases;
+        expect(aliases.keys, unorderedEquals(['kim', 'sam', 'tom']));
+        expect(aliases.values, unorderedEquals([1, 2, 3]));
+        final stored = (await gameDoc().get()).data()!['aliases'];
+        expect(stored, isA<String>());
+        expect(stored, isNot(contains('kim')));
+      },
+    );
+
+    test('without the setting no numbers are stored', () async {
+      await startWith(const GameSettings(anonymousPlayers: false));
+      expect((await gameDoc().get()).data()!.containsKey('aliases'), isFalse);
+      expect((await repo.watchGame(admin).first)!.aliases, isEmpty);
+    });
+
+    test('ending the round deletes the numbers', () async {
+      await startWith(const GameSettings());
+      await repo.endRound(admin);
+      expect((await gameDoc().get()).data()!.containsKey('aliases'), isFalse);
+      expect((await repo.watchGame(admin).first)!.aliases, isEmpty);
+    });
+
+    test('every round shuffles anew', () async {
+      await startWith(const GameSettings());
+      final orders = <String>{};
+      for (var i = 0; i < 8; i++) {
+        final a = (await repo.watchGame(admin).first)!.aliases;
+        orders.add('${a['kim']}${a['sam']}${a['tom']}');
+        await repo.endRound(admin);
+        await repo.startGame(admin);
+      }
+      expect(orders.length, greaterThan(1));
+    });
+  });
+
   group('end round (R-GAME-06, R-PRIV-03)', () {
     test('deletes all round data, keeps group and members', () async {
       await createDefault();

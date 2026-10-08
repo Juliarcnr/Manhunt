@@ -9,6 +9,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -706,5 +707,69 @@ describe('clean-up flows list before deleting', () => {
     await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'members', 'kim')));
     await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'members', 'admin')));
     await assertSucceeds(deleteDoc(doc(db, 'games', GID)));
+  });
+});
+
+describe('anonymous players (R-ANON-01)', () => {
+  const setHostRole = (role) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+    );
+
+  // As FirestoreGameRepository does it: read members + settings, start with
+  // the encrypted numbers, end the round deleting them.
+  for (const role of ['unassigned', 'player', 'hunter']) {
+    test(`host (${role}) starts with numbers and deletes them at the end`, async () => {
+      await setHostRole(role);
+      const db = as('admin');
+      await assertSucceeds(getDoc(doc(db, 'games', GID)));
+      await assertSucceeds(getDocs(collection(db, 'games', GID, 'members')));
+      await assertSucceeds(
+        updateDoc(doc(db, 'games', GID), {
+          status: 'running',
+          startAt: serverTimestamp(),
+          aliases: 'enc',
+          expiresAt: inDays(180),
+        }),
+      );
+      await assertSucceeds(getDoc(doc(db, 'games', GID)));
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'games', GID, 'members', 'kim'), {
+        caught: false, jokerUsed: false, playerJokerUsed: false,
+      });
+      batch.update(doc(db, 'games', GID), {
+        status: 'lobby', startAt: null, aliases: deleteField(), expiresAt: inDays(180),
+      });
+      await assertSucceeds(batch.commit());
+    });
+  }
+
+  test('start without numbers deletes old ones', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as('admin'), 'games', GID), {
+        status: 'running',
+        startAt: serverTimestamp(),
+        aliases: deleteField(),
+        expiresAt: inDays(180),
+      }),
+    );
+  });
+
+  test('everyone reads the numbers, only the host writes them', async () => {
+    await startRound();
+    await env.withSecurityRulesDisabled((ctx) =>
+      Promise.all([
+        updateDoc(doc(ctx.firestore(), 'games', GID), { aliases: 'enc' }),
+        // A hunter who is not the host.
+        setDoc(doc(ctx.firestore(), 'games', GID, 'members', 'tom'), {
+          name: 'enc', role: 'hunter', caught: false, jokerUsed: false, joinedAt: new Date(),
+        }),
+      ]),
+    );
+    for (const uid of ['kim', 'sam', 'tom']) {
+      await assertSucceeds(getDoc(doc(as(uid), 'games', GID)));
+      await assertFails(updateDoc(doc(as(uid), 'games', GID), { aliases: 'other' }));
+      await assertFails(updateDoc(doc(as(uid), 'games', GID), { aliases: deleteField() }));
+    }
   });
 });

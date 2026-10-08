@@ -53,7 +53,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings (Klartext-Kopie aus den Einstellungen für die Regeln, R-SET-15), startAt, createdAt, expiresAt | name, settings; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings (Klartext-Kopie aus den Einstellungen für die Regeln, R-SET-15), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`) | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker | Standort | ✔ |
@@ -95,6 +95,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Feldtest-Wünsche 2026-10-08: Gefangene nur im Chip „Gefangen“, nach Spielende wieder aufgeteilt (R-HUNT-11),
       Satellitenbild (R-MAP-03), Speedhunt-Chips für Spieler (R-SPEED-09), „Reguläre Pings an alle“ (R-SET-15,
       R-PLAY-05), flüssiger Live-Standort (R-MAP-04)
+- [x] Anonyme Spieler 2026-10-08 (R-SET-16, R-ANON-01 … 04): Host würfelt beim Start die Nummern (`shuffleAliases`, lib/core/round/player_aliases.dart),
+      gespeichert verschlüsselt in `games/{id}.aliases`, gelöscht bei Rundenende. Nur die Anzeige der Hunter ändert sich
+      (`showAliases`); Chips und Farben nach Nummer. Keine Regeländerung nötig (Host darf das Spiel-Dokument frei ändern).
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise

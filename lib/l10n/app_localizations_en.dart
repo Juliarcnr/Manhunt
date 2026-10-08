@@ -127,6 +127,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String playerAlias(int number) {
+    return 'Player $number';
+  }
+
+  @override
+  String overviewMyAlias(String alias) {
+    return 'Hunters see you as $alias';
+  }
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -258,6 +268,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSharedPingsHint =>
       'Players also see the latest regular ping of all other players (no history, no speedhunt pings). Replaces the joker “player positions”.';
+
+  @override
+  String get settingsAnonymousPlayers => 'Anonymous players';
+
+  @override
+  String get settingsAnonymousPlayersHint =>
+      'Hunters see “Player 1”, “Player 2” … instead of names – until the time is up. Players still see the real names.';
 
   @override
   String get settingsArea => 'Play area';

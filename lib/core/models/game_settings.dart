@@ -1,7 +1,7 @@
 import 'geo_point.dart';
 
 /// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
-/// R-SET-12, R-SET-13, R-SET-15).
+/// R-SET-12, R-SET-13, R-SET-15, R-SET-16).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -16,6 +16,7 @@ class GameSettings {
     this.jokerEnabled = true,
     this.playerJokerEnabled = true,
     this.sharedPings = false,
+    this.anonymousPlayers = true,
     this.area = const [],
   });
 
@@ -44,6 +45,10 @@ class GameSettings {
   /// Regular pings go to all players, not only to the hunters (R-SET-15).
   /// Replaces the joker "player positions".
   final bool sharedPings;
+
+  /// Hunters see "Player 1 … n" instead of the players' names until the time
+  /// is up (R-SET-16, R-ANON-01).
+  final bool anonymousPlayers;
 
   /// The joker "player positions" is only offered without [sharedPings].
   bool get playerJokerAvailable => playerJokerEnabled && !sharedPings;
@@ -91,6 +96,7 @@ class GameSettings {
     bool? jokerEnabled,
     bool? playerJokerEnabled,
     bool? sharedPings,
+    bool? anonymousPlayers,
     List<GeoPoint>? area,
   }) => GameSettings(
     duration: duration ?? this.duration,
@@ -105,6 +111,7 @@ class GameSettings {
     jokerEnabled: jokerEnabled ?? this.jokerEnabled,
     playerJokerEnabled: playerJokerEnabled ?? this.playerJokerEnabled,
     sharedPings: sharedPings ?? this.sharedPings,
+    anonymousPlayers: anonymousPlayers ?? this.anonymousPlayers,
     area: area ?? this.area,
   );
 
@@ -121,6 +128,7 @@ class GameSettings {
     'jokerEnabled': jokerEnabled,
     'playerJokerEnabled': playerJokerEnabled,
     'sharedPings': sharedPings,
+    'anonymousPlayers': anonymousPlayers,
     'area': [for (final p in area) p.toJson()],
   };
 
@@ -141,6 +149,7 @@ class GameSettings {
     jokerEnabled: json['jokerEnabled'] as bool? ?? true,
     playerJokerEnabled: json['playerJokerEnabled'] as bool? ?? true,
     sharedPings: json['sharedPings'] as bool? ?? false,
+    anonymousPlayers: json['anonymousPlayers'] as bool? ?? true,
     area: [
       for (final p in json['area']! as List<Object?>)
         GeoPoint.fromJson(p! as Map<String, Object?>),

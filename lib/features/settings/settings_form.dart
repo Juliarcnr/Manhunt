@@ -201,6 +201,19 @@ class SettingsForm extends StatelessWidget {
                       ),
                     ),
             ),
+            SwitchListTile(
+              key: const Key('anonymousPlayersSwitch'),
+              contentPadding: const EdgeInsets.only(right: 8),
+              title: Text(l10n.settingsAnonymousPlayers),
+              subtitle: Text(
+                l10n.settingsAnonymousPlayersHint,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              value: s.anonymousPlayers,
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(anonymousPlayers: v)),
+            ),
           ],
         ),
       ],

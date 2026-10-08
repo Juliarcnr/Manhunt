@@ -1,22 +1,27 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart' hide GeoPoint;
 
 import '../core/history/round_summary.dart';
 import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
+import '../core/round/player_aliases.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
-/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), startAt, createdAt, expiresAt
+/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), aliases (encrypted, per round), startAt, createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
 /// - `games/{groupId}/{pings,hunterLocs,events}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
 class FirestoreGameRepository implements GameRepository {
-  FirestoreGameRepository(this._db, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  FirestoreGameRepository(this._db, {DateTime Function()? now, Random? random})
+    : _now = now ?? DateTime.now,
+      _random = random ?? Random.secure();
 
   final FirebaseFirestore _db;
   final DateTime Function() _now;
+  final Random _random;
 
   /// Groups are deleted after nobody opened them for this long (R-PRIV-05).
   static const groupLifetime = Duration(days: 180);
@@ -92,38 +97,44 @@ class FirestoreGameRepository implements GameRepository {
   }
 
   @override
-  Stream<GameInfo?> watchGame(GroupSession session) => _game(session)
-      .snapshots()
-      .asyncMap((snap) async {
-        final data = snap.data();
-        if (data == null) return null;
-        final settingsJson = await session.crypto.decryptJson(
-          data['settings'] as String,
-        );
-        var settings = GameSettings.fromJson(
-          settingsJson! as Map<String, Object?>,
-        );
-        final areaEnc = data['area'] as String?;
-        if (areaEnc != null) {
-          final areaJson = await session.crypto.decryptJson(areaEnc);
-          settings = settings.copyWith(
-            area: [
-              for (final p in areaJson! as List<Object?>)
-                GeoPoint.fromJson(p! as Map<String, Object?>),
-            ],
-          );
-        }
-        final nameEnc = data['name'] as String?;
-        return GameInfo(
-          adminId: data['adminUid'] as String,
-          status: GameStatus.values.byName(data['status'] as String),
-          settings: settings,
-          startAt: (data['startAt'] as Timestamp?)?.toDate(),
-          name: nameEnc == null
-              ? null
-              : await session.crypto.decryptJson(nameEnc) as String?,
-        );
-      });
+  Stream<GameInfo?> watchGame(
+    GroupSession session,
+  ) => _game(session).snapshots().asyncMap((snap) async {
+    final data = snap.data();
+    if (data == null) return null;
+    final settingsJson = await session.crypto.decryptJson(
+      data['settings'] as String,
+    );
+    var settings = GameSettings.fromJson(settingsJson! as Map<String, Object?>);
+    final areaEnc = data['area'] as String?;
+    if (areaEnc != null) {
+      final areaJson = await session.crypto.decryptJson(areaEnc);
+      settings = settings.copyWith(
+        area: [
+          for (final p in areaJson! as List<Object?>)
+            GeoPoint.fromJson(p! as Map<String, Object?>),
+        ],
+      );
+    }
+    final nameEnc = data['name'] as String?;
+    final aliasesEnc = data['aliases'] as String?;
+    final aliasesJson = aliasesEnc == null
+        ? null
+        : await session.crypto.decryptJson(aliasesEnc) as Map<String, Object?>?;
+    return GameInfo(
+      adminId: data['adminUid'] as String,
+      status: GameStatus.values.byName(data['status'] as String),
+      settings: settings,
+      startAt: (data['startAt'] as Timestamp?)?.toDate(),
+      name: nameEnc == null
+          ? null
+          : await session.crypto.decryptJson(nameEnc) as String?,
+      aliases: {
+        for (final e in (aliasesJson ?? const {}).entries)
+          e.key: e.value! as int,
+      },
+    );
+  });
 
   @override
   Stream<GameStatus?> watchStatus(String groupId) =>
@@ -223,8 +234,32 @@ class FirestoreGameRepository implements GameRepository {
     await _game(session).update({
       'status': GameStatus.running.name,
       'startAt': FieldValue.serverTimestamp(),
+      'aliases': await _shuffledAliases(session),
       'expiresAt': _newExpiry(),
     });
+  }
+
+  /// Encrypted anonymous numbers for this round's players (R-ANON-01), or a
+  /// delete marker without [GameSettings.anonymousPlayers].
+  Future<Object> _shuffledAliases(GroupSession session) async {
+    final game = (await _game(session).get()).data()!;
+    final settingsJson = await session.crypto.decryptJson(
+      game['settings'] as String,
+    );
+    final settings = GameSettings.fromJson(
+      settingsJson! as Map<String, Object?>,
+    );
+    if (!settings.anonymousPlayers) return FieldValue.delete();
+    final members = await Future.wait([
+      for (final doc in (await _members(session).get()).docs)
+        _decodeMember(session, doc),
+    ]);
+    return session.crypto.encryptJson(
+      shuffleAliases([
+        for (final m in members)
+          if (m.isPlayer) m.id,
+      ], _random),
+    );
   }
 
   @override
@@ -275,6 +310,7 @@ class FirestoreGameRepository implements GameRepository {
     batch.update(_game(session), {
       'status': GameStatus.lobby.name,
       'startAt': null,
+      'aliases': FieldValue.delete(),
       'expiresAt': _newExpiry(),
     });
     await batch.commit();

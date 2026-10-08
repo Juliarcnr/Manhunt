@@ -37,6 +37,8 @@
   "filterPlayerJoker": "Spieler {time}",
   "overviewNoSpeedhunt": "Kein Speedhunt aktiv",
   "overviewStillFree": "{free} von {total} frei",
+  "playerAlias": "Spieler {number}",
+  "overviewMyAlias": "Für die Hunter bist du {alias}",
 
   "commonCancel": "Abbrechen",
   "commonSave": "Speichern",
@@ -84,6 +86,8 @@
   "settingsPlayerJokerHint": "Jeder Spieler darf einmal sehen, wo alle anderen Spieler gerade sind.",
   "settingsSharedPings": "Reguläre Pings an alle Spieler",
   "settingsSharedPingsHint": "Auch die Spieler sehen den jeweils letzten regulären Ping aller anderen Spieler (keine Historie, keine Speedhunt-Pings). Ersetzt den Joker „Spieler-Standorte“.",
+  "settingsAnonymousPlayers": "Anonyme Spieler",
+  "settingsAnonymousPlayersHint": "Hunter sehen statt der Namen nur „Spieler 1“, „Spieler 2“ … – bis die Zeit abgelaufen ist. Spieler sehen weiterhin die echten Namen.",
   "settingsArea": "Spielfeld",
   "settingsAreaMissing": "Noch nicht eingezeichnet",
   "areaTitle": "Spielfeld einzeichnen",

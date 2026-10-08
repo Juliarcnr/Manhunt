@@ -32,7 +32,9 @@ void main() {
     GeoPoint(52.50, 13.41),
     GeoPoint(52.51, 13.41),
   ];
-  const settings = GameSettings(area: area);
+  // Real names for the hunters, so the tests can find them; anonymous players
+  // have their own group (R-ANON-*).
+  const settings = GameSettings(area: area, anonymousPlayers: false);
 
   late FakeFirebaseFirestore db;
   late FakeLocationService location;
@@ -50,11 +52,14 @@ void main() {
     }
   }
 
-  Future<void> seed(WidgetTester tester) async {
+  Future<void> seed(
+    WidgetTester tester, {
+    GameSettings gameSettings = settings,
+  }) async {
     await tester.runAsync(() async {
       final games = FirestoreGameRepository(db);
       final alex = await testSession(code, 'alex');
-      await games.createGame(alex, name: 'Alex', settings: settings);
+      await games.createGame(alex, name: 'Alex', settings: gameSettings);
       await games.joinGame(await testSession(code, 'kim'), name: 'Kim');
       await games.joinGame(await testSession(code, 'sam'), name: 'Sam');
       final members = await games.watchMembers(alex).first;
@@ -72,6 +77,10 @@ void main() {
     GameSettings gameSettings = settings,
   }) async {
     final session = (await tester.runAsync(() => testSession(code, userId)))!;
+    // Anonymous numbers as shuffled by the host at the start (R-ANON-01).
+    final aliases = (await tester.runAsync(
+      () => FirestoreGameRepository(db).watchGame(session).first,
+    ))?.aliases;
     await tester.pumpWidget(
       ProviderScope(
         overrides: deviceOverrides(
@@ -93,6 +102,7 @@ void main() {
               status: GameStatus.running,
               settings: gameSettings,
               startAt: start,
+              aliases: aliases ?? const {},
             ),
             now: () => now,
           ),
@@ -1343,6 +1353,188 @@ void main() {
       await pumpAs(tester, 'kim');
       expect(find.byKey(const Key('filter_hunterJoker')), findsOneWidget);
       expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+    });
+
+    group('anonymous players (R-ANON-01 … R-ANON-04)', () {
+      // Default: anonymous (R-SET-16).
+      const anon = GameSettings(area: area);
+
+      /// Numbers shuffled by the host at the start.
+      Future<Map<String, int>> aliases(WidgetTester tester) async =>
+          (await tester.runAsync(
+            () async =>
+                FirestoreGameRepository(db)
+                    .watchGame(await testSession(code, 'alex'))
+                    .first,
+          ))!.aliases;
+
+      Finder label(String key, String text) =>
+          find.descendant(of: find.byKey(Key(key)), matching: find.text(text));
+
+      testWidgets('hunters see "Player n" on pins and chips, ordered and '
+          'coloured by number (R-ANON-01)', (tester) async {
+        final sh = start
+            .add(const Duration(minutes: 70))
+            .millisecondsSinceEpoch;
+        await seed(tester, gameSettings: anon);
+        final numbers = await aliases(tester);
+        expect(numbers.keys, unorderedEquals(['kim', 'sam']));
+        expect(numbers.values, unorderedEquals([1, 2]));
+        final kim = 'Player ${numbers['kim']}';
+        final sam = 'Player ${numbers['sam']}';
+        await ping(tester, 'kim', 'regular_1', 52.505, 20);
+        await ping(tester, 'sam', 'regular_1', 52.506, 20);
+        await ping(
+          tester,
+          'sam',
+          'speedhunt_${sh}_1',
+          52.503,
+          70,
+          kind: PingKind.speedhunt,
+        );
+        await pumpAs(tester, 'alex', gameSettings: anon);
+
+        expect(label('lastPing_kim', kim), findsOneWidget);
+        expect(label('lastPing_sam', sam), findsOneWidget);
+        expect(label('filter_player_kim', kim), findsOneWidget);
+        expect(label('filter_player_sam', sam), findsOneWidget);
+        expect(find.text('⚡1 $sam'), findsOneWidget);
+        final hm = DateFormat.Hm('en');
+        expect(
+          label(
+            'filter_speedhunt_sam_$sh',
+            '$sam ${hm.format(DateTime.fromMillisecondsSinceEpoch(sh))}',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Kim'), findsNothing);
+        expect(find.textContaining('Sam'), findsNothing);
+        // The hunters' own names stay.
+        expect(label('filter_hunters', 'Hunters'), findsOneWidget);
+
+        // Player 1 first and in the first colour – the join order (Kim
+        // before Sam) gives nobody away.
+        final first = numbers['kim'] == 1 ? 'kim' : 'sam';
+        final second = first == 'kim' ? 'sam' : 'kim';
+        expect(
+          tester.getRect(find.byKey(Key('filter_player_$first'))).left,
+          lessThan(
+            tester.getRect(find.byKey(Key('filter_player_$second'))).left,
+          ),
+        );
+        final pin = tester.widget<Icon>(
+          find.descendant(
+            of: find.byKey(Key('lastPing_$first')),
+            matching: find.byIcon(Icons.location_on),
+          ),
+        );
+        expect(pin.color, AppColors.playerPalette[0]);
+      });
+
+      testWidgets('speedhunt is picked by number (R-ANON-01)', (tester) async {
+        now = start.add(const Duration(minutes: 70)); // after R-SET-11
+        await seed(tester, gameSettings: anon);
+        final numbers = await aliases(tester);
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        await tester.tap(find.byKey(const Key('speedhuntButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('speedhuntPlayer')));
+        await tester.pumpAndSettle();
+        expect(find.text('Kim'), findsNothing);
+        expect(find.text('Sam'), findsNothing);
+        await tester.tap(find.text('Player ${numbers['sam']}').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('confirmSpeedhunt')));
+        await settle(tester);
+
+        final targets = await tester.runAsync(
+          () => db
+              .collection('games')
+              .get()
+              .then(
+                (games) => games.docs.single.reference
+                    .collection('speedhuntTargets')
+                    .get(),
+              ),
+        );
+        expect(targets!.docs.single.data()['uid'], 'sam');
+      });
+
+      testWidgets('catch is reported by real name and announced with it; '
+          'the caught player stays anonymous under "caught" (R-ANON-01)', (
+        tester,
+      ) async {
+        await seed(tester, gameSettings: anon);
+        final sam = 'Player ${(await aliases(tester))['sam']}';
+        await ping(tester, 'sam', 'regular_1', 52.506, 20);
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        await tester.tap(find.byKey(const Key('catchButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('catchPlayer')));
+        await tester.pumpAndSettle();
+        // The hunter knows whom they caught: real names in the list.
+        Finder item(String text) => find.descendant(
+          of: find.byType(DropdownMenuItem<String>),
+          matching: find.text(text),
+        );
+        expect(item('Sam'), findsWidgets);
+        expect(item(sam), findsNothing);
+        await tester.tap(find.text('Sam').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('confirmCatch')));
+        await settle(tester);
+
+        expect(find.text('Sam was caught'), findsOneWidget);
+        expect(notifications.shown.single.title, 'Sam was caught');
+        expect(find.byKey(const Key('filter_player_sam')), findsNothing);
+        await tapFilter(tester, 'caught');
+        expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
+        expect(find.text('Sam'), findsNothing);
+      });
+
+      testWidgets('real names once the time is up (R-ANON-02)', (tester) async {
+        await seed(tester, gameSettings: anon);
+        await ping(tester, 'kim', 'regular_1', 52.505, 20);
+        now = start.add(anon.duration + const Duration(minutes: 5));
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        expect(label('lastPing_kim', 'Kim'), findsOneWidget);
+        expect(label('filter_player_kim', 'Kim'), findsOneWidget);
+        expect(find.textContaining('Player '), findsNothing);
+      });
+
+      testWidgets('players see real names (R-ANON-03)', (tester) async {
+        const shared = GameSettings(area: area, sharedPings: true);
+        await seed(tester, gameSettings: shared);
+        await ping(tester, 'sam', 'regular_1', 52.506, 20);
+        await pumpAs(tester, 'kim', gameSettings: shared);
+        expect(label('lastPing_sam', 'Sam'), findsOneWidget);
+        expect(find.textContaining('Player '), findsNothing);
+      });
+
+      testWidgets('players see their own number in the overview, hunters '
+          'none (R-ANON-04)', (tester) async {
+        await seed(tester, gameSettings: anon);
+        final kim = (await aliases(tester))['kim'];
+        await pumpAs(tester, 'kim', gameSettings: anon);
+        await tester.tap(find.byKey(const Key('overviewButton')));
+        await tester.pumpAndSettle();
+        expect(find.text('Hunters see you as Player $kim'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox());
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        await tester.tap(find.byKey(const Key('overviewButton')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('overviewMyAlias')), findsNothing);
+      });
+
+      testWidgets('without the setting nobody gets a number', (tester) async {
+        await seed(tester);
+        expect(await aliases(tester), isEmpty);
+        await pumpAs(tester, 'kim');
+        await tester.tap(find.byKey(const Key('overviewButton')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('overviewMyAlias')), findsNothing);
+      });
     });
   });
 }

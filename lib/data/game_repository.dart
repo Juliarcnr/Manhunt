@@ -15,6 +15,7 @@ class GameInfo {
     required this.settings,
     this.startAt,
     this.name,
+    this.aliases = const {},
   });
 
   final String adminId;
@@ -26,6 +27,10 @@ class GameInfo {
 
   /// Group name (R-GROUPS-04); null for groups created before names existed.
   final String? name;
+
+  /// Anonymous player numbers of the current round by player id (R-ANON-01);
+  /// empty in the lobby and without [GameSettings.anonymousPlayers].
+  final Map<String, int> aliases;
 }
 
 /// What a device needs to talk to its group: the derived crypto and its own id.
@@ -77,6 +82,9 @@ abstract interface class GameRepository {
   Future<void> updateArea(GroupSession session, List<GeoPoint> area);
   Future<void> setRoles(GroupSession session, List<Member> members);
   Future<void> removeMember(GroupSession session, String memberId);
+
+  /// With [GameSettings.anonymousPlayers] also shuffles the players' anonymous
+  /// numbers for the round (R-ANON-01).
   Future<void> startGame(GroupSession session);
 
   /// Records a catch in the current round and marks the player as caught

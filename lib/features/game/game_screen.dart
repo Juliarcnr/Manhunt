@@ -10,6 +10,7 @@ import '../../core/history/round_summary.dart';
 import '../../core/models/member.dart';
 import '../../core/round/notices.dart';
 import '../../core/round/ping_schedule.dart';
+import '../../core/round/player_aliases.dart';
 import '../../core/schedule/game_clock.dart';
 import '../../core/schedule/speedhunt.dart';
 import '../../data/game_repository.dart';
@@ -458,9 +459,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
   }
 
+  /// [members]: players in the order and with the [names] hunters see them
+  /// (R-ANON-01).
   Future<void> _startSpeedhunt(
     GameClock clock,
     List<Member> members,
+    Map<String, String> names,
     List<Speedhunt> previous,
   ) async {
     final l10n = AppLocalizations.of(context);
@@ -478,6 +482,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final targetId = await showSpeedhuntDialog(
       context,
       members: members,
+      names: names,
       settings: widget.game.settings,
     );
     if (targetId == null || !mounted) return;
@@ -619,11 +624,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
     final members = ref.watch(membersProvider).value ?? const <Member>[];
     final me = _me(members);
-    final names = {for (final m in members) m.id: m.name};
-    final playersByColor = playerColors([
-      for (final m in members)
-        if (m.isPlayer) m.id,
-    ]);
+    final membersById = {for (final m in members) m.id: m};
     final caught = {
       for (final m in members)
         if (m.caught) m.id,
@@ -642,6 +643,32 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final running = activeSpeedhunt(speedhunts, now);
     // Once the time is up, caught players are split up again (R-HUNT-11).
     final caughtNow = caughtOnMap(caught, phase);
+
+    // Anonymous players (R-ANON-01): hunters see "Player 3" instead of the
+    // name until the time is up (R-ANON-02); players always see names
+    // (R-ANON-03). Chips and colours follow the numbers, not the join order,
+    // so neither gives a player away.
+    final settings = widget.game.settings;
+    final playerIds = [
+      for (final m in members)
+        if (m.isPlayer) m.id,
+    ];
+    final orderedPlayers = settings.anonymousPlayers
+        ? byAlias(widget.game.aliases, playerIds)
+        : playerIds;
+    final aliases = completeAliases(widget.game.aliases, playerIds);
+    final anonymous = showAliases(
+      enabled: settings.anonymousPlayers,
+      isHunter: isHunter,
+      phase: phase,
+    );
+    final names = {
+      for (final m in members)
+        m.id: anonymous && m.isPlayer
+            ? l10n.playerAlias(aliases[m.id]!)
+            : m.name,
+    };
+    final playersByColor = playerColors(orderedPlayers);
 
     final (title, color, until) = switch (phase) {
       GamePhase.notStarted => (
@@ -773,17 +800,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
           onChanged: (v) => set(filters.copyWith(lastPings: v)),
         ),
         // Tap cycles: points → points with lines → off (R-HUNT-04, R-HUNT-05).
-        for (final m in members)
-          if (m.isPlayer && !caughtNow.contains(m.id))
+        for (final id in orderedPlayers)
+          if (!caughtNow.contains(id))
             FilterItem(
-              id: 'player_${m.id}',
-              label: m.name,
-              icon: filters.historyOf(m.id) == HistoryMode.lines
+              id: 'player_$id',
+              label: names[id] ?? '?',
+              icon: filters.historyOf(id) == HistoryMode.lines
                   ? Icons.timeline
                   : null,
-              color: playersByColor[m.id] ?? AppColors.player,
-              selected: filters.historyOf(m.id) != HistoryMode.off,
-              onChanged: (_) => set(filters.cyclePlayer(m.id)),
+              color: playersByColor[id] ?? AppColors.player,
+              selected: filters.historyOf(id) != HistoryMode.off,
+              onChanged: (_) => set(filters.cyclePlayer(id)),
             ),
         // All caught players in one chip (R-HUNT-09).
         if (caughtNow.isNotEmpty)
@@ -1012,6 +1039,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
               context,
               members: members,
               myId: widget.session.userId,
+              // Players learn which number the hunters see (R-ANON-04).
+              myAlias: isPlayer && settings.anonymousPlayers
+                  ? l10n.playerAlias(aliases[widget.session.userId]!)
+                  : null,
               speedhuntRunning: running != null,
               onRemove: _isAdmin ? _removeMember : null,
             ),
@@ -1142,8 +1173,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
                         child: OutlinedButton.icon(
                           key: const Key('speedhuntButton'),
                           onPressed: speedhuntsLeft > 0
-                              ? () =>
-                                    _startSpeedhunt(clock, members, speedhunts)
+                              ? () => _startSpeedhunt(
+                                  clock,
+                                  [
+                                    for (final id in orderedPlayers)
+                                      membersById[id]!,
+                                  ],
+                                  names,
+                                  speedhunts,
+                                )
                               : null,
                           icon: const Icon(Icons.bolt),
                           label: Text(l10n.speedhuntButton(speedhuntsLeft)),

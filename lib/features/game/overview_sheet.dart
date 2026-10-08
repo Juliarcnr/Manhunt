@@ -10,6 +10,7 @@ Future<void> showOverviewSheet(
   BuildContext context, {
   required List<Member> members,
   required String myId,
+  String? myAlias,
   required bool speedhuntRunning,
   void Function(Member member)? onRemove,
 }) => showModalBottomSheet<void>(
@@ -19,6 +20,7 @@ Future<void> showOverviewSheet(
   builder: (_) => OverviewSheet(
     members: members,
     myId: myId,
+    myAlias: myAlias,
     speedhuntRunning: speedhuntRunning,
     onRemove: onRemove,
   ),
@@ -29,12 +31,16 @@ class OverviewSheet extends StatelessWidget {
     super.key,
     required this.members,
     required this.myId,
+    this.myAlias,
     required this.speedhuntRunning,
     this.onRemove,
   });
 
   final List<Member> members;
   final String myId;
+
+  /// The number the hunters see for this player, e.g. "Player 3" (R-ANON-04).
+  final String? myAlias;
   final bool speedhuntRunning;
 
   /// Host only: remove someone from the group (R-LOBBY-09).
@@ -125,6 +131,27 @@ class OverviewSheet extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
+            if (myAlias != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.badge_outlined,
+                      size: 18,
+                      color: AppColors.player,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.overviewMyAlias(myAlias!),
+                        key: const Key('overviewMyAlias'),
+                        style: const TextStyle(color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Container(

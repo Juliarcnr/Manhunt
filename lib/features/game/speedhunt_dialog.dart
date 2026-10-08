@@ -7,13 +7,17 @@ import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 
 /// Hunter picks the player for a speedhunt (R-SPEED-02). Returns the player id.
+/// [names] overrides the shown names, e.g. "Player 3" for anonymous players
+/// (R-ANON-01).
 Future<String?> showSpeedhuntDialog(
   BuildContext context, {
   required List<Member> members,
+  Map<String, String> names = const {},
   required GameSettings settings,
 }) => showDialog<String>(
   context: context,
-  builder: (_) => _SpeedhuntDialog(members: members, settings: settings),
+  builder: (_) =>
+      _SpeedhuntDialog(members: members, names: names, settings: settings),
 );
 
 String speedhuntDenialText(
@@ -31,9 +35,14 @@ String speedhuntDenialText(
 };
 
 class _SpeedhuntDialog extends StatefulWidget {
-  const _SpeedhuntDialog({required this.members, required this.settings});
+  const _SpeedhuntDialog({
+    required this.members,
+    required this.names,
+    required this.settings,
+  });
 
   final List<Member> members;
+  final Map<String, String> names;
   final GameSettings settings;
 
   @override
@@ -69,7 +78,10 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
             ),
             items: [
               for (final p in players)
-                DropdownMenuItem(value: p.id, child: Text(p.name)),
+                DropdownMenuItem(
+                  value: p.id,
+                  child: Text(widget.names[p.id] ?? p.name),
+                ),
             ],
             onChanged: (v) => setState(() => _playerId = v),
           ),

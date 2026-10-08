@@ -39,6 +39,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-13 | Einstellbar: wie lange nach dem Auslösen eines Speedhunts der erste Speedhunt-Ping gesendet wird (Standard: 0 min = sofort, in 1-Minuten-Schritten bis 30 min). Der Wert wird beim Auslösen im Speedhunt festgehalten. |
 | R-SET-14 | Alle Mitglieder können die Einstellungen der Gruppe in der Lobby ansehen (schreibgeschützt, aktuell gehalten); bearbeiten kann sie nur der Host (vgl. R-SET-10). |
 | R-SET-15 | Einstellbar: „Reguläre Pings an alle Spieler“ (Standard: aus). Dann gehen die regulären Pings nicht nur an die Hunter, sondern an alle Spieler (R-PLAY-05); Speedhunt-Pings weiterhin nur an die Hunter. Schließt den Joker „Spieler-Standorte“ aus: Einschalten des einen schaltet den anderen ab. (2026-10-08) |
+| R-SET-16 | Einstellbar: „Anonyme Spieler“ (Standard: an, auch für bestehende Gruppen). Siehe R-ANON-01 … 04. (2026-10-08) |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -121,6 +122,16 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins, jeder Spieler in eigener Farbe, klar unterscheidbar vom Hunter-Orange-Rot (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. Nicht zusammen mit R-SET-15. |
 | R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter einheitlich im Hunter-Orange-Rot, Spieler in ihren Spielerfarben). Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
 | R-PLAY-05 | Mit R-SET-15 haben Spieler den Chip „Letzte Spieler-Pings“: jeweils nur den letzten regulären Ping jedes anderen Spielers (eigene unter „Meine Pings“), keine Historie, keine Speedhunt-Pings. Gefangene Spieler grau, bis es neuere reguläre Pings gibt – dann verschwindet ihr Pin. Neue Pings schalten den Chip wieder ein (wie R-HUNT-08). (2026-10-08) |
+
+## 6a. Anonyme Spieler
+
+| ID | Anforderung |
+|---|---|
+| R-ANON-01 | Mit R-SET-16 sehen Hunter während der Runde statt der Spielernamen „Spieler 1“ … „Spieler n“: an allen Pings (Letzte Pings, ⚡-Badges), Spieler- und Speedhunt-Chips und in der Speedhunt-Auswahl. Die Nummern werden beim Start zufällig vergeben (auf allen Handys gleich, fest für die Runde); Reihenfolge der Chips und Spielerfarben richten sich nach der Nummer, nicht nach der Beitrittsreihenfolge. Gefangene bleiben im Chip „Gefangen“ anonym. Der Catch-Dialog der Hunter zeigt die echten Namen (man weiß, wen man gefangen hat); die Catch-Benachrichtigung nennt den echten Namen. Hunter-Namen und die Übersicht bleiben unverändert. (2026-10-08) |
+| R-ANON-02 | Ist die Spielzeit abgelaufen (vgl. R-HUNT-11), sehen auch die Hunter wieder die echten Namen. (2026-10-08) |
+| R-ANON-03 | Spieler sehen immer die echten Namen (z.B. bei R-PLAY-03, R-PLAY-05). (2026-10-08) |
+| R-ANON-04 | Spieler sehen in der Übersicht, unter welcher Nummer die Hunter sie sehen („Für die Hunter bist du Spieler 3“). (2026-10-08) |
+| | Grenze: Die Anonymisierung betrifft nur die Anzeige. Die (verschlüsselten) Namen bleiben für alle Mitglieder lesbar – wer die App auseinandernimmt, könnte nachsehen. Unter Freunden ausreichend. |
 
 ## 7. Benachrichtigungen
 
