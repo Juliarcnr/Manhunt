@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/foundation.dart';
 
+import '../core/geo/polygon.dart';
+import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
+import '../core/round/boundary_watch.dart';
 import '../core/round/joker.dart';
 import '../core/round/ping_schedule.dart';
 import '../core/schedule/game_clock.dart';
@@ -62,7 +65,9 @@ class EngineStatus {
 /// Drives this device during a running round, without any server:
 /// - tracks the location only while needed (R-PRIV-04),
 /// - players: sends every due ping automatically (R-PING-01, R-SPEED-03),
-/// - hunters: shares the live position with the other hunters (R-HUNT-02).
+/// - hunters: shares the live position with the other hunters (R-HUNT-02),
+/// - players outside the play area: warns them and, if they stay outside,
+///   shares their live position with the hunters (R-OUT-01 … R-OUT-04).
 ///
 /// Feed it with [update] whenever game, own member or speedhunts change.
 class RoundEngine {
@@ -74,6 +79,7 @@ class RoundEngine {
     DateTime Function()? now,
     this.tickInterval = const Duration(seconds: 5),
     this.hunterUploadInterval = const Duration(seconds: 15),
+    this.outsideUploadInterval = const Duration(seconds: 5),
   }) : _now = now ?? DateTime.now;
 
   /// A position older than this is not used for a ping; a fresh one is
@@ -86,6 +92,7 @@ class RoundEngine {
   final TrackingNotice notice;
   final Duration tickInterval;
   final Duration hunterUploadInterval;
+  final Duration outsideUploadInterval;
   final DateTime Function() _now;
 
   GameInfo? _game;
@@ -119,6 +126,24 @@ class RoundEngine {
   /// Emits after each successfully sent own *regular* ping (R-NOTIF-03).
   /// Speedhunt pings are not announced to the player (R-SPEED-04).
   Stream<PingSlot> get pingsSent => _pingsSent.stream;
+
+  /// Where this player stands relative to the play area (R-OUT-01).
+  final boundary = ValueNotifier(const BoundaryState());
+  final _boundaryEvents = StreamController<BoundaryEvent>.broadcast();
+
+  /// What the player must be told about leaving the play area (R-OUT-06).
+  Stream<BoundaryEvent> get boundaryEvents => _boundaryEvents.stream;
+
+  /// A warning is announced at most this often, so standing near the
+  /// buffer's edge does not buzz every few seconds.
+  static const warningRepeat = Duration(minutes: 2);
+  DateTime? _lastWarningAt;
+
+  /// The own outside position may be online: also true at start, so one
+  /// left over from before an app restart gets deleted.
+  var _outsideMaybeShared = true;
+  DateTime? _lastOutsideUpload;
+  var _outsideBusy = false;
 
   bool get isTracking => _tracking != null;
 
@@ -203,8 +228,12 @@ class RoundEngine {
     _sync();
   }
 
-  void _setStatus(EngineStatus Function(EngineStatus s) change) =>
-      status.value = change(status.value);
+  /// Uploads may still finish after [dispose].
+  var _disposed = false;
+
+  void _setStatus(EngineStatus Function(EngineStatus s) change) {
+    if (!_disposed) status.value = change(status.value);
+  }
 
   String? _loggedReason = '(start)';
 
@@ -269,6 +298,122 @@ class RoundEngine {
     _lastFix = fix;
     position.value = fix;
     _setStatus((s) => s.copyWith(state: TrackingState.ok, lastFixAt: fix.at));
+    _stepBoundary(fix: fix);
+  }
+
+  /// Only uncaught players in a running round, with the setting on
+  /// (R-SET-17).
+  bool get _watchesBoundary {
+    final me = _me;
+    final game = _game;
+    return _shouldTrack &&
+        me != null &&
+        me.isPlayer &&
+        game != null &&
+        game.settings.outsideLiveLocation;
+  }
+
+  /// Feeds a new position (or just the passing time) into the boundary
+  /// watch (R-OUT-01 … R-OUT-04).
+  void _stepBoundary({LocationFix? fix}) {
+    if (!_watchesBoundary) {
+      _setBoundary(const BoundaryState(), why: 'not watched');
+      return;
+    }
+    final area = _game!.settings.area;
+    final before = boundary.value;
+    final after = boundaryStep(before, area: area, now: _now(), fix: fix);
+    // Did time alone already change the phase (gap, afterglow over)?
+    final byTime =
+        boundaryStep(before, area: area, now: _now()).phase != before.phase;
+    if (fix != null && after.phase == before.phase) _logNearMiss(fix, area);
+    _setBoundary(
+      after,
+      // The position that changed the phase – or why time alone did.
+      why: fix != null && !byTime
+          ? describeFix(fix, area)
+          : switch (before.phase) {
+              BoundaryPhase.warning =>
+                'no position for '
+                    '${maxOutsideFixGap.inSeconds} s',
+              BoundaryPhase.afterglow => '${outsideAfterglow.inSeconds} s over',
+              _ => null,
+            },
+    );
+  }
+
+  DateTime? _lastNearMissAt;
+
+  /// Positions beyond the buffer that did not count only because of their
+  /// accuracy – logged at most every 10 s, to calibrate in the field
+  /// (R-OUT-07).
+  void _logNearMiss(LocationFix fix, List<GeoPoint> area) {
+    if (boundary.value.phase != BoundaryPhase.inside) return;
+    final distance = distanceOutsideM(fix.point, area);
+    if (distance == null || distance < outsideBufferM) return;
+    if (classifyFix(fix, area) == FixSide.outside) return;
+    final last = _lastNearMissAt;
+    if (last != null && _now().difference(last) < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastNearMissAt = _now();
+    _log('boundary: not counted (${describeFix(fix, area)})');
+  }
+
+  void _setBoundary(BoundaryState after, {String? why}) {
+    final before = boundary.value;
+    if (after == before) return;
+    boundary.value = after;
+    if (after.phase == before.phase) {
+      if (after.sharing) unawaited(_syncOutsideLocation());
+      return;
+    }
+    _log('boundary: ${after.phase.name}${why == null ? '' : ' ($why)'}');
+    switch (after.phase) {
+      case BoundaryPhase.warning:
+        final last = _lastWarningAt;
+        if (last == null || _now().difference(last) >= warningRepeat) {
+          _lastWarningAt = _now();
+          _boundaryEvents.add(BoundaryEvent.warning);
+        }
+      case BoundaryPhase.live:
+        // Not again when coming back out during the afterglow.
+        if (!before.sharing) _boundaryEvents.add(BoundaryEvent.live);
+      case BoundaryPhase.inside:
+        if (before.sharing) _boundaryEvents.add(BoundaryEvent.ended);
+      case BoundaryPhase.afterglow:
+        break;
+    }
+    unawaited(_syncOutsideLocation());
+  }
+
+  /// Uploads the own position while the hunters may see it, deletes it as
+  /// soon as they may not any more (R-OUT-03, R-OUT-04).
+  Future<void> _syncOutsideLocation() async {
+    if (_outsideBusy) return;
+    _outsideBusy = true;
+    try {
+      if (boundary.value.sharing) {
+        final fix = _lastFix;
+        if (!_isFresh(fix)) return;
+        final last = _lastOutsideUpload;
+        if (last != null && _now().difference(last) < outsideUploadInterval) {
+          return;
+        }
+        _outsideMaybeShared = true;
+        await rounds.updateOutsideLocation(session, fix!);
+        _lastOutsideUpload = _now();
+      } else if (_outsideMaybeShared) {
+        await rounds.clearOutsideLocation(session);
+        _outsideMaybeShared = false;
+        _lastOutsideUpload = null;
+      }
+    } on Exception catch (e) {
+      // Retried on the next tick.
+      _setStatus((s) => s.copyWith(lastError: 'Live: $e'));
+    } finally {
+      _outsideBusy = false;
+    }
   }
 
   void _stop() {
@@ -279,6 +424,12 @@ class RoundEngine {
     _tracking = null;
     _lastFix = null;
     position.value = null;
+    // Caught, time up, screen closed …: no position, so the hunters must not
+    // see an old one either.
+    _setBoundary(const BoundaryState(), why: 'tracking stopped');
+    if (_outsideMaybeShared && (_me?.isPlayer ?? false)) {
+      unawaited(_syncOutsideLocation());
+    }
     if (status.value.state != TrackingState.off) {
       _setStatus((s) => s.copyWith(state: TrackingState.off));
     }
@@ -298,6 +449,9 @@ class RoundEngine {
     try {
       await _refreshIfStreamSilent();
       if (me.isPlayer) {
+        _stepBoundary();
+        await _confirmOutside();
+        await _syncOutsideLocation();
         await _sendDuePings();
         await _recordSpeedhuntSnapshots();
         await _answerJokerRequests();
@@ -325,6 +479,19 @@ class RoundEngine {
     await _fetchDirect();
   }
 
+  /// During a warning, positions must keep coming to confirm the player is
+  /// still outside (R-OUT-03): on devices with a sporadic GPS stream, ask
+  /// the GPS directly every tick.
+  Future<void> _confirmOutside() async {
+    if (boundary.value.phase != BoundaryPhase.warning) return;
+    final last = _lastStreamFixAt;
+    if (last != null && _now().difference(last) < _confirmAfter) return;
+    await _fetchDirect();
+  }
+
+  /// The stream normally delivers about once per second.
+  static const _confirmAfter = Duration(seconds: 3);
+
   /// Latest tracked position, or – if there is none or it is stale (phone
   /// lying still, GPS stream stalled) – one fetched directly from the GPS.
   Future<LocationFix?> _fixForPing() async {
@@ -337,12 +504,16 @@ class RoundEngine {
   /// reveal the target (R-SPEED-04).
   Future<LocationFix?> _fetchDirect({bool log = true}) async {
     try {
-      final point = await location.currentPosition();
-      if (point == null) {
+      final direct = await location.currentFix();
+      if (direct == null) {
         if (log) _log('direct GPS: no position');
         return null;
       }
-      final fresh = LocationFix(point: point, at: _now().toUtc());
+      final fresh = LocationFix(
+        point: direct.point,
+        at: _now().toUtc(),
+        accuracyM: direct.accuracyM,
+      );
       _acceptFix(fresh);
       return fresh;
     } on Exception catch (e) {
@@ -457,7 +628,10 @@ class RoundEngine {
     _timer?.cancel();
     _timer = null;
     _stop();
+    _disposed = true;
     await _pingsSent.close();
+    await _boundaryEvents.close();
+    boundary.dispose();
     position.dispose();
     speedhuntSnapshots.dispose();
     log.dispose();

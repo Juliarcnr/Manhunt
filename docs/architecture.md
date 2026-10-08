@@ -57,6 +57,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`) | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker | Standort | ✔ |
+| `games/{groupId}/outsideLocs/{uid}` | updatedAt, `data` (live, alle 5 s) – nur solange der Spieler außerhalb des Spielfelds ist + 60 s (R-OUT-03/04); nur Hunter lesen, nur der Spieler selbst schreibt/löscht | Standort | ✔ |
 | `games/{groupId}/events/{auto}` | type (catch/speedhunt), createdAt, `data` – Speedhunt-Event **ohne** Ziel | Inhalt | ✔ |
 | `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar | – | ✔ |
 | `games/{groupId}/jokerRequests/{id}` | uid (Fragender), createdAt – nur Spieler lesbar; nur zusammen mit `playerJokerUsed` | – | ✔ |
@@ -69,7 +70,7 @@ in der Lobby, Beitritt nur als „unassigned“,
 Umbenennen nur sich selbst. Deploy: `firebase deploy --only firestore:rules`.
 
 **Lebenszyklus**: Eine Gruppe lebt über viele Runden (`status`: lobby ↔ running). „Spiel beenden“ (Host)
-löscht `pings`/`hunterLocs`/`events`, setzt caught/jokerUsed zurück und geht in die Lobby. Jede Host-Aktion setzt
+löscht `pings`/`hunterLocs`/`outsideLocs`/`events`, setzt caught/jokerUsed zurück und geht in die Lobby. Jede Host-Aktion setzt
 `expiresAt` = jetzt + 180 Tage; zusätzlich verlängert jedes Öffnen durch ein Mitglied (`checkIn`, max. 1× pro Tag). **TTL gibt es im Spark-Tarif nicht**; stattdessen ruft `SessionController.build`
 beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlängern (Regeln: Mitglieder dürfen nur `expiresAt` setzen, max. +181 Tage; löschen erst nach Ablauf).
 
@@ -129,6 +130,15 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   den Joker-Ergebnissen (`JokerStore`), nach Neustart per `restoreSpeedhuntSnapshots` zurück.
 - Spieler-Joker: Anfrage (`requestPlayerPositions`) → `RoundEngine.updateJokerRequests` auf den anderen
   Spieler-Handys beantwortet frische Anfragen (< 2 min) mit dem aktuellen Standort (`jokerAnswers`).
+- Spielfeld verlassen (R-OUT-*): reine Logik in `lib/core/round/boundary_watch.dart` (`classifyFix`, `boundaryStep`:
+  inside → warning → live → afterglow, Abstand zur Grenze über `distanceOutsideM` in `lib/core/geo/polygon.dart`).
+  `RoundEngine` füttert jeden Standort hinein, fragt während einer Warnung bei stockendem Stream direkt nach
+  (`currentFix`, mit Genauigkeit), lädt in live/afterglow alle 5 s nach `outsideLocs` hoch und löscht danach (auch beim
+  Stoppen des Trackings und einmal beim Start, falls nach einem Neustart etwas übrig ist). `boundaryEvents` → Hinweise
+  an den Spieler; `boundary` → rotes Banner. Hunter: `outsideLocationsProvider`, Pin-Layer `outsidePlayersLayer`,
+  `NoticeTracker.onOutside` meldet neu Hinausgegangene (Namen über `_displayNames`, also ggf. „Spieler n“).
+  Schwelle `outsideThresholdM` = 30 m + 2 × Genauigkeit; Debug-Log über `describeFix` (Wechsel mit Grund,
+  „not counted“ höchstens alle 10 s) zum Kalibrieren im Feldtest (R-OUT-07).
 
 ## App-Icon (R-UI-04)
 - Quellen: `assets/icon/*.svg` (1024×1024), daraus gerenderte PNGs. Plattform-Icons erzeugen mit

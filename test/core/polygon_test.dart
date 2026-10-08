@@ -78,4 +78,35 @@ void main() {
       expect(isInsidePolygon(const GeoPoint(lat - 0.01, 13.4), rect), isFalse);
     });
   });
+
+  group('distance to the edge (R-OUT-01)', () {
+    // Metres east of the rectangle's east edge, at mid-height.
+    GeoPoint east(double m) =>
+        GeoPoint(lat + dLat / 2, 13.4 + dLng + m / 67690);
+
+    test('positive outside, negative inside, in metres', () {
+      expect(distanceOutsideM(east(50), rect), closeTo(50, 1));
+      expect(distanceOutsideM(east(-20), rect), closeTo(-20, 1));
+    });
+
+    test('inside: distance to the nearest edge', () {
+      // Centre: 500 m to the long east and west edges.
+      final centre = GeoPoint(lat + dLat / 2, 13.4 + dLng / 2);
+      expect(distanceOutsideM(centre, rect), closeTo(-500, 10));
+    });
+
+    test('beyond a corner: distance to the corner', () {
+      // 30 m east and 40 m north of the north-east corner → 50 m.
+      final p = GeoPoint(lat + dLat + 40 / 111195, 13.4 + dLng + 30 / 67690);
+      expect(distanceOutsideM(p, rect), closeTo(50, 1));
+    });
+
+    test('on the edge ≈ 0', () {
+      expect(distanceOutsideM(east(0), rect)!.abs(), lessThan(0.5));
+    });
+
+    test('no area → null', () {
+      expect(distanceOutsideM(east(50), rect.take(2).toList()), isNull);
+    });
+  });
 }

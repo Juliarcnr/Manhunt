@@ -30,6 +30,9 @@ abstract final class AppColors {
 
   /// Speedhunt alert.
   static const speedhunt = Color(0xFFFFC400);
+
+  /// Outside the play area: warning and live location (R-OUT-05, R-OUT-06).
+  static const outside = Color(0xFFFF1744);
 }
 
 abstract final class AppTheme {

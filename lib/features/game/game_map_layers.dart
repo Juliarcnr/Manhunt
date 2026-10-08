@@ -69,6 +69,36 @@ Widget huntersLayer({
   );
 }
 
+/// Live positions of players outside the play area, for the hunters
+/// (R-OUT-05): a pin in the player's colour with a red "live" symbol before
+/// the name; it glides to each new position like the hunters' pins.
+Widget outsidePlayersLayer({
+  required Map<String, LocationFix> positions,
+  required Map<String, String> names,
+  required Map<String, Color> colors,
+}) => AnimatedMarkerLayer(
+  key: const Key('outsidePlayers'),
+  markers: [
+    for (final MapEntry(key: id, value: fix) in positions.entries)
+      Marker(
+        key: Key('outside_$id'),
+        point: fix.point.toLatLng(),
+        width: 160,
+        height: 64,
+        alignment: Alignment.topCenter,
+        child: _NamedPin(
+          name: names[id] ?? '?',
+          color: colors[id] ?? AppColors.player,
+          icon: Icons.person_pin_circle,
+          labelIcon: Icons.wifi_tethering,
+          labelColor: AppColors.outside,
+        ),
+      ),
+  ],
+  duration: const Duration(seconds: 2),
+  curve: Curves.easeInOut,
+);
+
 /// Other players' current positions from the player joker (R-PLAY-03).
 MarkerLayer playersLayer({
   required Map<String, LocationFix> positions,
@@ -337,6 +367,7 @@ class _NamedPin extends StatelessWidget {
     required this.color,
     required this.icon,
     this.labelIcon,
+    this.labelColor,
   });
 
   final String name;
@@ -345,6 +376,9 @@ class _NamedPin extends StatelessWidget {
 
   /// Optional role symbol before the name.
   final IconData? labelIcon;
+
+  /// Colour of [labelIcon]; [color] if not set.
+  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +396,7 @@ class _NamedPin extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (labelIcon case final labelIcon?) ...[
-                Icon(labelIcon, size: 13, color: color),
+                Icon(labelIcon, size: 13, color: labelColor ?? color),
                 const SizedBox(width: 3),
               ],
               Flexible(

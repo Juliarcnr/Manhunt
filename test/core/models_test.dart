@@ -76,6 +76,17 @@ void main() {
       expect(GameSettings.fromJson(legacy).anonymousPlayers, isTrue);
     });
 
+    test('live location outside the area is on by default, also for older '
+        'groups (R-SET-17)', () {
+      const s = GameSettings();
+      expect(s.outsideLiveLocation, isTrue);
+      const off = GameSettings(outsideLiveLocation: false);
+      expect(GameSettings.fromJson(off.toJson()).outsideLiveLocation, isFalse);
+      expect(off.copyWith(hunterCount: 2).outsideLiveLocation, isFalse);
+      final legacy = s.toJson()..remove('outsideLiveLocation');
+      expect(GameSettings.fromJson(legacy).outsideLiveLocation, isTrue);
+    });
+
     test('json roundtrip', () {
       const s = GameSettings(hunterCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());

@@ -277,6 +277,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Hunters see “Player 1”, “Player 2” … instead of names – until the time is up. Players still see the real names.';
 
   @override
+  String get settingsOutsideLive => 'Live location when leaving the area';
+
+  @override
+  String get settingsOutsideLiveHint =>
+      'If a player is clearly outside the play area (at least 30 m plus GPS inaccuracy) for 30 s, the hunters see their live location – until they are back, plus 1 minute. The player is warned first.';
+
+  @override
   String get settingsArea => 'Play area';
 
   @override
@@ -634,6 +641,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noticePingSentAll => 'Your location was sent to everyone';
+
+  @override
+  String get noticeOutsideWarning => 'You left the play area';
+
+  @override
+  String noticeOutsideWarningBody(int seconds) {
+    return 'Go back within $seconds s, or the hunters will see your live location.';
+  }
+
+  @override
+  String get noticeOutsideLive => 'The hunters see your live location';
+
+  @override
+  String noticeOutsideLiveBody(int seconds) {
+    return 'Until you are back in the play area, plus $seconds s.';
+  }
+
+  @override
+  String get noticeOutsideEnded => 'Your live location is no longer shared';
+
+  @override
+  String noticePlayerOutside(String player) {
+    return '$player left the play area';
+  }
+
+  @override
+  String get noticePlayerOutsideBody =>
+      'You see their live location on the map.';
+
+  @override
+  String outsideWarning(String time) {
+    return 'You are outside the play area – go back within $time, or the hunters will see your live location';
+  }
+
+  @override
+  String get outsideLive =>
+      'The hunters see your live location right now – go back into the play area';
+
+  @override
+  String outsideAfterglow(String time) {
+    return 'Back in the play area – the hunters still see your live location for $time';
+  }
 
   @override
   String get catchTitle => 'Report catch';

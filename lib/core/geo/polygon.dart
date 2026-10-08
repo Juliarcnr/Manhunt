@@ -19,19 +19,45 @@ bool isInsidePolygon(GeoPoint p, List<GeoPoint> polygon) {
   return inside;
 }
 
-/// Projects to a local flat plane in metres (equirectangular around the
+/// Projection to a local flat plane in metres (equirectangular around the
 /// polygon's mean latitude). Accurate enough for areas of a few km.
-List<Point<double>> _toMetres(List<GeoPoint> polygon) {
+Point<double> Function(GeoPoint) _projection(List<GeoPoint> polygon) {
   final lat0 =
       polygon.map((p) => p.lat).reduce((a, b) => a + b) / polygon.length;
   final cosLat = cos(lat0 * pi / 180);
-  return [
-    for (final p in polygon)
-      Point(
-        _earthRadiusM * p.lng * pi / 180 * cosLat,
-        _earthRadiusM * p.lat * pi / 180,
-      ),
-  ];
+  return (p) => Point(
+    _earthRadiusM * p.lng * pi / 180 * cosLat,
+    _earthRadiusM * p.lat * pi / 180,
+  );
+}
+
+List<Point<double>> _toMetres(List<GeoPoint> polygon) {
+  final project = _projection(polygon);
+  return [for (final p in polygon) project(p)];
+}
+
+/// Signed distance in metres from [p] to the edge of [polygon]: positive
+/// outside, negative inside (R-OUT-01). Null without a valid polygon.
+double? distanceOutsideM(GeoPoint p, List<GeoPoint> polygon) {
+  if (polygon.length < 3) return null;
+  final project = _projection(polygon);
+  final pts = [for (final v in polygon) project(v)];
+  final q = project(p);
+  var nearest = double.infinity;
+  for (var i = 0; i < pts.length; i++) {
+    final edge = _distanceToSegment(q, pts[i], pts[(i + 1) % pts.length]);
+    nearest = min(nearest, edge);
+  }
+  return isInsidePolygon(p, polygon) ? -nearest : nearest;
+}
+
+double _distanceToSegment(Point<double> p, Point<double> a, Point<double> b) {
+  final ab = b - a;
+  final lengthSq = ab.x * ab.x + ab.y * ab.y;
+  if (lengthSq == 0) return p.distanceTo(a);
+  final t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / lengthSq;
+  final c = t.clamp(0.0, 1.0);
+  return p.distanceTo(Point(a.x + ab.x * c, a.y + ab.y * c));
 }
 
 /// Area of the play area in km² (shown while drawing, R-SET-06).

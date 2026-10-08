@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
+import 'package:manhunt/core/round/boundary_watch.dart';
 import 'package:manhunt/core/round/joker.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
@@ -535,6 +536,212 @@ void main() {
       await flush();
       expect(sent, isEmpty);
       expect(engine.mySlots, isEmpty);
+    });
+  });
+
+  group('leaving the play area (R-OUT-01 … R-OUT-06)', () {
+    // ~1 km × 2 km rectangle; positions in metres east of its east edge.
+    const lat = 52.5;
+    const dLat = 2 / 111.195;
+    const dLng = 1 / 67.69;
+    const area = [
+      GeoPoint(lat, 13.4),
+      GeoPoint(lat, 13.4 + dLng),
+      GeoPoint(lat + dLat, 13.4 + dLng),
+      GeoPoint(lat + dLat, 13.4),
+    ];
+    GeoPoint east(double m) =>
+        GeoPoint(lat + dLat / 2, 13.4 + dLng + m / 67690);
+    late List<BoundaryEvent> events;
+
+    GameInfo areaGame({bool enabled = true}) => GameInfo(
+      adminId: 'h',
+      status: GameStatus.running,
+      settings: game0.copyWith(area: area, outsideLiveLocation: enabled),
+      startAt: start,
+    );
+
+    Future<void> startAs(Member me, {bool enabled = true}) async {
+      engine = await engineFor(me.id);
+      events = [];
+      engine.boundaryEvents.listen(events.add);
+      engine.update(
+        game: areaGame(enabled: enabled),
+        me: me,
+        speedhuntsOnMe: [],
+      );
+    }
+
+    /// One GPS position per second, [metresOut] beyond the edge.
+    Future<void> walk(double metresOut, {required int seconds}) async {
+      for (var i = 0; i < seconds; i++) {
+        now = now.add(const Duration(seconds: 1));
+        location.emit(
+          LocationFix(point: east(metresOut), at: now, accuracyM: 10),
+        );
+        await flush();
+      }
+      await pumpEventQueue();
+    }
+
+    Future<Map<String, LocationFix>> online() =>
+        rounds.watchOutsideLocations(hunterSession).first;
+
+    test('warned at once, live only after 30 s, then shared', () async {
+      await startAs(player);
+      await walk(-50, seconds: 5);
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+
+      await walk(100, seconds: 30);
+      expect(engine.boundary.value.phase, BoundaryPhase.warning);
+      expect(events, [BoundaryEvent.warning]);
+      expect(await online(), isEmpty);
+
+      await walk(100, seconds: 1);
+      expect(engine.boundary.value.phase, BoundaryPhase.live);
+      expect(events, [BoundaryEvent.warning, BoundaryEvent.live]);
+      final shared = await online();
+      expect(shared.keys, ['kim']);
+      expect(shared['kim']!.point.lng, closeTo(east(100).lng, 1e-9));
+    });
+
+    test('live position follows every 5 s while outside', () async {
+      await startAs(player);
+      await walk(100, seconds: 31);
+      await walk(300, seconds: 4);
+      expect((await online())['kim']!.point.lng, closeTo(east(100).lng, 1e-9));
+      await walk(300, seconds: 1);
+      expect((await online())['kim']!.point.lng, closeTo(east(300).lng, 1e-9));
+    });
+
+    test('back inside: shared 60 s longer, then deleted', () async {
+      await startAs(player);
+      await walk(100, seconds: 31);
+      await walk(-50, seconds: 1);
+      expect(engine.boundary.value.phase, BoundaryPhase.afterglow);
+      await walk(-50, seconds: 59);
+      expect(await online(), isNotEmpty);
+
+      await walk(-50, seconds: 1);
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+      expect(await online(), isEmpty);
+      expect(events.last, BoundaryEvent.ended);
+    });
+
+    test('coming back within 30 s shares nothing', () async {
+      await startAs(player);
+      await walk(100, seconds: 20);
+      await walk(-50, seconds: 60);
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+      expect(events, [BoundaryEvent.warning]);
+      expect(await online(), isEmpty);
+    });
+
+    test('the warning is not repeated every few seconds', () async {
+      await startAs(player);
+      for (var i = 0; i < 5; i++) {
+        await walk(100, seconds: 3);
+        await walk(-50, seconds: 3);
+      }
+      expect(events, [BoundaryEvent.warning]);
+    });
+
+    test('caught while live: deleted at once', () async {
+      await startAs(player);
+      await walk(100, seconds: 31);
+      expect(await online(), isNotEmpty);
+      engine.update(
+        game: areaGame(),
+        me: player.copyWith(caught: true),
+        speedhuntsOnMe: [],
+      );
+      await pumpEventQueue();
+      expect(await online(), isEmpty);
+      expect(events.last, BoundaryEvent.ended);
+    });
+
+    test('time up while live: deleted', () async {
+      await startAs(player);
+      await walk(100, seconds: 31);
+      now = at(61);
+      await engine.tick();
+      await pumpEventQueue();
+      expect(await online(), isEmpty);
+    });
+
+    test('setting off (R-SET-17): no warning, nothing shared', () async {
+      await startAs(player, enabled: false);
+      await walk(100, seconds: 120);
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+      expect(events, isEmpty);
+      expect(await online(), isEmpty);
+    });
+
+    test('hunters are never watched', () async {
+      await startAs(hunter);
+      await walk(100, seconds: 120);
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+      expect(await online(), isEmpty);
+    });
+
+    test('sporadic GPS stream: confirmed by direct requests', () async {
+      await startAs(player);
+      location
+        ..position = east(100)
+        ..positionAccuracyM = 10;
+      await walk(100, seconds: 1); // the stream then stays silent
+      for (var i = 0; i < 6; i++) {
+        now = now.add(const Duration(seconds: 5));
+        await engine.tick();
+        await pumpEventQueue();
+      }
+      expect(engine.boundary.value.phase, BoundaryPhase.live);
+      expect(await online(), isNotEmpty);
+    });
+
+    test('direct positions without accuracy never count', () async {
+      await startAs(player);
+      location.position = east(500);
+      await walk(100, seconds: 1);
+      for (var i = 0; i < 12; i++) {
+        now = now.add(const Duration(seconds: 5));
+        await engine.tick();
+        await pumpEventQueue();
+      }
+      expect(engine.boundary.value.phase, BoundaryPhase.inside);
+      expect(await online(), isEmpty);
+    });
+
+    test('debug log shows why, to calibrate in the field (R-OUT-07)', () async {
+      await startAs(player);
+      // 45 m out with ±10 m: beyond the buffer, but not counted (needs 50 m).
+      await walk(45, seconds: 12);
+      await walk(100, seconds: 31);
+      await walk(-50, seconds: 61);
+      final lines = engine.log.value
+          .where((l) => l.contains('boundary'))
+          .map((l) => l.substring(9)) // without the time
+          .toList();
+      expect(lines, [
+        'boundary: not counted (45 m out, ±10 m, needs 50 m)',
+        'boundary: not counted (45 m out, ±10 m, needs 50 m)',
+        'boundary: warning (100 m out, ±10 m, needs 50 m)',
+        'boundary: live (100 m out, ±10 m, needs 50 m)',
+        'boundary: afterglow (50 m in, ±10 m, needs 50 m)',
+        'boundary: inside (60 s over)',
+      ]);
+    });
+
+    test('a leftover from before an app restart is deleted', () async {
+      await rounds.updateOutsideLocation(
+        await testSession('ABCDE-FGHJK', 'kim'),
+        LocationFix(point: east(100), at: now),
+      );
+      await startAs(player);
+      await walk(-50, seconds: 1);
+      await engine.tick();
+      await pumpEventQueue();
+      expect(await online(), isEmpty);
     });
   });
 }

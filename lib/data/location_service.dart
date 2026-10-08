@@ -29,6 +29,10 @@ abstract interface class LocationService {
   /// Current position, or null if permission was denied / location is off.
   Future<GeoPoint?> currentPosition();
 
+  /// Like [currentPosition], with the reported accuracy – needed to tell
+  /// whether a player left the play area (R-OUT-02).
+  Future<LocationFix?> currentFix();
+
   /// Continuous positions while a round runs, also in the background
   /// (R-PING-03): Android foreground service with a permanent notification,
   /// iOS background location mode. Cancel the subscription to stop (R-PRIV-04).
@@ -54,7 +58,10 @@ class GeolocatorLocationService implements LocationService {
   }
 
   @override
-  Future<GeoPoint?> currentPosition() async {
+  Future<GeoPoint?> currentPosition() async => (await currentFix())?.point;
+
+  @override
+  Future<LocationFix?> currentFix() async {
     if (!await ensurePermission()) return null;
     final pos = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
@@ -62,7 +69,11 @@ class GeolocatorLocationService implements LocationService {
         timeLimit: Duration(seconds: 15),
       ),
     );
-    return GeoPoint(pos.latitude, pos.longitude);
+    return LocationFix(
+      point: GeoPoint(pos.latitude, pos.longitude),
+      at: pos.timestamp.toUtc(),
+      accuracyM: pos.accuracy,
+    );
   }
 
   @override

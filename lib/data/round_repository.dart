@@ -26,6 +26,17 @@ abstract interface class RoundRepository {
   /// Live hunter positions by hunter id – hunters only.
   Stream<Map<String, LocationFix>> watchHunterLocations(GroupSession session);
 
+  /// Player outside the play area shares their live position with the
+  /// hunters (R-OUT-03). Overwrites the previous one.
+  Future<void> updateOutsideLocation(GroupSession session, LocationFix fix);
+
+  /// Stops sharing: deletes the own outside position (R-OUT-04).
+  Future<void> clearOutsideLocation(GroupSession session);
+
+  /// Live positions of players outside the play area, by player id – hunters
+  /// only (R-OUT-05).
+  Stream<Map<String, LocationFix>> watchOutsideLocations(GroupSession session);
+
   /// Player uses their single joker (R-PLAY-02) and gets the hunters'
   /// current positions once.
   Future<Map<String, LocationFix>> useJoker(GroupSession session);

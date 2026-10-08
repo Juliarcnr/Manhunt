@@ -79,10 +79,25 @@ class FakeLocationService implements LocationService {
     return permissionGranted;
   }
 
+  /// Reported accuracy of [position] for direct requests.
+  double? positionAccuracyM;
+
   @override
   Future<GeoPoint?> currentPosition() async {
     currentCalls++;
     return permissionGranted ? position : null;
+  }
+
+  @override
+  Future<LocationFix?> currentFix() async {
+    final point = await currentPosition();
+    return point == null
+        ? null
+        : LocationFix(
+            point: point,
+            at: DateTime.now().toUtc(),
+            accuracyM: positionAccuracyM,
+          );
   }
 
   @override

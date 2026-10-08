@@ -278,6 +278,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Hunter sehen statt der Namen nur „Spieler 1“, „Spieler 2“ … – bis die Zeit abgelaufen ist. Spieler sehen weiterhin die echten Namen.';
 
   @override
+  String get settingsOutsideLive =>
+      'Live-Standort beim Verlassen des Spielfelds';
+
+  @override
+  String get settingsOutsideLiveHint =>
+      'Ist ein Spieler 30 s lang eindeutig außerhalb des Spielfelds (mind. 30 m plus GPS-Ungenauigkeit), sehen die Hunter seinen Live-Standort – bis er zurück ist, plus 1 Minute. Vorher wird er gewarnt.';
+
+  @override
   String get settingsArea => 'Spielfeld';
 
   @override
@@ -639,6 +647,49 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noticePingSentAll => 'Dein Standort wurde an alle gesendet';
+
+  @override
+  String get noticeOutsideWarning => 'Du hast das Spielfeld verlassen';
+
+  @override
+  String noticeOutsideWarningBody(int seconds) {
+    return 'Geh innerhalb von $seconds s zurück, sonst sehen die Hunter deinen Live-Standort.';
+  }
+
+  @override
+  String get noticeOutsideLive => 'Die Hunter sehen deinen Live-Standort';
+
+  @override
+  String noticeOutsideLiveBody(int seconds) {
+    return 'Bis du wieder im Spielfeld bist, plus $seconds s.';
+  }
+
+  @override
+  String get noticeOutsideEnded =>
+      'Dein Live-Standort wird nicht mehr gesendet';
+
+  @override
+  String noticePlayerOutside(String player) {
+    return '$player hat das Spielfeld verlassen';
+  }
+
+  @override
+  String get noticePlayerOutsideBody =>
+      'Du siehst den Live-Standort auf der Karte.';
+
+  @override
+  String outsideWarning(String time) {
+    return 'Du bist außerhalb des Spielfelds – geh innerhalb von $time zurück, sonst sehen die Hunter deinen Live-Standort';
+  }
+
+  @override
+  String get outsideLive =>
+      'Die Hunter sehen gerade deinen Live-Standort – geh zurück ins Spielfeld';
+
+  @override
+  String outsideAfterglow(String time) {
+    return 'Zurück im Spielfeld – die Hunter sehen deinen Live-Standort noch $time';
+  }
 
   @override
   String get catchTitle => 'Catch melden';

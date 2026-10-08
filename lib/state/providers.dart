@@ -183,6 +183,15 @@ final hunterLocationsProvider = StreamProvider<Map<String, LocationFix>>(
   ),
 );
 
+/// Live positions of players outside the play area – hunters only (R-OUT-05).
+final outsideLocationsProvider = StreamProvider<Map<String, LocationFix>>(
+  (ref) => _sessionStream(
+    ref,
+    const {},
+    ref.watch(roundRepositoryProvider).watchOutsideLocations,
+  ),
+);
+
 /// Joker "player positions" requests – players only (R-PLAY-03).
 final jokerRequestsProvider = StreamProvider<List<JokerRequest>>(
   (ref) => _sessionStream(

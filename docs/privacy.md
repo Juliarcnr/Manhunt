@@ -14,6 +14,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Anonyme Spielernummern der Runde (R-ANON-01): Zuordnung UID → „Spieler n“ | Firestore `games/{id}.aliases` | nein (verschlüsselt) | beim Beenden der Runde |
 | Schalter „Reguläre Pings an alle Spieler“ (R-SET-15) | Firestore `games/{id}.sharedPings` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; verrät nur die Spielvariante) | mit Gruppe |
 | Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse (ein Catch vermerkt ggf. den Start des Speedhunts, den er beendet – R-SPEED-10) | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings) | **beim Beenden der Runde** |
+| Live-Standort eines Spielers, der das Spielfeld verlassen hat (R-OUT-03), mit GPS-Genauigkeit – nur solange er eindeutig (30 m + doppelte Ungenauigkeit) und seit 30 s draußen ist, plus 60 s nach der Rückkehr (Einstellung R-SET-17) | Firestore `outsideLocs/{uid}` | **nein** (AES-GCM); nur Hunter dürfen lesen; lesbar ist nur, *dass* eine anonyme ID gerade draußen ist | vom eigenen Handy gelöscht, sobald die 60 s um sind, man gefangen wird oder die Zeit abläuft; spätestens beim Beenden der Runde |
 | Antworten auf den Spieler-Joker (aktueller Standort der anderen Spieler) | Firestore | **nein** (AES-GCM); nur der fragende Spieler darf sie lesen | beim Beenden der Runde |
 | Metadaten der Runde: wer wann gepingt hat (uid, Ping-Nr.), Ziel-uid eines Speedhunts, wer einen Joker wann benutzt hat | Firestore | ja (nötig für die Sicherheitsregeln; nur anonyme IDs, keine Orte) | beim Beenden der Runde (Joker-Zeitpunkte bleiben bis zur nächsten Runde) |
 | Rundenübersicht (Runde, Datum, Dauer, Teams, Catches mit Zeit und Hunter) | Firestore `history` | nein (verschlüsselt), nur Zeitpunkt des Rundenendes lesbar | mit Gruppe (keine Standorte enthalten) |
@@ -43,6 +44,9 @@ Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Report
 
 ## Standort
 Wird nur während eines laufenden Spiels erfasst (R-PRIV-04). Android zeigt dabei eine Dauer-Benachrichtigung.
+Ob man das Spielfeld verlassen hat, prüft nur das eigene Handy (R-OUT-01). Die Warnung bleibt auf dem Gerät; erst
+nach 30 s eindeutig draußen geht ein Live-Standort an die Hunter (R-OUT-03), und das zeigt die App dem Spieler die
+ganze Zeit über an (R-OUT-06).
 
 Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt des Jokers bzw. die Kennung der Spieler-Joker-Anfrage) werden nur
 **auf dem eigenen Gerät** im Schlüsselspeicher des Betriebssystems abgelegt, damit man sie in der laufenden Runde

@@ -34,13 +34,17 @@ Dauert 2–3 Minuten.
 - iPhone zeigt oben einen **blauen Standort-Hinweis** – auch das ist gewollt.
 - Wer die App aus Versehen geschlossen hat: einfach wieder öffnen, sie macht automatisch weiter.
   Pings, die mehr als 3 Minuten verpasst wurden, werden ausgelassen (statt einen veralteten Standort zu schicken).
+- **Im Spielfeld bleiben:** Wer es eindeutig verlässt (mehr als 30 m plus die doppelte GPS-Ungenauigkeit, also meist 40–90 m), wird sofort gewarnt
+  (Vibration, rotes Banner). Wer 30 s draußen bleibt, dessen **Live-Standort sehen die Hunter** – bis man zurück ist,
+  plus 1 Minute. Solange das passiert, zeigt die App es oben in Rot an. Am Rand stehen oder kurze GPS-Sprünge lösen
+  nichts aus. (Der Host kann das in den Einstellungen abschalten.)
 - Handy verloren oder neu installiert? Mit dem Gruppencode neu beitreten; der Host teilt die Rolle neu zu.
 
 ## 3. Für den Host
 
 - [ ] Spielfeld einzeichnen (das können alle in der Lobby) und Einstellungen prüfen: Dauer, Vorlauf, Ping-Abstand,
-  Speedhunts (Anzahl, Pings, Abstand, frühester Zeitpunkt), Joker – oder statt des Spieler-Jokers „Reguläre Pings
-  an alle Spieler“.
+  Speedhunts (Anzahl, Pings, Abstand, frühester Zeitpunkt), Joker, Live-Standort beim Verlassen des Spielfelds –
+  oder statt des Spieler-Jokers „Reguläre Pings an alle Spieler“.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
 - [ ] Nach dem Spiel **„Spiel beenden“** drücken: Erst dann werden alle Standorte gelöscht. Vorher könnt ihr euch die
   Pings gemeinsam auf der Karte anschauen (nach Ablauf der Zeit haben auch Gefangene wieder ihre eigenen Chips). Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.

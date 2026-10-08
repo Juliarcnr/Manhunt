@@ -58,4 +58,19 @@ void main() {
       );
     });
   });
+
+  group('players outside the play area (R-OUT-05)', () {
+    test('announced when they leave, also in the first snapshot', () {
+      final tracker = NoticeTracker();
+      List<String> ids(List<GameNotice> n) => [
+        for (final x in n) (x as PlayerOutsideNotice).playerId,
+      ];
+      expect(ids(tracker.onOutside(['kim'])), ['kim']);
+      expect(tracker.onOutside(['kim']), isEmpty);
+      expect(ids(tracker.onOutside(['kim', 'sam'])), ['sam']);
+      expect(tracker.onOutside([]), isEmpty);
+      // Leaving again later is a new event.
+      expect(ids(tracker.onOutside(['kim'])), ['kim']);
+    });
+  });
 }

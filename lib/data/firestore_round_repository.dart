@@ -9,6 +9,8 @@ import 'round_repository.dart';
 /// Firestore layout (all under `games/{groupId}`, deleted at round end):
 /// - `pings/{uid}_{slotId}`: uid, kind, slot, createdAt, data (LocationFix)
 /// - `hunterLocs/{uid}`: updatedAt, data (LocationFix)
+/// - `outsideLocs/{uid}`: updatedAt, data (LocationFix) – only while the
+///   player is outside the play area (R-OUT-03)
 /// - `events/{id}` type=speedhunt: createdAt, data (startedAt, pings, interval)
 /// - `speedhuntTargets/{eventId}`: uid (target), createdAt
 /// - `jokerRequests/{id}`: uid (requester), createdAt
@@ -90,7 +92,7 @@ class FirestoreRoundRepository implements RoundRepository {
     });
   }
 
-  Future<Map<String, LocationFix>> _decodeHunterLocs(
+  Future<Map<String, LocationFix>> _decodeLocations(
     GroupSession session,
     QuerySnapshot<Map<String, dynamic>> snap,
   ) async => {
@@ -106,7 +108,31 @@ class FirestoreRoundRepository implements RoundRepository {
       _game(session)
           .collection('hunterLocs')
           .snapshots()
-          .asyncMap((snap) => _decodeHunterLocs(session, snap));
+          .asyncMap((snap) => _decodeLocations(session, snap));
+
+  @override
+  Future<void> updateOutsideLocation(
+    GroupSession session,
+    LocationFix fix,
+  ) async {
+    await _game(session).collection('outsideLocs').doc(session.userId).set({
+      'updatedAt': FieldValue.serverTimestamp(),
+      'data': await session.crypto.encryptJson(fix.toJson()),
+    });
+  }
+
+  @override
+  Future<void> clearOutsideLocation(GroupSession session) =>
+      _game(session).collection('outsideLocs').doc(session.userId).delete();
+
+  @override
+  Stream<Map<String, LocationFix>> watchOutsideLocations(
+    GroupSession session,
+  ) =>
+      _game(session)
+          .collection('outsideLocs')
+          .snapshots()
+          .asyncMap((snap) => _decodeLocations(session, snap));
 
   @override
   Future<Map<String, LocationFix>> useJoker(GroupSession session) async {
@@ -117,7 +143,7 @@ class FirestoreRoundRepository implements RoundRepository {
         .doc(session.userId)
         .update({'jokerUsed': true, 'jokerAt': FieldValue.serverTimestamp()});
     final snap = await _game(session).collection('hunterLocs').get();
-    return _decodeHunterLocs(session, snap);
+    return _decodeLocations(session, snap);
   }
 
   @override

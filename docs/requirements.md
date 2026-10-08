@@ -40,6 +40,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-14 | Alle Mitglieder können die Einstellungen der Gruppe in der Lobby ansehen (schreibgeschützt, aktuell gehalten); bearbeiten kann sie nur der Host (vgl. R-SET-10). |
 | R-SET-15 | Einstellbar: „Reguläre Pings an alle Spieler“ (Standard: aus). Dann gehen die regulären Pings nicht nur an die Hunter, sondern an alle Spieler (R-PLAY-05); Speedhunt-Pings weiterhin nur an die Hunter. Schließt den Joker „Spieler-Standorte“ aus: Einschalten des einen schaltet den anderen ab. (2026-10-08) |
 | R-SET-16 | Einstellbar: „Anonyme Spieler“ (Standard: an, auch für bestehende Gruppen). Siehe R-ANON-01 … 04. (2026-10-08) |
+| R-SET-17 | Einstellbar: „Live-Standort beim Verlassen des Spielfelds“ (Standard: an, auch für bestehende Gruppen). Siehe R-OUT-01 … 06. (2026-10-08) |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -133,6 +134,18 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-ANON-03 | Spieler sehen immer die echten Namen (z.B. bei R-PLAY-03, R-PLAY-05). (2026-10-08) |
 | R-ANON-04 | Spieler sehen in der Übersicht, unter welcher Nummer die Hunter sie sehen („Für die Hunter bist du Spieler 3“). (2026-10-08) |
 | | Grenze: Die Anonymisierung betrifft nur die Anzeige. Die (verschlüsselten) Namen bleiben für alle Mitglieder lesbar – wer die App auseinandernimmt, könnte nachsehen. Unter Freunden ausreichend. |
+
+## 6b. Spielfeld verlassen
+
+| ID | Anforderung |
+|---|---|
+| R-OUT-01 | Mit R-SET-17 prüft das Handy jedes nicht gefangenen Spielers während Vorlauf und Jagd laufend, ob er das Spielfeld (R-GAME-02) verlassen hat. Hunter werden nicht geprüft. (2026-10-08) |
+| R-OUT-02 | Wegen der GPS-Streuung (20–30 m, im Feldtest gesehen) zählt ein Standort nur als „außerhalb“, wenn er mindestens **30 m + die doppelte vom Handy gemeldete Ungenauigkeit** jenseits der Grenze liegt (die gemeldete Ungenauigkeit ist nur ein 68-%-Radius und neben Gebäuden oft zu optimistisch; verdoppelt etwa 95 %). Beispiel: ±10 m → ab 50 m draußen. Standorte mit mehr als 30 m Ungenauigkeit oder ohne Angabe zählen nie als außerhalb. Ein falscher Live-Standort würde das Spiel zerstören – im Zweifel wird nichts gesendet. (2026-10-08) |
+| R-OUT-03 | Erst wenn ein Spieler **30 s ohne Unterbrechung** eindeutig außerhalb ist (mind. 5 Standorte, keine Lücke über 15 s), sehen die Hunter seinen Live-Standort (alle 5 s aktualisiert). Ein einziger unklarer oder innerer Standort beginnt die 30 s von vorn. Bei stockendem GPS fragt das Handy in der Zeit selbst nach. (2026-10-08) |
+| R-OUT-04 | Ist der Spieler wieder im Spielfeld, sehen die Hunter den Live-Standort noch **60 s** weiter, danach wird er gelöscht. Verlässt er das Feld in der Zeit erneut, ist er sofort wieder live. Wird er gefangen, endet die Zeit oder schließt sich die Runde, wird er sofort gelöscht. (2026-10-08) |
+| R-OUT-05 | Hunter sehen den Live-Standort als Pin in der Spielerfarbe mit rotem Live-Symbol und bekommen eine Benachrichtigung „… hat das Spielfeld verlassen“ – mit R-SET-16 als „Spieler n“ (R-ANON-01). Andere Spieler sehen ihn nie. (2026-10-08) |
+| R-OUT-06 | Der Spieler wird sofort gewarnt (Vibration, Benachrichtigung höchstens alle 2 min, rotes Banner mit Countdown „geh innerhalb von … zurück“). Solange die Hunter seinen Live-Standort sehen (auch während der 60 s), zeigt ein rotes Banner das dauerhaft an; Benachrichtigungen beim Start und Ende des Sendens. (2026-10-08) |
+| R-OUT-07 | Zum Einstellen der Schwellen im Feldtest protokolliert das Debug-Log (lange auf die Kopfzeile drücken) jeden Wechsel mit Grund, z.B. „warning (100 m out, ±10 m, needs 50 m)“, sowie höchstens alle 10 s Standorte, die zwar über 30 m draußen lagen, aber wegen der Ungenauigkeit nicht zählten („not counted …“). Das Log bleibt auf dem Gerät. (2026-10-08) |
 
 ## 7. Benachrichtigungen
 

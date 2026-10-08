@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/history/round_summary.dart';
 import '../../core/models/member.dart';
+import '../../core/round/boundary_watch.dart';
 import '../../core/round/notices.dart';
 import '../../core/round/ping_schedule.dart';
 import '../../core/round/player_aliases.dart';
@@ -58,6 +59,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   final _map = MapController();
   final _subscriptions = <ProviderSubscription<Object?>>[];
   StreamSubscription<PingSlot>? _pingsSentSub;
+  StreamSubscription<BoundaryEvent>? _boundarySub;
   var _lifecycle = AppLifecycleState.resumed;
   ({String title, String? body})? _banner;
   Timer? _bannerTimer;
@@ -96,6 +98,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     engine.log.value = ['screen opened'];
     _pingsSentSub = engine.pingsSent.listen(
       (slot) => _notify(PingSentNotice(slot.kind)),
+    );
+    _boundarySub = engine.boundaryEvents.listen(
+      (event) => _notify(OwnBoundaryNotice(event)),
     );
     // Location first, then notifications: Android drops a permission dialog
     // requested while another one is open (field test 2026-10-05).
@@ -264,8 +269,43 @@ class _GameScreenState extends ConsumerState<GameScreen>
       s.close();
     }
     unawaited(_pingsSentSub?.cancel());
+    unawaited(_boundarySub?.cancel());
     unawaited(_engine?.dispose());
     super.dispose();
+  }
+
+  /// Names as shown on this device: hunters see "Player 3" instead of the
+  /// players' names until the time is up (R-ANON-01 … R-ANON-03).
+  Map<String, String> _displayNames(
+    List<Member> members, {
+    required bool isHunter,
+    required GamePhase phase,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final aliases = completeAliases(widget.game.aliases, [
+      for (final m in members)
+        if (m.isPlayer) m.id,
+    ]);
+    final anonymous = showAliases(
+      enabled: widget.game.settings.anonymousPlayers,
+      isHunter: isHunter,
+      phase: phase,
+    );
+    return {
+      for (final m in members)
+        m.id: anonymous && m.isPlayer
+            ? l10n.playerAlias(aliases[m.id]!)
+            : m.name,
+    };
+  }
+
+  GamePhase _phaseNow() {
+    final startAt = widget.game.startAt;
+    if (startAt == null) return GamePhase.notStarted;
+    return GameClock(
+      startAt: startAt,
+      settings: widget.game.settings,
+    ).phaseAt(widget.now());
   }
 
   Member? _me(List<Member>? members) {
@@ -306,7 +346,33 @@ class _GameScreenState extends ConsumerState<GameScreen>
             : l10n.noticePingSent,
         null,
       ),
+      // Only hunters get it; anonymous like everything else they see
+      // (R-ANON-01).
+      PlayerOutsideNotice(:final playerId) => (
+        l10n.noticePlayerOutside(
+          _displayNames(
+                members ?? const [],
+                isHunter: true,
+                phase: _phaseNow(),
+              )[playerId] ??
+              '?',
+        ),
+        l10n.noticePlayerOutsideBody,
+      ),
+      OwnBoundaryNotice(:final event) => switch (event) {
+        BoundaryEvent.warning => (
+          l10n.noticeOutsideWarning,
+          l10n.noticeOutsideWarningBody(outsideGrace.inSeconds),
+        ),
+        BoundaryEvent.live => (
+          l10n.noticeOutsideLive,
+          l10n.noticeOutsideLiveBody(outsideAfterglow.inSeconds),
+        ),
+        BoundaryEvent.ended => (l10n.noticeOutsideEnded, null),
+      },
     };
+    // The own boundary state has its own permanent banner (R-OUT-06).
+    final banner = notice is! OwnBoundaryNotice;
     final notifications = ref.read(notificationServiceProvider);
     if (_lifecycle == AppLifecycleState.resumed) {
       // App open: own banner + vibration always (also when muted); the
@@ -316,6 +382,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       unawaited(
         notifications.show(title: title, body: body ?? '', foreground: true),
       );
+      if (!banner) return;
       _bannerTimer?.cancel();
       setState(() => _banner = (title: title, body: body));
       _bannerTimer = Timer(noticeBannerDuration(notice), () {
@@ -667,17 +734,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ? byAlias(widget.game.aliases, playerIds)
         : playerIds;
     final aliases = completeAliases(widget.game.aliases, playerIds);
-    final anonymous = showAliases(
-      enabled: settings.anonymousPlayers,
-      isHunter: isHunter,
-      phase: phase,
-    );
-    final names = {
-      for (final m in members)
-        m.id: anonymous && m.isPlayer
-            ? l10n.playerAlias(aliases[m.id]!)
-            : m.name,
-    };
+    final names = _displayNames(members, isHunter: isHunter, phase: phase);
     final playersByColor = playerColors(orderedPlayers);
 
     final (title, color, until) = switch (phase) {
@@ -792,6 +849,33 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         );
       }
+      // Players outside the play area, live (R-OUT-05) – always shown, on
+      // top. Caught players are left out, their devices stop sharing anyway.
+      final outside = {
+        for (final e
+            in (ref.watch(outsideLocationsProvider).value ??
+                    const <String, LocationFix>{})
+                .entries)
+          if (!caught.contains(e.key)) e.key: e.value,
+      };
+      ref.listen(outsideLocationsProvider, (_, next) {
+        final ids = next.value?.keys;
+        if (ids == null) return;
+        final caughtIds = {
+          for (final m in ref.read(membersProvider).value ?? const <Member>[])
+            if (m.caught) m.id,
+        };
+        _notices
+            .onOutside(ids.where((id) => !caughtIds.contains(id)))
+            .forEach(_notify);
+      });
+      layers.add(
+        outsidePlayersLayer(
+          positions: outside,
+          names: names,
+          colors: playersByColor,
+        ),
+      );
       void set(MapFilters f) => setState(() => _filters = f);
       filterItems.addAll([
         FilterItem(
@@ -1093,6 +1177,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Outside the play area: as long as the hunters see (or are
+                // about to see) the live location, the player sees it at the
+                // very top (R-OUT-06).
+                if (engine != null && isPlayer)
+                  ValueListenableBuilder(
+                    valueListenable: engine.boundary,
+                    builder: (_, boundary, _) =>
+                        _OutsideBanner(state: boundary, now: now),
+                  ),
                 // "Next ping(s) in …" on top, above the filters.
                 for (final line in infoLines)
                   Padding(
@@ -1268,6 +1361,61 @@ class _SpeedhuntBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The player is outside the play area (R-OUT-06): warning with countdown,
+/// then – as long as the hunters see the live location – a permanent notice.
+class _OutsideBanner extends StatelessWidget {
+  const _OutsideBanner({required this.state, required this.now});
+
+  final BoundaryState state;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final (icon, text) = switch (state.phase) {
+      BoundaryPhase.inside => (null, null),
+      BoundaryPhase.warning => (
+        Icons.warning_amber_rounded,
+        l10n.outsideWarning(_formatCountdown(state.liveAt!.difference(now))),
+      ),
+      BoundaryPhase.live => (Icons.wifi_tethering, l10n.outsideLive),
+      BoundaryPhase.afterglow => (
+        Icons.wifi_tethering,
+        l10n.outsideAfterglow(
+          _formatCountdown(state.afterglowUntil!.difference(now)),
+        ),
+      ),
+    };
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        key: Key('outsideBanner_${state.phase.name}'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.outside,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

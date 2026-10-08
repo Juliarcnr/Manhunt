@@ -88,9 +88,30 @@ void main() {
       await games.startGame(hunter);
       await rounds.sendPing(kim, slot, fix(52.5));
       await rounds.updateHunterLocation(hunter, fix(52.4));
+      await rounds.updateOutsideLocation(kim, fix(52.6));
       await games.endRound(hunter);
       expect(await rounds.watchAllPings(hunter).first, isEmpty);
       expect(await rounds.watchHunterLocations(hunter).first, isEmpty);
+      expect(await rounds.watchOutsideLocations(hunter).first, isEmpty);
+    });
+  });
+
+  group('live position outside the play area (R-OUT-03, R-OUT-04)', () {
+    test('overwritten while outside, encrypted, deleted when back', () async {
+      await rounds.updateOutsideLocation(kim, fix(52.654321));
+      await rounds.updateOutsideLocation(kim, fix(52.66, 1));
+      var locs = await rounds.watchOutsideLocations(hunter).first;
+      expect(locs.keys, ['kim']);
+      expect(locs['kim']!.point.lat, 52.66);
+      expect(db.dump(), isNot(contains('52.66')));
+      await rounds.clearOutsideLocation(kim);
+      locs = await rounds.watchOutsideLocations(hunter).first;
+      expect(locs, isEmpty);
+    });
+
+    test('clearing without a shared position is harmless', () async {
+      await rounds.clearOutsideLocation(kim);
+      expect(await rounds.watchOutsideLocations(hunter).first, isEmpty);
     });
   });
 

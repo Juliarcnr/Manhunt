@@ -141,4 +141,38 @@ void main() {
       expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isFalse);
     });
   });
+
+  group('live location outside the area (R-SET-17)', () {
+    testWidgets('on by default, can be switched off', (tester) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => SingleChildScrollView(
+                child: SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      const key = Key('outsideLiveLocationSwitch');
+      expect(
+        find.text('Live-Standort beim Verlassen des Spielfelds'),
+        findsOneWidget,
+      );
+      expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isTrue);
+      await tester.ensureVisible(find.byKey(key));
+      await tester.tap(find.byKey(key));
+      await tester.pumpAndSettle();
+      expect(settings.outsideLiveLocation, isFalse);
+      expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isFalse);
+    });
+  });
 }

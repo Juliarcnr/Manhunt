@@ -578,6 +578,18 @@ abstract class AppLocalizations {
   /// **'Hunters see “Player 1”, “Player 2” … instead of names – until the time is up. Players still see the real names.'**
   String get settingsAnonymousPlayersHint;
 
+  /// No description provided for @settingsOutsideLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location when leaving the area'**
+  String get settingsOutsideLive;
+
+  /// No description provided for @settingsOutsideLiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If a player is clearly outside the play area (at least 30 m plus GPS inaccuracy) for 30 s, the hunters see their live location – until they are back, plus 1 minute. The player is warned first.'**
+  String get settingsOutsideLiveHint;
+
   /// No description provided for @settingsArea.
   ///
   /// In en, this message translates to:
@@ -1189,6 +1201,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your location was sent to everyone'**
   String get noticePingSentAll;
+
+  /// No description provided for @noticeOutsideWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'You left the play area'**
+  String get noticeOutsideWarning;
+
+  /// No description provided for @noticeOutsideWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Go back within {seconds} s, or the hunters will see your live location.'**
+  String noticeOutsideWarningBody(int seconds);
+
+  /// No description provided for @noticeOutsideLive.
+  ///
+  /// In en, this message translates to:
+  /// **'The hunters see your live location'**
+  String get noticeOutsideLive;
+
+  /// No description provided for @noticeOutsideLiveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Until you are back in the play area, plus {seconds} s.'**
+  String noticeOutsideLiveBody(int seconds);
+
+  /// No description provided for @noticeOutsideEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your live location is no longer shared'**
+  String get noticeOutsideEnded;
+
+  /// No description provided for @noticePlayerOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'{player} left the play area'**
+  String noticePlayerOutside(String player);
+
+  /// No description provided for @noticePlayerOutsideBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You see their live location on the map.'**
+  String get noticePlayerOutsideBody;
+
+  /// No description provided for @outsideWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'You are outside the play area – go back within {time}, or the hunters will see your live location'**
+  String outsideWarning(String time);
+
+  /// No description provided for @outsideLive.
+  ///
+  /// In en, this message translates to:
+  /// **'The hunters see your live location right now – go back into the play area'**
+  String get outsideLive;
+
+  /// No description provided for @outsideAfterglow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back in the play area – the hunters still see your live location for {time}'**
+  String outsideAfterglow(String time);
 
   /// No description provided for @catchTitle.
   ///

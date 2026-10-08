@@ -63,7 +63,8 @@ service cloud.firestore {
 
     function isRoundCollection(name) {
       return name in [
-        'pings', 'hunterLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers'
+        'pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests',
+        'jokerAnswers'
       ];
     }
 
@@ -186,6 +187,18 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
           && request.resource.data.data is string;
         allow delete: if signedIn() && request.auth.uid == hunterId;
+      }
+
+      // Live position of a player outside the play area (R-OUT-03): hunters
+      // only, never other players (R-OUT-05). Written by the player's own
+      // device while outside, deleted by it when back inside.
+      match /outsideLocs/{playerId} {
+        allow read: if isHunter(gid);
+        allow create, update: if isRunning(gid) && isPlayer(gid)
+          && request.auth.uid == playerId
+          && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
+          && request.resource.data.data is string;
+        allow delete: if signedIn() && request.auth.uid == playerId;
       }
 
       // Catches (R-CATCH-01) and speedhunts (R-SPEED-02). Content encrypted;

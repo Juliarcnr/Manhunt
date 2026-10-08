@@ -12,7 +12,7 @@ import 'game_repository.dart';
 /// Firestore layout (see docs/architecture.md):
 /// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), aliases (encrypted, per round), startAt, createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
-/// - `games/{groupId}/{pings,hunterLocs,events}/…`: per-round data, deleted when the round ends
+/// - `games/{groupId}/{pings,hunterLocs,outsideLocs,events}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
 class FirestoreGameRepository implements GameRepository {
   FirestoreGameRepository(this._db, {DateTime Function()? now, Random? random})
@@ -34,6 +34,7 @@ class FirestoreGameRepository implements GameRepository {
   static const roundCollections = [
     'pings',
     'hunterLocs',
+    'outsideLocs',
     'events',
     'speedhuntTargets',
     'jokerRequests',

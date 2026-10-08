@@ -219,7 +219,7 @@ describe('rounds & cleanup', () => {
   const seedRoundData = () =>
     env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
-      for (const name of ['pings', 'hunterLocs', 'events', 'speedhuntTargets']) {
+      for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets']) {
         await setDoc(doc(db, 'games', GID, name, 'd1'), { data: 'enc' });
       }
     });
@@ -247,7 +247,7 @@ describe('rounds & cleanup', () => {
     await assertSucceeds(getDocs(collection(as('kim'), 'games', GID, 'events')));
     await assertFails(getDocs(collection(as('stranger'), 'games', GID, 'events')));
     await assertFails(deleteDoc(doc(as('kim'), 'games', GID, 'pings', 'd1')));
-    for (const name of ['pings', 'hunterLocs', 'events', 'speedhuntTargets']) {
+    for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets']) {
       await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID, name, 'd1')));
     }
   });
@@ -426,6 +426,63 @@ describe('running round (phase 5)', () => {
         }),
       );
       await assertFails(getDocs(collection(as('kim'), 'games', GID, 'hunterLocs')));
+    });
+  });
+
+  describe('live position outside the play area (R-OUT-03, R-OUT-05)', () => {
+    const outsideDoc = (db, uid) => doc(db, 'games', GID, 'outsideLocs', uid);
+    const setHostRole = (role) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+      );
+
+    test('player flow: share, update, delete own position', async () => {
+      const db = as('kim');
+      await assertSucceeds(setDoc(outsideDoc(db, 'kim'), hunterLoc()));
+      await assertSucceeds(setDoc(outsideDoc(db, 'kim'), hunterLoc()));
+      await assertSucceeds(deleteDoc(outsideDoc(db, 'kim')));
+      // Deleting again (e.g. after an app restart, nothing online) is fine.
+      await assertSucceeds(deleteDoc(outsideDoc(db, 'kim')));
+    });
+
+    test('hunter (host) lists them; players never see others or their own', async () => {
+      await assertSucceeds(setDoc(outsideDoc(as('kim'), 'kim'), hunterLoc()));
+      await assertSucceeds(getDocs(collection(as('admin'), 'games', GID, 'outsideLocs')));
+      await assertFails(getDocs(collection(as('sam'), 'games', GID, 'outsideLocs')));
+      await assertFails(getDoc(outsideDoc(as('sam'), 'kim')));
+      await assertFails(getDoc(outsideDoc(as('kim'), 'kim')));
+      await assertFails(getDocs(collection(as('stranger'), 'games', GID, 'outsideLocs')));
+    });
+
+    test('only for oneself, only players, only the known fields', async () => {
+      await assertFails(setDoc(outsideDoc(as('kim'), 'sam'), hunterLoc()));
+      await assertFails(setDoc(outsideDoc(as('admin'), 'admin'), hunterLoc()));
+      await assertFails(setDoc(outsideDoc(as('kim'), 'kim'), { ...hunterLoc(), name: 'Kim' }));
+      await assertFails(setDoc(outsideDoc(as('kim'), 'kim'), { updatedAt: serverTimestamp(), data: 1 }));
+      await assertSucceeds(setDoc(outsideDoc(as('kim'), 'kim'), hunterLoc()));
+      await assertFails(deleteDoc(outsideDoc(as('sam'), 'kim')));
+    });
+
+    test('host as player shares and deletes like any player', async () => {
+      await setHostRole('player');
+      await assertSucceeds(setDoc(outsideDoc(as('admin'), 'admin'), hunterLoc()));
+      await assertFails(getDocs(collection(as('admin'), 'games', GID, 'outsideLocs')));
+      await assertSucceeds(deleteDoc(outsideDoc(as('admin'), 'admin')));
+    });
+
+    test('host unassigned cannot share or read', async () => {
+      await setHostRole('unassigned');
+      await assertFails(setDoc(outsideDoc(as('admin'), 'admin'), hunterLoc()));
+      await assertFails(getDocs(collection(as('admin'), 'games', GID, 'outsideLocs')));
+    });
+
+    test('no sharing outside a running round', async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID), { status: 'lobby' }),
+      );
+      await assertFails(setDoc(outsideDoc(as('kim'), 'kim'), hunterLoc()));
+      // Clearing a leftover is still allowed.
+      await assertSucceeds(deleteDoc(outsideDoc(as('kim'), 'kim')));
     });
   });
 
@@ -665,7 +722,7 @@ describe('player joker (R-PLAY-03)', () => {
 // before deleting. This failed with "permission denied" for a host who was
 // not a hunter (bug found in the first field test, 2026-10-05).
 describe('clean-up flows list before deleting', () => {
-  const ROUND = ['pings', 'hunterLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers'];
+  const ROUND = ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers'];
 
   const seed = () =>
     env.withSecurityRulesDisabled(async (ctx) => {

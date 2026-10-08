@@ -1663,4 +1663,98 @@ void main() {
       });
     });
   });
+
+  group('leaving the play area (R-OUT-05, R-OUT-06)', () {
+    // ~170 m east of the triangular [area] (still on screen) / inside it.
+    const outside = GeoPoint(52.505, 13.4125);
+    const inside = GeoPoint(52.502, 13.409);
+
+    Future<void> shareOutside(WidgetTester tester, String userId) =>
+        tester.runAsync(() async {
+          await FirestoreRoundRepository(db).updateOutsideLocation(
+            await testSession(code, userId),
+            LocationFix(point: outside, at: now, accuracyM: 10),
+          );
+        });
+
+    Finder label(String key, String text) =>
+        find.descendant(of: find.byKey(Key(key)), matching: find.text(text));
+
+    testWidgets('hunters see the live pin and are told, anonymously '
+        '(R-ANON-01)', (tester) async {
+      const anon = GameSettings(area: area);
+      await seed(tester, gameSettings: anon);
+      final number = (await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .watchGame(await testSession(code, 'alex'))
+                .first,
+      ))!.aliases['kim'];
+      await shareOutside(tester, 'kim');
+      await pumpAs(tester, 'alex', gameSettings: anon);
+
+      expect(label('outside_kim', 'Player $number'), findsOneWidget);
+      expect(
+        notifications.shown.map((n) => n.title),
+        contains('Player $number left the play area'),
+      );
+      expect(find.textContaining('Kim'), findsNothing);
+    });
+
+    testWidgets('without anonymous players: real name', (tester) async {
+      await seed(tester);
+      await shareOutside(tester, 'kim');
+      await pumpAs(tester, 'alex');
+      expect(label('outside_kim', 'Kim'), findsOneWidget);
+      expect(find.text('Kim left the play area'), findsOneWidget);
+    });
+
+    testWidgets('players never see others outside', (tester) async {
+      await seed(tester);
+      await shareOutside(tester, 'sam');
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('outside_sam')), findsNothing);
+    });
+
+    testWidgets('the player is told the whole time their live location is '
+        'shared (R-OUT-06)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      Future<void> walk(GeoPoint p, int seconds) async {
+        for (var i = 0; i < seconds; i++) {
+          now = now.add(const Duration(seconds: 1));
+          location.emit(LocationFix(point: p, at: now, accuracyM: 10));
+          await tester.pump(const Duration(seconds: 1));
+        }
+      }
+
+      await walk(inside, 3);
+      expect(find.byKey(const Key('outsideBanner_inside')), findsNothing);
+      expect(find.textContaining('live location'), findsNothing);
+
+      await walk(outside, 10);
+      expect(find.byKey(const Key('outsideBanner_warning')), findsOneWidget);
+      expect(find.textContaining('go back within 00:21'), findsOneWidget);
+      expect(notifications.shown.last.title, 'You left the play area');
+
+      await walk(outside, 21);
+      expect(find.byKey(const Key('outsideBanner_live')), findsOneWidget);
+      expect(
+        notifications.shown.last.title,
+        'The hunters see your live location',
+      );
+
+      await walk(inside, 1);
+      expect(find.byKey(const Key('outsideBanner_afterglow')), findsOneWidget);
+      expect(find.textContaining('for 01:00'), findsOneWidget);
+
+      await walk(inside, 60);
+      expect(find.textContaining('live location'), findsNothing);
+      expect(
+        notifications.shown.last.title,
+        'Your live location is no longer shared',
+      );
+      await settle(tester);
+    });
+  });
 }

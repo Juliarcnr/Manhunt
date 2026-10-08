@@ -214,6 +214,19 @@ class SettingsForm extends StatelessWidget {
                   ? null
                   : (v) => change(s.copyWith(anonymousPlayers: v)),
             ),
+            SwitchListTile(
+              key: const Key('outsideLiveLocationSwitch'),
+              contentPadding: const EdgeInsets.only(right: 8),
+              title: Text(l10n.settingsOutsideLive),
+              subtitle: Text(
+                l10n.settingsOutsideLiveHint,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              value: s.outsideLiveLocation,
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(outsideLiveLocation: v)),
+            ),
           ],
         ),
       ],
