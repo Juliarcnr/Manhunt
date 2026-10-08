@@ -1244,6 +1244,12 @@ abstract class AppLocalizations {
   /// **'You see their live location on the map.'**
   String get noticePlayerOutsideBody;
 
+  /// No description provided for @outsideLiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get outsideLiveBadge;
+
   /// No description provided for @outsideWarning.
   ///
   /// In en, this message translates to:

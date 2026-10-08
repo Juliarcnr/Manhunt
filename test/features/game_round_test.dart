@@ -1706,6 +1706,8 @@ void main() {
       await shareOutside(tester, 'kim');
       await pumpAs(tester, 'alex');
       expect(label('outside_kim', 'Kim'), findsOneWidget);
+      // Red "LIVE" badge instead of a symbol before the name.
+      expect(label('outside_kim', 'LIVE'), findsOneWidget);
       expect(find.text('Kim left the play area'), findsOneWidget);
     });
 

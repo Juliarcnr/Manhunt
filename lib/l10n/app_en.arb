@@ -232,6 +232,7 @@
   "noticePlayerOutside": "{player} left the play area",
   "@noticePlayerOutside": {"placeholders": {"player": {"type": "String"}}},
   "noticePlayerOutsideBody": "You see their live location on the map.",
+  "outsideLiveBadge": "LIVE",
   "outsideWarning": "You are outside the play area – go back within {time}, or the hunters will see your live location",
   "@outsideWarning": {"placeholders": {"time": {"type": "String"}}},
   "outsideLive": "The hunters see your live location right now – go back into the play area",

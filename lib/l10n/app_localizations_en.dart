@@ -671,6 +671,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'You see their live location on the map.';
 
   @override
+  String get outsideLiveBadge => 'LIVE';
+
+  @override
   String outsideWarning(String time) {
     return 'You are outside the play area – go back within $time, or the hunters will see your live location';
   }

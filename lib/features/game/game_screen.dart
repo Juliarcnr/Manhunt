@@ -874,6 +874,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           positions: outside,
           names: names,
           colors: playersByColor,
+          liveLabel: l10n.outsideLiveBadge,
         ),
       );
       void set(MapFilters f) => setState(() => _filters = f);

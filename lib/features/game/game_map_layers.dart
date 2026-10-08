@@ -70,12 +70,14 @@ Widget huntersLayer({
 }
 
 /// Live positions of players outside the play area, for the hunters
-/// (R-OUT-05): a pin in the player's colour with a red "live" symbol before
-/// the name; it glides to each new position like the hunters' pins.
+/// (R-OUT-05): a pin in the player's colour with a red [liveLabel] badge
+/// ("LIVE") before the name; it glides to each new position like the
+/// hunters' pins.
 Widget outsidePlayersLayer({
   required Map<String, LocationFix> positions,
   required Map<String, String> names,
   required Map<String, Color> colors,
+  required String liveLabel,
 }) => AnimatedMarkerLayer(
   key: const Key('outsidePlayers'),
   markers: [
@@ -90,8 +92,7 @@ Widget outsidePlayersLayer({
           name: names[id] ?? '?',
           color: colors[id] ?? AppColors.player,
           icon: Icons.person_pin_circle,
-          labelIcon: Icons.wifi_tethering,
-          labelColor: AppColors.outside,
+          badge: liveLabel,
         ),
       ),
   ],
@@ -367,7 +368,7 @@ class _NamedPin extends StatelessWidget {
     required this.color,
     required this.icon,
     this.labelIcon,
-    this.labelColor,
+    this.badge,
   });
 
   final String name;
@@ -377,8 +378,8 @@ class _NamedPin extends StatelessWidget {
   /// Optional role symbol before the name.
   final IconData? labelIcon;
 
-  /// Colour of [labelIcon]; [color] if not set.
-  final Color? labelColor;
+  /// Optional red text badge before the name, e.g. "LIVE".
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -396,8 +397,27 @@ class _NamedPin extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (labelIcon case final labelIcon?) ...[
-                Icon(labelIcon, size: 13, color: labelColor ?? color),
+                Icon(labelIcon, size: 13, color: color),
                 const SizedBox(width: 3),
+              ],
+              if (badge case final badge?) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.outside,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
               ],
               Flexible(
                 child: Text(

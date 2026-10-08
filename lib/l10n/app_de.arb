@@ -206,6 +206,7 @@
   "noticeOutsideEnded": "Dein Live-Standort wird nicht mehr gesendet",
   "noticePlayerOutside": "{player} hat das Spielfeld verlassen",
   "noticePlayerOutsideBody": "Du siehst den Live-Standort auf der Karte.",
+  "outsideLiveBadge": "LIVE",
   "outsideWarning": "Du bist außerhalb des Spielfelds – geh innerhalb von {time} zurück, sonst sehen die Hunter deinen Live-Standort",
   "outsideLive": "Die Hunter sehen gerade deinen Live-Standort – geh zurück ins Spielfeld",
   "outsideAfterglow": "Zurück im Spielfeld – die Hunter sehen deinen Live-Standort noch {time}",
