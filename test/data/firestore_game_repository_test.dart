@@ -319,6 +319,41 @@ void main() {
       expect(round.abortedEarly, isFalse); // ended after the planned 3 h
     });
 
+    test('an undone catch is forgotten, others stay (R-CATCH-04)', () async {
+      final start = now;
+      final sam = await testSession(code, 'sam');
+      await repo.joinGame(sam, name: 'Sam');
+      final members = await repo.watchMembers(admin).first;
+      await repo.setRoles(admin, [
+        for (final m in members)
+          m.copyWith(role: m.id == 'admin' ? Role.hunter : Role.player),
+      ]);
+      await repo.startGame(admin);
+      await gameDoc().update({'startAt': Timestamp.fromDate(start)});
+      // Reported twice (hunter + self), plus another player.
+      for (final c in [
+        CatchRecord(playerId: 'guest', at: start.add(const Duration(hours: 1))),
+        CatchRecord(playerId: 'guest', at: start.add(const Duration(hours: 1))),
+        CatchRecord(playerId: 'sam', at: start.add(const Duration(hours: 2))),
+      ]) {
+        await repo.recordCatch(admin, c);
+      }
+
+      await repo.undoCatch(admin, 'guest');
+
+      final after = await repo.watchMembers(admin).first;
+      expect(after.firstWhere((m) => m.id == 'guest').caught, isFalse);
+      expect(after.firstWhere((m) => m.id == 'sam').caught, isTrue);
+      final catches = await repo.watchCatches(admin).first;
+      expect(catches.map((c) => c.playerId), ['sam']);
+
+      now = start.add(const Duration(hours: 3));
+      await repo.endRound(admin);
+      final round = (await repo.watchHistory(admin).first).single;
+      expect(round.catches.map((c) => c.player), ['Sam']);
+      expect(round.survivors, ['Kim']);
+    });
+
     test('history survives "end game", catch events do not', () async {
       await playRound(
         catches: [CatchRecord(playerId: 'guest', at: now)],

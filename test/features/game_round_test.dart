@@ -193,35 +193,51 @@ void main() {
       expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
     });
 
-    testWidgets('host removes someone via the overview (R-LOBBY-09)', (
-      tester,
-    ) async {
+    Future<void> catchSam(WidgetTester tester) => tester.runAsync(
+      () async => FirestoreGameRepository(db).recordCatch(
+        await testSession(code, 'alex'),
+        CatchRecord(
+          playerId: 'sam',
+          at: start.add(const Duration(minutes: 20)),
+        ),
+      ),
+    );
+
+    testWidgets('host undoes a catch via the overview, nobody is removed '
+        'during a round (R-CATCH-04, R-LOBBY-09)', (tester) async {
       await seed(tester);
+      await catchSam(tester);
       await pumpAs(tester, 'alex');
       await tester.tap(find.byKey(const Key('overviewButton')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('overviewRemove_alex')), findsNothing);
-      await tester.tap(find.byKey(const Key('overviewRemove_sam')));
+      expect(find.byKey(const Key('overviewRemove_kim')), findsNothing);
+      // Only caught players can be taken back.
+      expect(find.byKey(const Key('overviewUndoCatch_kim')), findsNothing);
+      await tester.tap(find.byKey(const Key('overviewUndoCatch_sam')));
       await tester.pumpAndSettle();
-      expect(find.text('Remove Sam?'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('confirmRemove')));
+      expect(find.text('Undo the catch of Sam?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirmUndoCatch')));
       await settle(tester);
 
+      final session = (await tester.runAsync(() => testSession(code, 'alex')))!;
+      final repo = FirestoreGameRepository(db);
       final members = await tester.runAsync(
-        () async =>
-            FirestoreGameRepository(db)
-                .watchMembers(await testSession(code, 'alex'))
-                .first,
+        () => repo.watchMembers(session).first,
       );
-      expect(members!.map((m) => m.id), isNot(contains('sam')));
+      expect(members!.firstWhere((m) => m.id == 'sam').caught, isFalse);
+      final catches = await tester.runAsync(
+        () => repo.watchCatches(session).first,
+      );
+      expect(catches, isEmpty);
     });
 
-    testWidgets('players cannot remove anyone', (tester) async {
+    testWidgets('players cannot undo a catch (R-CATCH-04)', (tester) async {
       await seed(tester);
+      await catchSam(tester);
       await pumpAs(tester, 'kim');
       await tester.tap(find.byKey(const Key('overviewButton')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('overviewRemove_sam')), findsNothing);
+      expect(find.byKey(const Key('overviewUndoCatch_sam')), findsNothing);
     });
 
     testWidgets('speedhunt during head start is refused', (tester) async {

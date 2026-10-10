@@ -1304,6 +1304,30 @@ abstract class AppLocalizations {
   /// **'Yes, caught'**
   String get catchSelfConfirm;
 
+  /// No description provided for @undoCatchAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo catch'**
+  String get undoCatchAction;
+
+  /// No description provided for @undoCatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo the catch of {name}?'**
+  String undoCatchTitle(String name);
+
+  /// No description provided for @undoCatchText.
+  ///
+  /// In en, this message translates to:
+  /// **'For when the wrong person was reported: they are no longer caught and play on as usual.'**
+  String get undoCatchText;
+
+  /// No description provided for @undoCatchConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo catch'**
+  String get undoCatchConfirm;
+
   /// No description provided for @historyTitle.
   ///
   /// In en, this message translates to:

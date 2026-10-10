@@ -55,7 +55,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-07 | Geht ein Handy verloren, tritt man der Gruppe einfach neu bei (keine Wiederherstellung nötig). |
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
-| R-LOBBY-09 | Der Host kann Mitglieder aus der Gruppe entfernen – in der Lobby (Symbol neben der Person) und während einer Runde (Übersicht), jeweils mit Rückfrage. Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
+| R-LOBBY-09 | Der Host kann Mitglieder in der Lobby aus der Gruppe entfernen (Symbol neben der Person, mit Rückfrage). Während einer Runde nicht mehr – dort gibt es stattdessen „Catch rückgängig“ (R-CATCH-04, geändert am 2026-10-10). Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 
 ### Mehrere Gruppen
 
@@ -165,6 +165,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-CATCH-01 | Ein Catch kann von einem Hunter (für einen Spieler) **oder** vom gefangenen Spieler selbst gemeldet werden. |
 | R-CATCH-02 | Gefangene Spieler werden in der Übersicht durchgestrichen dargestellt. |
 | R-CATCH-03 | Es wird nur festgehalten, **dass** jemand gefangen wurde, nicht von wem. Der Catch-Dialog für Hunter fragt nur nach dem Spieler; auch Historie und Benachrichtigungen nennen keinen Hunter. (Geändert am 2026-10-05; vorher „Gefangen von“-Feld.) |
+| R-CATCH-04 | Der Host kann während der Runde in der Übersicht einen Catch rückgängig machen (Symbol neben gefangenen Spielern, mit Rückfrage) – als Sicherheitsmechanismus, falls jemand Falsches eingetragen wurde. Die Catch-Ereignisse des Spielers werden gelöscht (tauchen nicht in der Historie auf; ein dadurch beendeter Speedhunt läuft – falls noch nicht abgelaufen – weiter) und der Spieler nimmt wieder ganz regulär am Spiel teil. (2026-10-10) |
 
 ## 8a. Historie
 

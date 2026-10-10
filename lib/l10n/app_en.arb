@@ -245,6 +245,11 @@
   "catchSelfTitle": "I was caught",
   "catchSelfText": "You will be marked as caught and everyone will be notified.",
   "catchSelfConfirm": "Yes, caught",
+  "undoCatchAction": "Undo catch",
+  "undoCatchTitle": "Undo the catch of {name}?",
+  "@undoCatchTitle": {"placeholders": {"name": {"type": "String"}}},
+  "undoCatchText": "For when the wrong person was reported: they are no longer caught and play on as usual.",
+  "undoCatchConfirm": "Undo catch",
 
   "historyTitle": "History",
   "historyEmpty": "No finished rounds yet. After „End game“ each round appears here – without locations.",

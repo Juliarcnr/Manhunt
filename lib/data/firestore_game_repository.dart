@@ -276,6 +276,26 @@ class FirestoreGameRepository implements GameRepository {
   }
 
   @override
+  Future<void> undoCatch(GroupSession session, String playerId) async {
+    final events = await _game(session)
+        .collection('events')
+        .where('type', isEqualTo: 'catch')
+        .get();
+    final batch = _db.batch();
+    for (final doc in events.docs) {
+      final json = await session.crypto.decryptJson(
+        doc.data()['data'] as String,
+      );
+      if (CatchRecord.fromJson(json! as Map<String, Object?>).playerId ==
+          playerId) {
+        batch.delete(doc.reference);
+      }
+    }
+    batch.update(_members(session).doc(playerId), {'caught': false});
+    await batch.commit();
+  }
+
+  @override
   Stream<List<CatchRecord>> watchCatches(GroupSession session) =>
       _game(session)
           .collection('events')

@@ -217,6 +217,10 @@
   "catchSelfTitle": "Ich wurde gefangen",
   "catchSelfText": "Du wirst als gefangen markiert und alle bekommen eine Benachrichtigung.",
   "catchSelfConfirm": "Ja, gefangen",
+  "undoCatchAction": "Catch rückgängig machen",
+  "undoCatchTitle": "Catch von {name} rückgängig machen?",
+  "undoCatchText": "Falls jemand Falsches eingetragen wurde: Die Person gilt nicht mehr als gefangen und spielt ganz normal weiter.",
+  "undoCatchConfirm": "Rückgängig machen",
 
   "historyTitle": "Historie",
   "historyEmpty": "Noch keine beendeten Runden. Nach „Spiel beenden“ erscheint hier jede Runde – ohne Standorte.",

@@ -714,6 +714,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get catchSelfConfirm => 'Ja, gefangen';
 
   @override
+  String get undoCatchAction => 'Catch rückgängig machen';
+
+  @override
+  String undoCatchTitle(String name) {
+    return 'Catch von $name rückgängig machen?';
+  }
+
+  @override
+  String get undoCatchText =>
+      'Falls jemand Falsches eingetragen wurde: Die Person gilt nicht mehr als gefangen und spielt ganz normal weiter.';
+
+  @override
+  String get undoCatchConfirm => 'Rückgängig machen';
+
+  @override
   String get historyTitle => 'Historie';
 
   @override

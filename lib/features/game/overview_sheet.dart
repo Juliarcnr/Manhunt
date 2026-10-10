@@ -12,7 +12,7 @@ Future<void> showOverviewSheet(
   required String myId,
   String? myAlias,
   required bool speedhuntRunning,
-  void Function(Member member)? onRemove,
+  void Function(Member member)? onUndoCatch,
 }) => showModalBottomSheet<void>(
   context: context,
   showDragHandle: true,
@@ -22,7 +22,7 @@ Future<void> showOverviewSheet(
     myId: myId,
     myAlias: myAlias,
     speedhuntRunning: speedhuntRunning,
-    onRemove: onRemove,
+    onUndoCatch: onUndoCatch,
   ),
 );
 
@@ -33,7 +33,7 @@ class OverviewSheet extends StatelessWidget {
     required this.myId,
     this.myAlias,
     required this.speedhuntRunning,
-    this.onRemove,
+    this.onUndoCatch,
   });
 
   final List<Member> members;
@@ -43,8 +43,8 @@ class OverviewSheet extends StatelessWidget {
   final String? myAlias;
   final bool speedhuntRunning;
 
-  /// Host only: remove someone from the group (R-LOBBY-09).
-  final void Function(Member member)? onRemove;
+  /// Host only: take back a wrongly reported catch (R-CATCH-04).
+  final void Function(Member member)? onUndoCatch;
 
   @override
   Widget build(BuildContext context) {
@@ -99,17 +99,14 @@ class OverviewSheet extends StatelessWidget {
         children: [
           if (m.caught)
             const Icon(Icons.back_hand_outlined, color: AppColors.textMuted),
-          if (onRemove != null && m.id != myId)
+          if (onUndoCatch != null && m.caught)
             IconButton(
-              key: Key('overviewRemove_${m.id}'),
-              tooltip: l10n.lobbyRemove,
-              icon: const Icon(
-                Icons.person_remove_outlined,
-                color: AppColors.textMuted,
-              ),
+              key: Key('overviewUndoCatch_${m.id}'),
+              tooltip: l10n.undoCatchAction,
+              icon: const Icon(Icons.undo, color: AppColors.textMuted),
               onPressed: () {
                 Navigator.pop(context);
-                onRemove!(m);
+                onUndoCatch!(m);
               },
             ),
         ],

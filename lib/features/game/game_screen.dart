@@ -486,22 +486,22 @@ class _GameScreenState extends ConsumerState<GameScreen>
     if (mounted) setState(() => _ending = false);
   }
 
-  /// Host removes someone during the round (R-LOBBY-09).
-  Future<void> _removeMember(Member m) async {
+  /// Host takes back a wrongly reported catch (R-CATCH-04). [m] carries the
+  /// name as this device shows it.
+  Future<void> _undoCatch(Member m) async {
     final l10n = AppLocalizations.of(context);
     if (!await _confirm(
-      icon: Icons.person_remove_outlined,
-      color: Colors.redAccent,
-      title: l10n.lobbyRemoveMember(m.name),
-      text: l10n.removeMemberText,
-      action: l10n.lobbyRemove,
-      actionKey: const Key('confirmRemove'),
-      destructive: true,
+      icon: Icons.undo,
+      color: AppColors.player,
+      title: l10n.undoCatchTitle(m.name),
+      text: l10n.undoCatchText,
+      action: l10n.undoCatchConfirm,
+      actionKey: const Key('confirmUndoCatch'),
     )) {
       return;
     }
     await _run(
-      () => ref.read(gameRepositoryProvider).removeMember(widget.session, m.id),
+      () => ref.read(gameRepositoryProvider).undoCatch(widget.session, m.id),
     );
   }
 
@@ -1139,7 +1139,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                   ? l10n.playerAlias(aliases[widget.session.userId]!)
                   : null,
               speedhuntRunning: running != null,
-              onRemove: _isAdmin ? _removeMember : null,
+              onUndoCatch: _isAdmin ? _undoCatch : null,
             ),
           ),
           if (_isAdmin)

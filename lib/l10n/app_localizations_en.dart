@@ -707,6 +707,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catchSelfConfirm => 'Yes, caught';
 
   @override
+  String get undoCatchAction => 'Undo catch';
+
+  @override
+  String undoCatchTitle(String name) {
+    return 'Undo the catch of $name?';
+  }
+
+  @override
+  String get undoCatchText =>
+      'For when the wrong person was reported: they are no longer caught and play on as usual.';
+
+  @override
+  String get undoCatchConfirm => 'Undo catch';
+
+  @override
   String get historyTitle => 'History';
 
   @override

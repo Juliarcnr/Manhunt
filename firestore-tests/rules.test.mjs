@@ -502,6 +502,59 @@ describe('running round (phase 5)', () => {
       await assertFails(updateDoc(doc(as('kim'), 'games', GID, 'members', 'kim'), { caught: false }));
       await assertFails(updateDoc(doc(as('sam'), 'games', GID, 'members', 'kim'), { caught: false }));
     });
+
+    // Undo as FirestoreGameRepository.undoCatch does it (R-CATCH-04): list
+    // the catch events, delete the player's ones and un-catch in one batch.
+    const undoFlow = async (uid, player) => {
+      const db = as(uid);
+      const events = await getDocs(
+        query(collection(db, 'games', GID, 'events'), where('type', '==', 'catch')),
+      );
+      const batch = writeBatch(db);
+      for (const e of events.docs) batch.delete(e.ref);
+      batch.update(doc(db, 'games', GID, 'members', player), { caught: false });
+      await batch.commit();
+    };
+    const catchKim = async () => {
+      const db = as('kim');
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'games', GID, 'events', 'c1'), {
+        type: 'catch', createdAt: serverTimestamp(), data: 'enc',
+      });
+      batch.update(doc(db, 'games', GID, 'members', 'kim'), { caught: true });
+      await assertSucceeds(batch.commit());
+    };
+    const setRole = (uid, role) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', uid), { role }),
+      );
+
+    for (const role of ['hunter', 'player', 'unassigned']) {
+      test(`host (${role}) undoes a catch (R-CATCH-04)`, async () => {
+        await catchKim();
+        await setRole('admin', role);
+        await assertSucceeds(undoFlow('admin', 'kim'));
+        const kim = await getDoc(doc(as('kim'), 'games', GID, 'members', 'kim'));
+        assert.equal(kim.data().caught, false);
+        const events = await getDocs(collection(as('kim'), 'games', GID, 'events'));
+        assert.equal(events.size, 0);
+      });
+    }
+
+    test('host undoes their own catch as player (R-CATCH-04)', async () => {
+      await setRole('admin', 'player');
+      await assertSucceeds(updateDoc(doc(as('admin'), 'games', GID, 'members', 'admin'), { caught: true }));
+      await assertSucceeds(undoFlow('admin', 'admin'));
+    });
+
+    test('other hunters and players cannot undo a catch (R-CATCH-04)', async () => {
+      await catchKim();
+      await setRole('sam', 'hunter');
+      await assertFails(undoFlow('sam', 'kim'));
+      await setRole('sam', 'player');
+      await assertFails(undoFlow('sam', 'kim'));
+      await assertFails(undoFlow('kim', 'kim'));
+    });
   });
 
   describe('speedhunt (R-SPEED-02, R-SPEED-04)', () => {

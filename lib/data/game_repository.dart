@@ -94,6 +94,11 @@ abstract interface class GameRepository {
   /// Catches of the current round, for notifications (R-NOTIF-02).
   Stream<List<CatchRecord>> watchCatches(GroupSession session);
 
+  /// Host only: takes back a wrongly reported catch (R-CATCH-04). Deletes the
+  /// player's catch events – so history and speedhunt forget it – and marks
+  /// them as not caught; they play on as usual.
+  Future<void> undoCatch(GroupSession session, String playerId);
+
   /// Host ends the round (R-GAME-06): saves a [RoundSummary] to the history
   /// (R-HIST-02), deletes all locations and round events (R-PRIV-03), resets
   /// caught/joker and returns the group to the lobby.

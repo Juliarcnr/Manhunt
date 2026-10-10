@@ -80,6 +80,8 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Wird das Ziel während des Speedhunts gefangen, endet er sofort (R-SPEED-10): Der Melder (Hunter oder Ziel selbst, beide
   kennen das Ziel) schreibt den Speedhunt-Start ins verschlüsselte Catch-Event (`CatchRecord.endsSpeedhunt`); alle
   Geräte setzen daraus `Speedhunt.endedAt` (`applyCatches` in den Providern) → keine weiteren Pings/⚡-Pings, Banner aus.
+- Catch rückgängig (R-CATCH-04): der Host löscht die Catch-Events des Spielers und setzt `caught` zurück (`undoCatch`) →
+  alle Geräte leiten Gefangen-Status, Speedhunt-Ende und Historie wieder aus den verbleibenden Daten ab.
 - Joker: einmal pro Spieler und Spiel; per Einstellung abschaltbar (`jokerEnabled`).
 - Reguläre Pings: bei `n × pingInterval` nach Start, kein Ping exakt bei Spielende.
 
