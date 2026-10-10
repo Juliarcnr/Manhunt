@@ -216,6 +216,9 @@
 
   "noticeCaught": "{player} was caught",
   "@noticeCaught": {"placeholders": {"player": {"type": "String"}}},
+  "noticeReleased": "{player} is back in the game",
+  "@noticeReleased": {"placeholders": {"player": {"type": "String"}}},
+  "noticeReleasedSelf": "You are back in the game",
   "noticeSpeedhunt": "Speedhunt started!",
   "noticeSpeedhuntBody": "A player will be located {pings}× every {minutes} min.",
   "@noticeSpeedhuntBody": {"placeholders": {"pings": {"type": "int"}, "minutes": {"type": "int"}}},

@@ -56,6 +56,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   var _ending = false;
   RoundEngine? _engine;
   final _notices = NoticeTracker();
+
   final _map = MapController();
   final _subscriptions = <ProviderSubscription<Object?>>[];
   StreamSubscription<PingSlot>? _pingsSentSub;
@@ -128,7 +129,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
           next,
         ) {
           final catches = next.value;
-          if (catches != null) _notices.onCatches(catches).forEach(_notify);
+          if (catches == null) return;
+          for (final notice in _notices.onCatches(catches)) {
+            if (notice is ReleaseNotice) {
+              unawaited(_announceRelease(notice));
+            } else {
+              _notify(notice);
+            }
+          }
         }, fireImmediately: true),
       )
       ..add(
@@ -315,6 +323,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return null;
   }
 
+  /// "Back in the game" (R-CATCH-05). Ending a round deletes all catches too,
+  /// but only after the group is back in the lobby – so check the (plain)
+  /// status first; the decrypted [GameInfo] may still lag behind.
+  Future<void> _announceRelease(ReleaseNotice notice) async {
+    final status = await ref
+        .read(gameRepositoryProvider)
+        .watchStatus(widget.session.groupId)
+        .first;
+    if (status == GameStatus.running) _notify(notice);
+  }
+
   /// In-app banner + vibration in the foreground, system notification in the
   /// background (R-NOTIF-01).
   void _notify(GameNotice notice) {
@@ -328,6 +347,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final (title, body) = switch (notice) {
       CatchNotice(:final record) => (
         l10n.noticeCaught(names[record.playerId] ?? '?'),
+        null,
+      ),
+      // Real name for everyone, like the catch (R-CATCH-05).
+      ReleaseNotice(:final playerId) => (
+        playerId == widget.session.userId
+            ? l10n.noticeReleasedSelf
+            : l10n.noticeReleased(names[playerId] ?? '?'),
         null,
       ),
       SpeedhuntNotice(:final speedhunt) => (

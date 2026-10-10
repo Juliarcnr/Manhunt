@@ -166,6 +166,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-CATCH-02 | Gefangene Spieler werden in der Übersicht durchgestrichen dargestellt. |
 | R-CATCH-03 | Es wird nur festgehalten, **dass** jemand gefangen wurde, nicht von wem. Der Catch-Dialog für Hunter fragt nur nach dem Spieler; auch Historie und Benachrichtigungen nennen keinen Hunter. (Geändert am 2026-10-05; vorher „Gefangen von“-Feld.) |
 | R-CATCH-04 | Der Host kann während der Runde in der Übersicht einen Catch rückgängig machen (Symbol neben gefangenen Spielern, mit Rückfrage) – als Sicherheitsmechanismus, falls jemand Falsches eingetragen wurde. Die Catch-Ereignisse des Spielers werden gelöscht (tauchen nicht in der Historie auf; ein dadurch beendeter Speedhunt läuft – falls noch nicht abgelaufen – weiter) und der Spieler nimmt wieder ganz regulär am Spiel teil. (2026-10-10) |
+| R-CATCH-05 | Wird ein Catch rückgängig gemacht (R-CATCH-04), bekommt die betroffene Person „Du bist wieder im Spiel“, alle anderen (Spieler und Hunter) „[Name] ist wieder im Spiel“ – mit dem echten Namen, auch mit R-SET-16. Erkannt wird das am Verschwinden der Catch-Einträge; am Rundenende (dort werden alle gelöscht) gibt es keine solche Meldung. (2026-10-10) |
 
 ## 8a. Historie
 

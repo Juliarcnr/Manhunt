@@ -14,6 +14,12 @@ class CatchNotice extends GameNotice {
   final CatchRecord record;
 }
 
+/// The host took back [playerId]'s catch; they play on (R-CATCH-05).
+class ReleaseNotice extends GameNotice {
+  const ReleaseNotice(this.playerId);
+  final String playerId;
+}
+
 /// A speedhunt started – deliberately without target (R-NOTIF-04, R-SPEED-04).
 class SpeedhuntNotice extends GameNotice {
   const SpeedhuntNotice(this.speedhunt);
@@ -52,6 +58,7 @@ class OwnBoundaryNotice extends GameNotice {
 /// nothing, so old events are not announced again.
 class NoticeTracker {
   Set<String>? _catches;
+  Set<String> _caught = const {};
   Set<String>? _speedhunts;
   Set<String>? _outside;
 
@@ -63,7 +70,9 @@ class NoticeTracker {
 
   List<GameNotice> onCatches(List<CatchRecord> catches) {
     final known = _catches;
+    final knownCaught = _caught;
     _catches = {for (final c in catches) _catchKey(c)};
+    _caught = {for (final c in catches) c.playerId};
     if (known == null) return const [];
     // One catch per player, even if hunter and player both reported it.
     final announced = <String>{};
@@ -71,6 +80,10 @@ class NoticeTracker {
       for (final c in catches)
         if (!known.contains(_catchKey(c)) && announced.add(c.playerId))
           CatchNotice(c),
+      // All catches of a player gone: the host undid them (R-CATCH-04). At
+      // round end they vanish too – the caller must not announce those.
+      for (final id in knownCaught)
+        if (!_caught.contains(id)) ReleaseNotice(id),
     ];
   }
 

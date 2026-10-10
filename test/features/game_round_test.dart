@@ -229,6 +229,61 @@ void main() {
         () => repo.watchCatches(session).first,
       );
       expect(catches, isEmpty);
+      expect(find.text('Sam is back in the game'), findsOneWidget);
+    });
+
+    Future<void> undoSam(WidgetTester tester) async {
+      await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .undoCatch(await testSession(code, 'alex'), 'sam'),
+      );
+      await settle(tester);
+    }
+
+    testWidgets('the player is told they are back in the game (R-CATCH-05)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await catchSam(tester);
+      await pumpAs(tester, 'sam');
+      expect(find.byKey(const Key('selfCatchButton')), findsNothing);
+      await undoSam(tester);
+      expect(find.text('You are back in the game'), findsOneWidget);
+      expect(
+        notifications.shown.map((n) => n.title),
+        contains('You are back in the game'),
+      );
+      expect(find.byKey(const Key('selfCatchButton')), findsOneWidget);
+    });
+
+    testWidgets('other players are told by real name (R-CATCH-05)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await catchSam(tester);
+      await pumpAs(tester, 'kim');
+      await undoSam(tester);
+      expect(find.text('Sam is back in the game'), findsOneWidget);
+    });
+
+    testWidgets('ending the round is no "back in the game" (R-CATCH-05)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await catchSam(tester);
+      await pumpAs(tester, 'kim');
+      await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .endRound(await testSession(code, 'alex')),
+      );
+      await settle(tester);
+      expect(find.textContaining('back in the game'), findsNothing);
+      expect(
+        notifications.shown.map((n) => n.title),
+        isNot(contains('Sam is back in the game')),
+      );
     });
 
     testWidgets('players cannot undo a catch (R-CATCH-04)', (tester) async {
@@ -1632,6 +1687,21 @@ void main() {
         await tapFilter(tester, 'caught');
         expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
         expect(find.text('Sam'), findsNothing);
+      });
+
+      testWidgets('hunters are told by real name when a catch is undone '
+          '(R-CATCH-05)', (tester) async {
+        await seed(tester, gameSettings: anon);
+        final games = FirestoreGameRepository(db);
+        final alex = (await tester.runAsync(() => testSession(code, 'alex')))!;
+        await tester.runAsync(
+          () =>
+              games.recordCatch(alex, CatchRecord(playerId: 'sam', at: start)),
+        );
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        await tester.runAsync(() => games.undoCatch(alex, 'sam'));
+        await settle(tester);
+        expect(find.text('Sam is back in the game'), findsOneWidget);
       });
 
       testWidgets('real names once the time is up (R-ANON-02)', (tester) async {

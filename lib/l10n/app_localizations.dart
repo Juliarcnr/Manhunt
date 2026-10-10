@@ -1172,6 +1172,18 @@ abstract class AppLocalizations {
   /// **'{player} was caught'**
   String noticeCaught(String player);
 
+  /// No description provided for @noticeReleased.
+  ///
+  /// In en, this message translates to:
+  /// **'{player} is back in the game'**
+  String noticeReleased(String player);
+
+  /// No description provided for @noticeReleasedSelf.
+  ///
+  /// In en, this message translates to:
+  /// **'You are back in the game'**
+  String get noticeReleasedSelf;
+
   /// No description provided for @noticeSpeedhunt.
   ///
   /// In en, this message translates to:

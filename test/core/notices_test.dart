@@ -36,6 +36,26 @@ void main() {
       expect(notices, hasLength(1));
     });
 
+    test('an undone catch is announced once (R-CATCH-05)', () {
+      final tracker = NoticeTracker()
+        ..onCatches([])
+        ..onCatches([c('kim', 5), c('kim', 6), c('sam', 7)]);
+      final notices = tracker.onCatches([c('sam', 7)]);
+      expect((notices.single as ReleaseNotice).playerId, 'kim');
+      expect(tracker.onCatches([c('sam', 7)]), isEmpty);
+      // Caught again later: a new catch.
+      expect(
+        tracker.onCatches([c('sam', 7), c('kim', 20)]).single,
+        isA<CatchNotice>(),
+      );
+    });
+
+    test('no release from the first snapshot (R-CATCH-05)', () {
+      final tracker = NoticeTracker();
+      expect(tracker.onCatches([]), isEmpty);
+      expect(tracker.onCatches([]), isEmpty);
+    });
+
     test('new speedhunt is announced', () {
       final tracker = NoticeTracker()..onSpeedhunts([sh(10)]);
       final notices = tracker.onSpeedhunts([sh(10), sh(40)]);

@@ -625,6 +625,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String noticeReleased(String player) {
+    return '$player is back in the game';
+  }
+
+  @override
+  String get noticeReleasedSelf => 'You are back in the game';
+
+  @override
   String get noticeSpeedhunt => 'Speedhunt started!';
 
   @override

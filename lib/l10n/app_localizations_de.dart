@@ -631,6 +631,14 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String noticeReleased(String player) {
+    return '$player ist wieder im Spiel';
+  }
+
+  @override
+  String get noticeReleasedSelf => 'Du bist wieder im Spiel';
+
+  @override
   String get noticeSpeedhunt => 'Speedhunt gestartet!';
 
   @override

@@ -124,6 +124,8 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   gefangene Spieler; tickt alle 5 s. Spieler: `duePings` → `sendPing` (Doc-ID `{uid}_{slotId}` ⇒ idempotent,
   die Regeln verbieten Überschreiben; >3 min verspätete Pings werden verworfen). Hunter: Live-Position alle 15 s.
 - Benachrichtigungen: `NoticeTracker` meldet nur *neue* Catches/Speedhunts (erster Snapshot = Basis).
+  Verschwinden alle Catches eines Spielers, meldet er „wieder im Spiel“ (R-CATCH-05) – außer die Runde ist laut Server
+  schon beendet (beim Rundenende werden alle Catch-Events gelöscht).
   Vordergrund → In-App-Banner + `HapticFeedback.vibrate`, Hintergrund → `NotificationService` (System, vibriert).
 - Hunter-only-Streams (`allPingsProvider`, `hunterLocationsProvider`) nur bei Hunter-Rolle beobachten,
   `jokerRequestsProvider` nur bei Spieler-Rolle, `sharedPingsProvider` nur bei Spieler-Rolle mit `sharedPings`.
