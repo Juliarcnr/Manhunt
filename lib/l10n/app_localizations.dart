@@ -896,6 +896,18 @@ abstract class AppLocalizations {
   /// **'Time is up'**
   String get gamePhaseTimeUp;
 
+  /// No description provided for @gamePhaseHuntersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunters won'**
+  String get gamePhaseHuntersWon;
+
+  /// No description provided for @gamePhasePlayersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Player wins} other{Players win}}'**
+  String gamePhasePlayersWon(int count);
+
   /// No description provided for @gameTimeUpHint.
   ///
   /// In en, this message translates to:
@@ -1166,6 +1178,36 @@ abstract class AppLocalizations {
   /// **'No hunter positions available right now.'**
   String get jokerNoHunters;
 
+  /// No description provided for @noticeHuntersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'All players caught – the hunters won!'**
+  String get noticeHuntersWon;
+
+  /// No description provided for @noticePlayersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'Time is up – {names} {count, plural, =1{has} other{have}} won!'**
+  String noticePlayersWon(String names, int count);
+
+  /// No description provided for @nameList.
+  ///
+  /// In en, this message translates to:
+  /// **'{rest} and {last}'**
+  String nameList(String rest, String last);
+
+  /// No description provided for @overviewHuntersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'The hunters won – all players were caught'**
+  String get overviewHuntersWon;
+
+  /// No description provided for @overviewPlayersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'{names} {count, plural, =1{was never caught and has} other{were never caught and have}} won'**
+  String overviewPlayersWon(String names, int count);
+
   /// No description provided for @noticeCaught.
   ///
   /// In en, this message translates to:
@@ -1339,6 +1381,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Undo catch'**
   String get undoCatchConfirm;
+
+  /// No description provided for @lastCatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Last player – hunters win'**
+  String get lastCatchTitle;
+
+  /// No description provided for @lastCatchText.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the last player still in the game. With this catch the hunters have won.\n\nThis cannot be undone. The round is not officially over yet, but from then on every hunter and every player can look at the past locations of everyone until the host ends the round.'**
+  String get lastCatchText;
+
+  /// No description provided for @lastCatchConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, hunters win'**
+  String get lastCatchConfirm;
 
   /// No description provided for @historyTitle.
   ///

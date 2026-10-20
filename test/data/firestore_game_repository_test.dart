@@ -239,6 +239,57 @@ void main() {
     });
   });
 
+  group('round over (R-GAME-06, R-GAME-08)', () {
+    test('the duration is kept in plain text for the rules', () async {
+      await createDefault();
+      expect((await gameDoc().get()).data()!['durationSec'], 3 * 3600);
+      // Groups from before the field get it with the next start.
+      await gameDoc().update({'durationSec': FieldValue.delete()});
+      await repo.startGame(admin);
+      expect((await gameDoc().get()).data()!['durationSec'], 3 * 3600);
+      await repo.updateSettings(
+        admin,
+        const GameSettings(duration: Duration(hours: 2)),
+      );
+      expect((await gameDoc().get()).data()!['durationSec'], 2 * 3600);
+    });
+
+    test('catching the last player marks the round as won, ending and '
+        'starting clear it', () async {
+      await createDefault();
+      await repo.joinGame(guest, name: 'Kim');
+      await repo.startGame(admin);
+      await repo.recordCatch(
+        admin,
+        CatchRecord(playerId: 'guest', at: now),
+        finishes: true,
+      );
+      final game = await repo.watchGame(admin).first;
+      expect(game!.finishedAt, isNotNull);
+      expect(
+        (await repo.watchMembers(admin).first)
+            .firstWhere((m) => m.id == 'guest')
+            .caught,
+        isTrue,
+      );
+
+      await repo.endRound(admin);
+      expect((await repo.watchGame(admin).first)!.finishedAt, isNull);
+
+      await gameDoc().update({'finishedAt': Timestamp.fromDate(now)});
+      await repo.startGame(admin);
+      expect((await repo.watchGame(admin).first)!.finishedAt, isNull);
+    });
+
+    test('a normal catch does not end the round', () async {
+      await createDefault();
+      await repo.joinGame(guest, name: 'Kim');
+      await repo.startGame(admin);
+      await repo.recordCatch(admin, CatchRecord(playerId: 'guest', at: now));
+      expect((await repo.watchGame(admin).first)!.finishedAt, isNull);
+    });
+  });
+
   group('end round (R-GAME-06, R-PRIV-03)', () {
     test('deletes all round data, keeps group and members', () async {
       await createDefault();

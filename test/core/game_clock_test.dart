@@ -26,6 +26,43 @@ void main() {
     });
   });
 
+  group('hunters won: last player caught (R-GAME-08)', () {
+    final won = GameClock(
+      startAt: start,
+      settings: settings,
+      finishedAt: at(50),
+    );
+
+    test('the round ends at the last catch, like time up', () {
+      expect(won.phaseAt(at(49)), GamePhase.hunting);
+      expect(won.phaseAt(at(50)), GamePhase.ended);
+      expect(won.endAt, at(50));
+      expect(won.plannedEndAt, at(180));
+      expect(won.huntersWon, isTrue);
+    });
+
+    test('no regular pings after it', () {
+      expect(won.regularPingTimes(), [at(20), at(40)]);
+      expect(won.nextRegularPing(at(45)), isNull);
+    });
+
+    test('a leftover from an earlier round (before the start) is ignored', () {
+      final leftover = GameClock(
+        startAt: start,
+        settings: settings,
+        finishedAt: at(-60),
+      );
+      expect(leftover.huntersWon, isFalse);
+      expect(leftover.endAt, at(180));
+      expect(leftover.phaseAt(at(30)), GamePhase.hunting);
+    });
+
+    test('without it the planned end applies', () {
+      expect(clock.endAt, at(180));
+      expect(clock.huntersWon, isFalse);
+    });
+  });
+
   group('regular pings (R-PING-02)', () {
     test('first ping at minute 20, then every 20 min, none at the end', () {
       final times = clock.regularPingTimes();

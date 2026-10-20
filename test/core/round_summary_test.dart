@@ -70,6 +70,19 @@ void main() {
       expect(RoundSummary.fromJson(endAt(90).toJson()).abortedEarly, isTrue);
     });
 
+    test('a round the hunters won early is no abort (R-GAME-08)', () {
+      final s = RoundSummary.build(
+        round: 1,
+        startedAt: start,
+        endedAt: at(90),
+        members: members,
+        catches: const [],
+        plannedDuration: const Duration(hours: 3),
+        finishedAt: at(80),
+      );
+      expect(s.abortedEarly, isFalse);
+    });
+
     test('catches of people who left the group are skipped', () {
       final s = build([CatchRecord(playerId: 'gone', at: at(30))]);
       expect(s.catches, isEmpty);

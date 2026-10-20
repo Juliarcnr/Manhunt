@@ -12,6 +12,8 @@ Future<void> showOverviewSheet(
   required String myId,
   String? myAlias,
   required bool speedhuntRunning,
+  String? winner,
+  Set<String> winnerIds = const {},
   void Function(Member member)? onUndoCatch,
 }) => showModalBottomSheet<void>(
   context: context,
@@ -22,6 +24,8 @@ Future<void> showOverviewSheet(
     myId: myId,
     myAlias: myAlias,
     speedhuntRunning: speedhuntRunning,
+    winner: winner,
+    winnerIds: winnerIds,
     onUndoCatch: onUndoCatch,
   ),
 );
@@ -33,6 +37,8 @@ class OverviewSheet extends StatelessWidget {
     required this.myId,
     this.myAlias,
     required this.speedhuntRunning,
+    this.winner,
+    this.winnerIds = const {},
     this.onUndoCatch,
   });
 
@@ -42,6 +48,12 @@ class OverviewSheet extends StatelessWidget {
   /// The number the hunters see for this player, e.g. "Player 3" (R-ANON-04).
   final String? myAlias;
   final bool speedhuntRunning;
+
+  /// Who won, once the round is over (R-GAME-09), e.g. "The hunters won".
+  final String? winner;
+
+  /// Members who won; they get a trophy.
+  final Set<String> winnerIds;
 
   /// Host only: take back a wrongly reported catch (R-CATCH-04).
   final void Function(Member member)? onUndoCatch;
@@ -97,6 +109,12 @@ class OverviewSheet extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (winnerIds.contains(m.id))
+            Icon(
+              Icons.emoji_events,
+              key: Key('overviewWinner_${m.id}'),
+              color: AppColors.speedhunt,
+            ),
           if (m.caught)
             const Icon(Icons.back_hand_outlined, color: AppColors.textMuted),
           if (onUndoCatch != null && m.caught)
@@ -147,6 +165,34 @@ class OverviewSheet extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+            if (winner case final winner?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Container(
+                  key: const Key('overviewWinner'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.speedhunt.withValues(alpha: 0.15),
+                    border: Border.all(color: AppColors.speedhunt),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.emoji_events,
+                        color: AppColors.speedhunt,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          winner,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             Padding(

@@ -75,6 +75,7 @@ void main() {
     WidgetTester tester,
     String userId, {
     GameSettings gameSettings = settings,
+    DateTime? finishedAt,
   }) async {
     final session = (await tester.runAsync(() => testSession(code, userId)))!;
     // Anonymous numbers as shuffled by the host at the start (R-ANON-01).
@@ -102,6 +103,7 @@ void main() {
               status: GameStatus.running,
               settings: gameSettings,
               startAt: start,
+              finishedAt: finishedAt,
               aliases: aliases ?? const {},
             ),
             now: () => now,
@@ -1843,6 +1845,307 @@ void main() {
         'Your live location is no longer shared',
       );
       await settle(tester);
+    });
+  });
+
+  group('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () {
+    const timeUpHint =
+        'The round keeps running so you can look at the '
+        'locations together. The host ends it.';
+
+    Future<void> regularPing(WidgetTester tester, String player) =>
+        tester.runAsync(
+          () async => FirestoreRoundRepository(db).sendPing(
+            await testSession(code, player),
+            PingSlot(
+              id: 'regular_1',
+              kind: PingKind.regular,
+              at: start.add(const Duration(minutes: 20)),
+            ),
+            LocationFix(
+              point: const GeoPoint(52.505, 13.405),
+              at: start.add(const Duration(minutes: 20)),
+            ),
+          ),
+        );
+
+    Future<void> catchByRepo(WidgetTester tester, String player) =>
+        tester.runAsync(
+          () async => FirestoreGameRepository(db).recordCatch(
+            await testSession(code, 'alex'),
+            CatchRecord(
+              playerId: player,
+              at: start.add(const Duration(minutes: 25)),
+            ),
+          ),
+        );
+
+    Future<Map<String, dynamic>> gameDoc(WidgetTester tester) async {
+      final session = (await tester.runAsync(() => testSession(code, 'alex')))!;
+      final snap = await tester.runAsync(
+        () => db.collection('games').doc(session.groupId).get(),
+      );
+      return snap!.data()!;
+    }
+
+    Future<bool> caught(WidgetTester tester, String player) async {
+      final members = await tester.runAsync(
+        () async =>
+            FirestoreGameRepository(db)
+                .watchMembers(await testSession(code, 'alex'))
+                .first,
+      );
+      return members!.firstWhere((m) => m.id == player).caught;
+    }
+
+    Future<void> hunterCatches(WidgetTester tester, String name) async {
+      await tester.tap(find.byKey(const Key('catchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('catchPlayer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirmCatch')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('time up: players get the hunter view and the hint '
+        '(R-GAME-06)', (tester) async {
+      await seed(tester);
+      await regularPing(tester, 'sam');
+      now = start.add(settings.duration + const Duration(minutes: 5));
+      await pumpAs(tester, 'kim');
+
+      for (final id in ['hunters', 'lastPings', 'player_kim', 'player_sam']) {
+        expect(find.byKey(Key('filter_$id')), findsOneWidget, reason: id);
+      }
+      expect(find.byKey(const Key('filter_myPings')), findsNothing);
+      // Sam's ping, which Kim could not see during the game.
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+      expect(find.text(timeUpHint), findsOneWidget);
+      expect(find.byKey(const Key('jokerButton')), findsNothing);
+    });
+
+    testWidgets('while the game is on players keep their own view', (
+      tester,
+    ) async {
+      await seed(tester);
+      await regularPing(tester, 'sam');
+      await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('filter_myPings')), findsOneWidget);
+      expect(find.byKey(const Key('filter_player_sam')), findsNothing);
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+    });
+
+    testWidgets('catching a player who is not the last needs no extra '
+        'confirmation (R-GAME-08)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'alex');
+      await hunterCatches(tester, 'Sam');
+      expect(find.byKey(const Key('confirmLastCatch')), findsNothing);
+      await settle(tester);
+      expect(await caught(tester, 'sam'), isTrue);
+      expect((await gameDoc(tester))['finishedAt'], isNull);
+    });
+
+    testWidgets('hunter catches the last player: confirmation, then the '
+        'hunters won (R-GAME-08)', (tester) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await pumpAs(tester, 'alex');
+
+      // Cancel: no catch at all.
+      await hunterCatches(tester, 'Sam');
+      expect(find.text('Last player – hunters win'), findsOneWidget);
+      expect(find.textContaining('cannot be undone'), findsOneWidget);
+      expect(find.textContaining('every player can look'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await settle(tester);
+      expect(await caught(tester, 'sam'), isFalse);
+      expect((await gameDoc(tester))['finishedAt'], isNull);
+
+      await hunterCatches(tester, 'Sam');
+      await tester.tap(find.byKey(const Key('confirmLastCatch')));
+      await settle(tester);
+      expect(await caught(tester, 'sam'), isTrue);
+      expect((await gameDoc(tester))['finishedAt'], isNotNull);
+    });
+
+    testWidgets('the last player reports their own catch: confirmation, then '
+        'the hunters won (R-GAME-08)', (tester) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await pumpAs(tester, 'sam');
+      await tester.tap(find.byKey(const Key('selfCatchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirmSelfCatch')));
+      await tester.pumpAndSettle();
+      expect(find.text('Last player – hunters win'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirmLastCatch')));
+      await settle(tester);
+      expect(await caught(tester, 'sam'), isTrue);
+      expect((await gameDoc(tester))['finishedAt'], isNotNull);
+    });
+
+    testWidgets('after the hunters won it is like time up for everyone '
+        '(R-GAME-08)', (tester) async {
+      await seed(tester);
+      await regularPing(tester, 'sam');
+      await catchByRepo(tester, 'kim');
+      await catchByRepo(tester, 'sam');
+      await pumpAs(
+        tester,
+        'kim',
+        finishedAt: now.subtract(const Duration(minutes: 1)),
+      );
+      expect(find.text('HUNTERS WON'), findsOneWidget);
+      expect(find.text(timeUpHint), findsOneWidget);
+      // Kim was caught, but now the time-up hint is enough.
+      expect(find.textContaining('You were caught'), findsNothing);
+      // Caught players split up again, like after the time (R-HUNT-11).
+      expect(find.byKey(const Key('filter_caught')), findsNothing);
+      expect(find.byKey(const Key('filter_player_sam')), findsOneWidget);
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+    });
+
+    testWidgets('time up: a banner names the players who won, then goes; '
+        'the overview keeps it (R-GAME-09)', (tester) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await pumpAs(tester, 'alex');
+      const banner = 'Time is up – Sam has won!';
+      expect(find.text(banner), findsNothing);
+
+      now = start.add(settings.duration);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text(banner), findsOneWidget);
+      expect(notifications.shown.map((n) => n.title), contains(banner));
+      // Header: no names, they are in the overview.
+      expect(find.text('PLAYER WINS'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 16));
+      expect(find.text(banner), findsNothing);
+
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('overviewWinner')),
+          matching: find.text('Sam was never caught and has won'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('overviewWinner_sam')), findsOneWidget);
+      expect(find.byKey(const Key('overviewWinner_kim')), findsNothing);
+      expect(find.byKey(const Key('overviewWinner_alex')), findsNothing);
+    });
+
+    testWidgets('the last catch arrives: banner "hunters won" for everyone '
+        '(R-GAME-08, R-GAME-09)', (tester) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await pumpAs(tester, 'kim');
+      await catchByRepo(tester, 'sam');
+      // The game document now carries finishedAt.
+      await pumpAs(tester, 'kim', finishedAt: now);
+      expect(
+        find.text('All players caught – the hunters won!'),
+        findsOneWidget,
+      );
+      // Short: the header says it permanently (R-GAME-09).
+      await tester.pump(const Duration(seconds: 6));
+      expect(find.text('All players caught – the hunters won!'), findsNothing);
+      expect(find.text('HUNTERS WON'), findsOneWidget);
+    });
+
+    testWidgets('caught while others are still in the game: only the hint, '
+        'no other positions (R-GAME-06, R-CATCH-01)', (tester) async {
+      await seed(tester);
+      await regularPing(tester, 'sam');
+      await catchByRepo(tester, 'kim');
+      await pumpAs(tester, 'kim');
+      expect(
+        find.text('You were caught – your location is no longer shared.'),
+        findsOneWidget,
+      );
+      expect(find.text(timeUpHint), findsNothing);
+      for (final id in ['hunters', 'lastPings', 'player_sam']) {
+        expect(find.byKey(Key('filter_$id')), findsNothing, reason: id);
+      }
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+      expect(find.byKey(const Key('selfCatchButton')), findsNothing);
+    });
+
+    testWidgets('time up with several players left: all are named '
+        '(R-GAME-09)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      now = start.add(settings.duration);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Time is up – Kim and Sam have won!'), findsOneWidget);
+      expect(find.text('PLAYERS WIN'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 16));
+    });
+
+    testWidgets('time up with everyone caught: the hunters won (R-GAME-09)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await catchByRepo(tester, 'sam');
+      await pumpAs(tester, 'sam');
+      now = start.add(settings.duration);
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        find.text('All players caught – the hunters won!'),
+        findsOneWidget,
+      );
+      expect(find.text('HUNTERS WON'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 16));
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('The hunters won – all players were caught'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('overviewWinner_alex')), findsOneWidget);
+    });
+
+    testWidgets('no winner in the overview while the game is on '
+        '(R-GAME-09)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overviewWinner')), findsNothing);
+      expect(find.byIcon(Icons.emoji_events), findsNothing);
+    });
+
+    testWidgets('opening the app after the end: no banner again, but the '
+        'overview tells who won (R-GAME-09)', (tester) async {
+      await seed(tester);
+      now = start.add(settings.duration + const Duration(minutes: 5));
+      await pumpAs(tester, 'sam');
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.textContaining('have won!'), findsNothing);
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.text('Kim and Sam were never caught and have won'), findsOne);
+    });
+
+    testWidgets('after the hunters won the host cannot undo catches '
+        '(R-CATCH-04, R-GAME-08)', (tester) async {
+      await seed(tester);
+      await catchByRepo(tester, 'kim');
+      await catchByRepo(tester, 'sam');
+      await pumpAs(
+        tester,
+        'alex',
+        finishedAt: now.subtract(const Duration(minutes: 1)),
+      );
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overviewUndoCatch_sam')), findsNothing);
+      expect(find.byKey(const Key('overviewUndoCatch_kim')), findsNothing);
     });
   });
 }

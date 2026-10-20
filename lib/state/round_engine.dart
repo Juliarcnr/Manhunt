@@ -151,7 +151,11 @@ class RoundEngine {
     final startAt = _game?.startAt;
     final game = _game;
     if (startAt == null || game == null) return null;
-    return GameClock(startAt: startAt, settings: game.settings);
+    return GameClock(
+      startAt: startAt,
+      settings: game.settings,
+      finishedAt: game.finishedAt,
+    );
   }
 
   /// This player's ping plan incl. speedhunts; empty for hunters. For display

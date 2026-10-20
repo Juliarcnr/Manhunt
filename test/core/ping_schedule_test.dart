@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
+import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/core/schedule/game_clock.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
@@ -340,6 +341,30 @@ void main() {
     test('after the time is up nobody counts as caught on the map', () {
       expect(caughtOnMap({'a'}, GamePhase.hunting), {'a'});
       expect(caughtOnMap({'a'}, GamePhase.ended), isEmpty);
+    });
+  });
+
+  group('isLastPlayer (R-GAME-08)', () {
+    const members = [
+      Member(id: 'h', name: 'Alex', role: Role.hunter),
+      Member(id: 'k', name: 'Kim', role: Role.player, caught: true),
+      Member(id: 's', name: 'Sam', role: Role.player),
+      Member(id: 'u', name: 'Uli'),
+    ];
+
+    test('only the one player still in the game is the last', () {
+      expect(isLastPlayer(members, 's'), isTrue);
+      expect(isLastPlayer(members, 'k'), isFalse);
+      expect(isLastPlayer(members, 'h'), isFalse);
+    });
+
+    test('not while others are still in the game', () {
+      final more = [
+        ...members,
+        const Member(id: 'l', name: 'Lou', role: Role.player),
+      ];
+      expect(isLastPlayer(more, 's'), isFalse);
+      expect(isLastPlayer(more, 'l'), isFalse);
     });
   });
 }

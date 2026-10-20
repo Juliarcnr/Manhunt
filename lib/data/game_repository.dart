@@ -14,6 +14,7 @@ class GameInfo {
     required this.status,
     required this.settings,
     this.startAt,
+    this.finishedAt,
     this.name,
     this.aliases = const {},
   });
@@ -24,6 +25,10 @@ class GameInfo {
 
   /// Start of the current round; null in the lobby.
   final DateTime? startAt;
+
+  /// When the last player was caught and the hunters won (R-GAME-08); null
+  /// otherwise and in the lobby.
+  final DateTime? finishedAt;
 
   /// Group name (R-GROUPS-04); null for groups created before names existed.
   final String? name;
@@ -89,7 +94,13 @@ abstract interface class GameRepository {
 
   /// Records a catch in the current round and marks the player as caught
   /// (R-CATCH-01, R-CATCH-02). Who reported it is not stored (R-CATCH-03).
-  Future<void> recordCatch(GroupSession session, CatchRecord record);
+  /// [finishes]: it is the last player – the hunters have won and the round
+  /// is over as if the time were up (R-GAME-08).
+  Future<void> recordCatch(
+    GroupSession session,
+    CatchRecord record, {
+    bool finishes = false,
+  });
 
   /// Catches of the current round, for notifications (R-NOTIF-02).
   Stream<List<CatchRecord>> watchCatches(GroupSession session);

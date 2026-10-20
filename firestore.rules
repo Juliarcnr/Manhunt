@@ -43,6 +43,25 @@ service cloud.firestore {
       return game(gid).status == 'running';
     }
 
+    // The round's time is up or the hunters caught everyone (R-GAME-06,
+    // R-GAME-08), but the host has not ended it yet: everyone may look at all
+    // positions. `durationSec` is the plain copy of the encrypted duration.
+    function roundOver(gid) {
+      let g = game(gid);
+      return g.status == 'running' && g.get('startAt', null) is timestamp
+        && (finishedThisRound(g)
+          || (g.get('durationSec', null) is int
+            && request.time >= g.startAt + duration.value(g.durationSec, 's')));
+    }
+
+    // A finishedAt from before the start is a leftover of an earlier round
+    // (ended by an older app that did not clear it) and does not count.
+    function finishedThisRound(g) {
+      return g.get('finishedAt', null) is timestamp
+        && g.get('startAt', null) is timestamp
+        && g.finishedAt >= g.startAt;
+    }
+
     // A player who just used the joker may read hunter positions for 2 minutes.
     function jokerWindowOpen(gid) {
       return isPlayer(gid)
@@ -80,11 +99,13 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(
-             ['adminUid', 'status', 'name', 'settings', 'area', 'sharedPings', 'startAt', 'createdAt', 'expiresAt'])
+             ['adminUid', 'status', 'name', 'settings', 'area', 'sharedPings', 'durationSec', 'startAt', 'createdAt', 'expiresAt'])
         // Group name (R-GROUPS-04) is optional and encrypted.
         && request.resource.data.get('name', '') is string
         // "Regular pings to all players" (R-SET-15), plain for the ping rules.
         && request.resource.data.get('sharedPings', false) is bool
+        // Plain round duration for roundOver().
+        && request.resource.data.get('durationSec', 0) is int
         && request.resource.data.adminUid == request.auth.uid
         && request.resource.data.status == 'lobby'
         && request.resource.data.settings is string
@@ -98,6 +119,16 @@ service cloud.firestore {
           && validExpiry())
         // Any member opening the group extends its lifetime (R-PRIV-05).
         || (isMember(gid) && onlyChanges(['expiresAt']) && validExpiry())
+        // Catching the last player: the hunters won (R-GAME-08). Once, by a
+        // hunter or by the player reporting their own catch in the same batch –
+        // so no player can unlock all positions while still in the game.
+        || (isRunning(gid) && onlyChanges(['finishedAt'])
+            && !finishedThisRound(resource.data)
+            && request.resource.data.finishedAt == request.time
+            && (isHunter(gid)
+              || (isPlayer(gid) && myMember(gid).caught == false
+                && getAfter(/databases/$(database)/documents/games/$(gid)/members/$(request.auth.uid))
+                     .data.caught == true)))
         // Any member may edit the (encrypted) play area while in the lobby (R-SET-10).
         || (isMember(gid) && resource.data.status == 'lobby'
             && onlyChanges(['area', 'expiresAt'])
@@ -164,9 +195,11 @@ service cloud.firestore {
       // Location pings of players (R-PING-01). Hunters read all, players
       // only their own (R-HUNT-03, R-PLAY-01) – or, if the host lets the
       // regular pings go to everyone, all regular ones; never speedhunt pings
-      // (R-SET-15, R-SPEED-04). One doc per slot, never edited.
+      // (R-SET-15, R-SPEED-04). Once the round is over, players read all
+      // (R-GAME-06). One doc per slot, never edited.
       match /pings/{pingId} {
         allow read: if isHunter(gid)
+          || (isPlayer(gid) && roundOver(gid))
           || (isMember(gid) && resource.data.uid == request.auth.uid)
           || (isPlayer(gid) && game(gid).get('sharedPings', false) == true
             && resource.data.kind == 'regular');
@@ -179,9 +212,11 @@ service cloud.firestore {
       }
 
       // Live hunter positions (R-HUNT-02): hunters only; a player right after
-      // using their joker may read them once (R-PLAY-02).
+      // using their joker may read them once (R-PLAY-02), all players once the
+      // round is over (R-GAME-06).
       match /hunterLocs/{hunterId} {
-        allow read: if isHunter(gid) || jokerWindowOpen(gid);
+        allow read: if isHunter(gid) || jokerWindowOpen(gid)
+          || (isPlayer(gid) && roundOver(gid));
         allow create, update: if isRunning(gid) && isHunter(gid)
           && request.auth.uid == hunterId
           && request.resource.data.keys().hasOnly(['updatedAt', 'data'])

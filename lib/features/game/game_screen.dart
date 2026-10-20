@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 import 'package:intl/intl.dart';
 
 import '../../core/history/round_summary.dart';
@@ -12,6 +13,7 @@ import '../../core/round/boundary_watch.dart';
 import '../../core/round/notices.dart';
 import '../../core/round/ping_schedule.dart';
 import '../../core/round/player_aliases.dart';
+import '../../core/round/round_result.dart';
 import '../../core/schedule/game_clock.dart';
 import '../../core/schedule/speedhunt.dart';
 import '../../data/game_repository.dart';
@@ -74,10 +76,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _ticker = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => setState(() {}),
-    );
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      // The time running out is no event, so check every second.
+      _checkRoundOver();
+      setState(() {});
+    });
   }
 
   @override
@@ -110,11 +113,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
     _subscriptions
       ..add(
-        ref.listenManual(
-          membersProvider,
-          (_, _) => _feedEngine(),
-          fireImmediately: true,
-        ),
+        ref.listenManual(membersProvider, (_, _) {
+          _feedEngine();
+          _checkRoundOver();
+        }, fireImmediately: true),
       )
       ..add(
         ref.listenManual(
@@ -151,6 +153,34 @@ class _GameScreenState extends ConsumerState<GameScreen>
       );
     engine.speedhuntSnapshots.addListener(_onSpeedhuntSnapshots);
     _feedEngine();
+  }
+
+  /// Who won, once the round is over (R-GAME-09); null while the game is on
+  /// and while the members are not loaded yet.
+  RoundResult? _result(List<Member> members) =>
+      roundResult(clock: _clock(), now: widget.now(), members: members);
+
+  /// Announces the winners once when the round becomes over (R-GAME-09). The
+  /// first check with loaded members is the baseline: a round already over
+  /// when opening the app is not announced again.
+  void _checkRoundOver() {
+    final members = ref.read(membersProvider).value;
+    // Not loaded yet (the first value may be an empty list): no baseline.
+    if (members == null || !members.any((m) => m.isPlayer)) return;
+    _notices.onRoundOver(_result(members)).forEach(_notify);
+  }
+
+  /// "Kim, Sam and Lou".
+  String _nameList(List<String> names) => names.length < 2
+      ? names.join()
+      : AppLocalizations.of(
+          context,
+        ).nameList(names.sublist(0, names.length - 1).join(', '), names.last);
+
+  /// Real names of the winning players (R-ANON-02: the round is over).
+  String _winnerNames(PlayersWon result, List<Member> members) {
+    final names = {for (final m in members) m.id: m.name};
+    return _nameList([for (final id in result.playerIds) names[id] ?? '?']);
   }
 
   /// The player's own ⚡ pings (R-SPEED-09) as ping records, oldest first.
@@ -258,6 +288,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void didUpdateWidget(GameScreen old) {
     super.didUpdateWidget(old);
     _feedEngine();
+    // The hunters' win arrives with the game (R-GAME-08).
+    _checkRoundOver();
     // The start time arrives a moment after "start" (server timestamp).
     unawaited(_loadJokers());
   }
@@ -273,6 +305,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _ticker?.cancel();
     _map.dispose();
     _bannerTimer?.cancel();
+    for (final t in _retryTimers.values) {
+      t.cancel();
+    }
     for (final s in _subscriptions) {
       s.close();
     }
@@ -307,13 +342,31 @@ class _GameScreenState extends ConsumerState<GameScreen>
     };
   }
 
-  GamePhase _phaseNow() {
+  /// Null while the start time is still missing (server timestamp).
+  GameClock? _clock() {
     final startAt = widget.game.startAt;
-    if (startAt == null) return GamePhase.notStarted;
+    if (startAt == null) return null;
     return GameClock(
       startAt: startAt,
       settings: widget.game.settings,
-    ).phaseAt(widget.now());
+      finishedAt: widget.game.finishedAt,
+    );
+  }
+
+  GamePhase _phaseNow() =>
+      _clock()?.phaseAt(widget.now()) ?? GamePhase.notStarted;
+
+  final _retryTimers = <ProviderOrFamily, Timer>{};
+
+  /// The rules let players read all positions only once the server's clock
+  /// says the round is over (R-GAME-06); this phone's clock may be a little
+  /// ahead. So a refused stream is simply opened again a bit later.
+  void _retryOnError(ProviderOrFamily provider, AsyncValue<Object?> next) {
+    if (!next.hasError || _retryTimers.containsKey(provider)) return;
+    _retryTimers[provider] = Timer(const Duration(seconds: 5), () {
+      _retryTimers.remove(provider);
+      if (mounted) ref.invalidate(provider);
+    });
   }
 
   Member? _me(List<Member>? members) {
@@ -396,6 +449,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ),
         BoundaryEvent.ended => (l10n.noticeOutsideEnded, null),
       },
+      RoundOverNotice(result: HuntersWon()) => (
+        l10n.noticeHuntersWon,
+        l10n.gameTimeUpHint,
+      ),
+      RoundOverNotice(result: final PlayersWon result) => (
+        l10n.noticePlayersWon(
+          _winnerNames(result, members ?? const []),
+          result.playerIds.length,
+        ),
+        l10n.gameTimeUpHint,
+      ),
     };
     // The own boundary state has its own permanent banner (R-OUT-06).
     final banner = notice is! OwnBoundaryNotice;
@@ -470,8 +534,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
   /// abort that needs two confirmations (R-GAME-07).
   Future<void> _endRound() async {
     final l10n = AppLocalizations.of(context);
-    final startAt = widget.game.startAt;
-    final endAt = startAt?.add(widget.game.settings.duration);
+    // After the hunters won the round is over already (R-GAME-08).
+    final endAt = _clock()?.endAt;
     final now = widget.now();
     final early = endAt != null && now.isBefore(endAt);
 
@@ -534,18 +598,42 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Future<void> _reportCatchAsHunter(List<Member> members) async {
     final playerId = await showHunterCatchDialog(context, members: members);
     if (playerId == null) return;
-    await _run(() => _recordCatch(playerId));
+    await _catchIfConfirmed(playerId);
   }
 
   Future<void> _reportSelfCatch() async {
     if (!await showSelfCatchDialog(context)) return;
-    await _run(() => _recordCatch(widget.session.userId));
+    await _catchIfConfirmed(widget.session.userId);
+  }
+
+  /// Catching the last player while the game is on ends it: the hunters won
+  /// (R-GAME-08). That cannot be undone, so it needs an extra confirmation.
+  Future<void> _catchIfConfirmed(String playerId) async {
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final phase = _phaseNow();
+    final finishes =
+        (phase == GamePhase.headStart || phase == GamePhase.hunting) &&
+        isLastPlayer(members, playerId);
+    if (finishes) {
+      final l10n = AppLocalizations.of(context);
+      if (!await _confirm(
+        icon: Icons.emoji_events_outlined,
+        color: AppColors.hunter,
+        title: l10n.lastCatchTitle,
+        text: l10n.lastCatchText,
+        action: l10n.lastCatchConfirm,
+        actionKey: const Key('confirmLastCatch'),
+      )) {
+        return;
+      }
+    }
+    await _run(() => _recordCatch(playerId, finishes: finishes));
   }
 
   /// A catch of the speedhunt target ends the speedhunt (R-SPEED-10). Hunters
   /// and the caught player may look up the target; the catch names the
   /// speedhunt so everyone else learns it ended.
-  Future<void> _recordCatch(String playerId) async {
+  Future<void> _recordCatch(String playerId, {bool finishes = false}) async {
     final at = widget.now().toUtc();
     final onTarget = await ref
         .read(roundRepositoryProvider)
@@ -559,6 +647,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             at: at,
             endsSpeedhunt: speedhuntEndedByCatch(onTarget, at),
           ),
+          finishes: finishes,
         );
   }
 
@@ -736,11 +825,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final isHunter = me?.isHunter ?? false;
     final isPlayer = me?.isPlayer ?? false;
 
-    final startAt = widget.game.startAt;
     // startAt is a server timestamp and briefly null right after "start".
-    final clock = startAt == null
-        ? null
-        : GameClock(startAt: startAt, settings: widget.game.settings);
+    final clock = _clock();
     final now = widget.now();
     final phase = clock?.phaseAt(now) ?? GamePhase.notStarted;
     final running = activeSpeedhunt(speedhunts, now);
@@ -779,15 +865,36 @@ class _GameScreenState extends ConsumerState<GameScreen>
         AppColors.hunter,
         clock!.endAt,
       ),
-      GamePhase.ended => (l10n.gamePhaseTimeUp, AppColors.speedhunt, null),
+      GamePhase.ended => (
+        // Who won; the names are in the overview (R-GAME-09).
+        switch (_result(members)) {
+          PlayersWon(:final playerIds) => l10n.gamePhasePlayersWon(
+            playerIds.length,
+          ),
+          HuntersWon() => l10n.gamePhaseHuntersWon,
+          null => l10n.gamePhaseTimeUp,
+        },
+        AppColors.speedhunt,
+        null,
+      ),
     };
 
     // Role-specific map content. Hunter-only data is only watched by hunters
-    // (the security rules reject it for players).
+    // (the security rules reject it for players) – and by everyone once the
+    // round is over: then all see what the hunters see (R-GAME-06).
     final layers = <Widget>[...areaLayers(widget.game.settings.area)];
     final filters = _filters;
     final filterItems = <FilterItem>[];
-    if (isHunter) {
+    if (isHunter || (isPlayer && phase == GamePhase.ended)) {
+      if (!isHunter) {
+        ref
+          ..listen(allPingsProvider, (_, next) {
+            _retryOnError(allPingsProvider, next);
+          })
+          ..listen(hunterLocationsProvider, (_, next) {
+            _retryOnError(hunterLocationsProvider, next);
+          });
+      }
       final pings = ref.watch(allPingsProvider).value ?? const [];
       // New regular pings switch "last pings" back on, new speedhunt pings
       // their speedhunt's chip (R-HUNT-08).
@@ -877,32 +984,35 @@ class _GameScreenState extends ConsumerState<GameScreen>
       }
       // Players outside the play area, live (R-OUT-05) – always shown, on
       // top. Caught players are left out, their devices stop sharing anyway.
-      final outside = {
-        for (final e
-            in (ref.watch(outsideLocationsProvider).value ??
-                    const <String, LocationFix>{})
-                .entries)
-          if (!caught.contains(e.key)) e.key: e.value,
-      };
-      ref.listen(outsideLocationsProvider, (_, next) {
-        final ids = next.value?.keys;
-        if (ids == null) return;
-        final caughtIds = {
-          for (final m in ref.read(membersProvider).value ?? const <Member>[])
-            if (m.caught) m.id,
+      // Hunters only: players never see them (and they end with the time).
+      if (isHunter) {
+        final outside = {
+          for (final e
+              in (ref.watch(outsideLocationsProvider).value ??
+                      const <String, LocationFix>{})
+                  .entries)
+            if (!caught.contains(e.key)) e.key: e.value,
         };
-        _notices
-            .onOutside(ids.where((id) => !caughtIds.contains(id)))
-            .forEach(_notify);
-      });
-      layers.add(
-        outsidePlayersLayer(
-          positions: outside,
-          names: names,
-          colors: playersByColor,
-          liveLabel: l10n.outsideLiveBadge,
-        ),
-      );
+        ref.listen(outsideLocationsProvider, (_, next) {
+          final ids = next.value?.keys;
+          if (ids == null) return;
+          final caughtIds = {
+            for (final m in ref.read(membersProvider).value ?? const <Member>[])
+              if (m.caught) m.id,
+          };
+          _notices
+              .onOutside(ids.where((id) => !caughtIds.contains(id)))
+              .forEach(_notify);
+        });
+        layers.add(
+          outsidePlayersLayer(
+            positions: outside,
+            names: names,
+            colors: playersByColor,
+            liveLabel: l10n.outsideLiveBadge,
+          ),
+        );
+      }
       void set(MapFilters f) => setState(() => _filters = f);
       filterItems.addAll([
         FilterItem(
@@ -1099,7 +1209,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.gameNextPing(_formatCountdown(nextSlot.at.difference(now))),
       if (nextRegular != null)
         l10n.gameNextPings(_formatCountdown(nextRegular.difference(now))),
-      if (me?.caught ?? false) l10n.gameCaughtSelf,
+      // Once the round is over the time-up hint says enough.
+      if ((me?.caught ?? false) && phase != GamePhase.ended)
+        l10n.gameCaughtSelf,
       if (phase == GamePhase.ended) l10n.gameTimeUpHint,
     ];
     // Below the filters the same gap as above them: the info lines if any,
@@ -1165,7 +1277,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
                   ? l10n.playerAlias(aliases[widget.session.userId]!)
                   : null,
               speedhuntRunning: running != null,
-              onUndoCatch: _isAdmin ? _undoCatch : null,
+              // Who won, once the round is over (R-GAME-09).
+              winner: switch (_result(members)) {
+                null => null,
+                HuntersWon() => l10n.overviewHuntersWon,
+                final PlayersWon r => l10n.overviewPlayersWon(
+                  _winnerNames(r, members),
+                  r.playerIds.length,
+                ),
+              },
+              winnerIds: switch (_result(members)) {
+                null => const {},
+                final r => winnerIds(r, members),
+              },
+              // Irreversible once the hunters won (R-GAME-08).
+              onUndoCatch: _isAdmin && !(clock?.huntersWon ?? false)
+                  ? _undoCatch
+                  : null,
             ),
           ),
           if (_isAdmin)
@@ -1319,8 +1447,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       ),
                     ],
                     if (isPlayer && !me.caught) ...[
-                      if (widget.game.settings.jokerEnabled ||
-                          widget.game.settings.playerJokerAvailable) ...[
+                      // Jokers are pointless once all positions are open.
+                      if (phase != GamePhase.ended &&
+                          (widget.game.settings.jokerEnabled ||
+                              widget.game.settings.playerJokerAvailable)) ...[
                         Expanded(
                           child: OutlinedButton.icon(
                             key: const Key('jokerButton'),

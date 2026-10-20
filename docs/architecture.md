@@ -35,6 +35,11 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 - **Kein Server-Timer**: Alle Ping-Zeitpunkte werden aus `startAt` + `GameSettings` deterministisch berechnet
   (`GameClock.regularPingTimes`, `Speedhunt.pingTimes`). Jedes Spieler-Gerät pingt selbst.
   `startAt` ist ein Firestore-Server-Timestamp; Uhr-Abweichungen der Handys werden später darüber ausgeglichen.
+  Wird der letzte Spieler gefangen (nach Bestätigung, R-GAME-08), setzt derselbe Batch `finishedAt`; `GameClock.endAt`
+  ist dann dieser Zeitpunkt, und alles hängt wie bei Zeitablauf an `GamePhase.ended`. Damit die Regeln das Spielende
+  kennen, liegt die Dauer zusätzlich als Klartext `durationSec` am Spiel (`roundOver()` in den Regeln); danach sehen
+  auch Spieler die Hunter-Ansicht (R-GAME-06). Geht das Handy etwas vor, lehnt der Server kurz ab – die Spielansicht
+  abonniert dann nach 5 s neu.
 - **Code = Schlüssel**: Der Beitrittscode (10 Zeichen, ≈48 bit) wird per PBKDF2 (50k Iterationen, im Isolate,
   ≈1 s) zu 512 bit abgeleitet: 256 bit AES-Schlüssel + 128 bit öffentliche `groupId`.
   Der Code selbst geht nie an Firebase; lokal liegt er im OS-Keystore.
@@ -53,10 +58,10 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings (Klartext-Kopie aus den Einstellungen für die Regeln, R-SET-15), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
-| `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`) | Standort | ✔ |
-| `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker | Standort | ✔ |
+| `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`); nach Spielende alle (R-GAME-06) | Standort | ✔ |
+| `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/outsideLocs/{uid}` | updatedAt, `data` (live, alle 5 s) – nur solange der Spieler außerhalb des Spielfelds ist + 60 s (R-OUT-03/04); nur Hunter lesen, nur der Spieler selbst schreibt/löscht | Standort | ✔ |
 | `games/{groupId}/events/{auto}` | type (catch/speedhunt), createdAt, `data` – Speedhunt-Event **ohne** Ziel | Inhalt | ✔ |
 | `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar | – | ✔ |

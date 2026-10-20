@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/round/notices.dart';
+import 'package:manhunt/core/round/round_result.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
 
 void main() {
@@ -91,6 +92,32 @@ void main() {
       expect(tracker.onOutside([]), isEmpty);
       // Leaving again later is a new event.
       expect(ids(tracker.onOutside(['kim'])), ['kim']);
+    });
+  });
+
+  group('round over: who won (R-GAME-08, R-GAME-09)', () {
+    test('announced once when the round becomes over, banner for 15 s', () {
+      final tracker = NoticeTracker();
+      expect(tracker.onRoundOver(null), isEmpty);
+      final notices = tracker.onRoundOver(const PlayersWon(['kim']));
+      final notice = notices.single as RoundOverNotice;
+      expect((notice.result as PlayersWon).playerIds, ['kim']);
+      expect(noticeBannerDuration(notice), const Duration(seconds: 15));
+      expect(tracker.onRoundOver(const PlayersWon(['kim'])), isEmpty);
+    });
+
+    test('hunters won', () {
+      final tracker = NoticeTracker()..onRoundOver(null);
+      final notice = tracker.onRoundOver(const HuntersWon()).single;
+      expect((notice as RoundOverNotice).result, isA<HuntersWon>());
+      // The header says it permanently, so the banner is short.
+      expect(noticeBannerDuration(notice), const Duration(seconds: 5));
+    });
+
+    test('already over when opening the app: not announced again', () {
+      final tracker = NoticeTracker();
+      expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
+      expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
     });
   });
 }

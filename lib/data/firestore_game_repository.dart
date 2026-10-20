@@ -10,7 +10,7 @@ import '../core/round/player_aliases.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
-/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), aliases (encrypted, per round), startAt, createdAt, expiresAt
+/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), sharedPings + durationSec (plain, for the rules), aliases (encrypted, per round), startAt, finishedAt (per round), createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
 /// - `games/{groupId}/{pings,hunterLocs,outsideLocs,events}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
@@ -127,6 +127,7 @@ class FirestoreGameRepository implements GameRepository {
       status: GameStatus.values.byName(data['status'] as String),
       settings: settings,
       startAt: (data['startAt'] as Timestamp?)?.toDate(),
+      finishedAt: (data['finishedAt'] as Timestamp?)?.toDate(),
       name: nameEnc == null
           ? null
           : await session.crypto.decryptJson(nameEnc) as String?,
@@ -180,7 +181,8 @@ class FirestoreGameRepository implements GameRepository {
   /// The play area is stored separately from the other settings so every
   /// member may edit it (R-SET-10) while the rest stays host-only.
   /// `sharedPings` is also kept in plain text: the security rules need it to
-  /// let players read the regular pings (R-SET-15).
+  /// let players read the regular pings (R-SET-15). So is `durationSec`: once
+  /// the time is up, players may read all positions too (R-GAME-06).
   Future<Map<String, Object?>> _encodeSettings(
     GroupSession session,
     GameSettings settings, {
@@ -190,6 +192,7 @@ class FirestoreGameRepository implements GameRepository {
       settings.copyWith(area: const []).toJson(),
     ),
     'sharedPings': settings.sharedPings,
+    'durationSec': settings.duration.inSeconds,
     if (withArea) 'area': await _encodeArea(session, settings.area),
   };
 
@@ -232,17 +235,6 @@ class FirestoreGameRepository implements GameRepository {
   Future<void> startGame(GroupSession session) async {
     // Clear leftovers of an interrupted clean-up so rounds never mix.
     await _deleteRoundData(session);
-    await _game(session).update({
-      'status': GameStatus.running.name,
-      'startAt': FieldValue.serverTimestamp(),
-      'aliases': await _shuffledAliases(session),
-      'expiresAt': _newExpiry(),
-    });
-  }
-
-  /// Encrypted anonymous numbers for this round's players (R-ANON-01), or a
-  /// delete marker without [GameSettings.anonymousPlayers].
-  Future<Object> _shuffledAliases(GroupSession session) async {
     final game = (await _game(session).get()).data()!;
     final settingsJson = await session.crypto.decryptJson(
       game['settings'] as String,
@@ -250,6 +242,23 @@ class FirestoreGameRepository implements GameRepository {
     final settings = GameSettings.fromJson(
       settingsJson! as Map<String, Object?>,
     );
+    await _game(session).update({
+      'status': GameStatus.running.name,
+      'startAt': FieldValue.serverTimestamp(),
+      // Also for groups created before the field existed (R-GAME-06).
+      'durationSec': settings.duration.inSeconds,
+      'finishedAt': FieldValue.delete(),
+      'aliases': await _shuffledAliases(session, settings),
+      'expiresAt': _newExpiry(),
+    });
+  }
+
+  /// Encrypted anonymous numbers for this round's players (R-ANON-01), or a
+  /// delete marker without [GameSettings.anonymousPlayers].
+  Future<Object> _shuffledAliases(
+    GroupSession session,
+    GameSettings settings,
+  ) async {
     if (!settings.anonymousPlayers) return FieldValue.delete();
     final members = await Future.wait([
       for (final doc in (await _members(session).get()).docs)
@@ -264,7 +273,11 @@ class FirestoreGameRepository implements GameRepository {
   }
 
   @override
-  Future<void> recordCatch(GroupSession session, CatchRecord record) async {
+  Future<void> recordCatch(
+    GroupSession session,
+    CatchRecord record, {
+    bool finishes = false,
+  }) async {
     final batch = _db.batch()
       ..set(_game(session).collection('events').doc(), {
         'type': 'catch',
@@ -272,6 +285,12 @@ class FirestoreGameRepository implements GameRepository {
         'data': await session.crypto.encryptJson(record.toJson()),
       })
       ..update(_members(session).doc(record.playerId), {'caught': true});
+    // Same batch: the rules only let a player set it with their own catch.
+    if (finishes) {
+      batch.update(_game(session), {
+        'finishedAt': FieldValue.serverTimestamp(),
+      });
+    }
     await batch.commit();
   }
 
@@ -331,6 +350,7 @@ class FirestoreGameRepository implements GameRepository {
     batch.update(_game(session), {
       'status': GameStatus.lobby.name,
       'startAt': null,
+      'finishedAt': FieldValue.delete(),
       'aliases': FieldValue.delete(),
       'expiresAt': _newExpiry(),
     });
@@ -373,6 +393,7 @@ class FirestoreGameRepository implements GameRepository {
       members: members,
       catches: catches,
       plannedDuration: settings.duration,
+      finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
     );
     await history.add({
       'endedAt': Timestamp.fromDate(endedAt),

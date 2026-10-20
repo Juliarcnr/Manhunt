@@ -1,4 +1,5 @@
 import '../models/geo_point.dart';
+import '../models/member.dart';
 import '../schedule/game_clock.dart';
 import '../schedule/speedhunt.dart';
 
@@ -195,6 +196,16 @@ int _max(int a, int b) => a > b ? a : b;
 /// as uncaught again, so all pings can be looked at together (R-HUNT-11).
 Set<String> caughtOnMap(Set<String> caught, GamePhase phase) =>
     phase == GamePhase.ended ? const {} : caught;
+
+/// Whether catching [playerId] catches the last player still in the game –
+/// then the hunters have won (R-GAME-08).
+bool isLastPlayer(List<Member> members, String playerId) {
+  final left = [
+    for (final m in members)
+      if (m.isPlayer && !m.caught) m.id,
+  ];
+  return left.length == 1 && left.single == playerId;
+}
 
 /// Whether [next] holds a regular ping that [previous] did not – switches the
 /// "last pings" filter back on (R-HUNT-08). Without [previous] (first load)

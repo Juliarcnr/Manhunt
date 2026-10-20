@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +12,12 @@ import '../helpers.dart';
 
 void main() {
   final start = DateTime.utc(2026, 10, 4, 14);
-  GameInfo running(String adminId) => GameInfo(
+  GameInfo running(String adminId, {DateTime? finishedAt}) => GameInfo(
     adminId: adminId,
     status: GameStatus.running,
     settings: const GameSettings(),
     startAt: start,
+    finishedAt: finishedAt,
   );
 
   Future<(FakeFirebaseFirestore, GroupSession)> pumpGame(
@@ -23,6 +25,7 @@ void main() {
     required String userId,
     required DateTime now,
     String adminId = 'admin',
+    DateTime? finishedAt,
   }) async {
     final db = FakeFirebaseFirestore();
     final session = (await tester.runAsync(
@@ -37,7 +40,7 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: GameScreen(
             session: session,
-            game: running(adminId),
+            game: running(adminId, finishedAt: finishedAt),
             now: () => now,
           ),
         ),
@@ -166,5 +169,41 @@ void main() {
       () => repo.watchHistory(session).first,
     );
     expect(history!.single.abortedEarly, isTrue);
+  });
+
+  testWidgets('after the hunters won, ending needs one confirmation and is '
+      'no abort (R-GAME-08, R-GAME-07)', (tester) async {
+    final finishedAt = start.add(const Duration(hours: 1));
+    final (db, session) = await pumpGame(
+      tester,
+      userId: 'admin',
+      now: finishedAt.add(const Duration(minutes: 10)),
+      finishedAt: finishedAt,
+    );
+    final repo = deviceRepo(db);
+    await tester.runAsync(() async {
+      await repo.createGame(session, name: 'Julia', settings: defaultSettings);
+      await repo.startGame(session);
+      await db.collection('games').doc(session.groupId).update({
+        'finishedAt': Timestamp.fromDate(finishedAt),
+      });
+    });
+    expect(find.text('HUNTERS WON'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('endRoundButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirmAbortFirst')), findsNothing);
+    expect(find.text('End game?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirmEndRound')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+
+    final game = await tester.runAsync(() => repo.watchGame(session).first);
+    expect(game!.status, GameStatus.lobby);
+    expect(game.finishedAt, isNull);
+    final history = await tester.runAsync(
+      () => repo.watchHistory(session).first,
+    );
+    expect(history!.single.abortedEarly, isFalse);
   });
 }

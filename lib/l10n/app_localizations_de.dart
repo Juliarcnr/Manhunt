@@ -465,6 +465,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gamePhaseTimeUp => 'Zeit abgelaufen';
 
   @override
+  String get gamePhaseHuntersWon => 'Hunter haben gewonnen';
+
+  @override
+  String gamePhasePlayersWon(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Spieler gewinnen',
+      one: 'Spieler gewinnt',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get gameTimeUpHint =>
       'Die Runde läuft weiter, damit ihr euch die Standorte noch gemeinsam anschauen könnt. Der Host beendet sie.';
 
@@ -626,6 +640,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get jokerNoHunters => 'Gerade keine Hunter-Standorte verfügbar.';
 
   @override
+  String get noticeHuntersWon =>
+      'Alle Spieler gefangen – die Hunter haben gewonnen!';
+
+  @override
+  String noticePlayersWon(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'haben',
+      one: 'hat',
+    );
+    return 'Zeit abgelaufen – $names $_temp0 gewonnen!';
+  }
+
+  @override
+  String nameList(String rest, String last) {
+    return '$rest und $last';
+  }
+
+  @override
+  String get overviewHuntersWon =>
+      'Die Hunter haben gewonnen – alle Spieler wurden gefangen';
+
+  @override
+  String overviewPlayersWon(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'wurden nie gefangen und haben',
+      one: 'wurde nie gefangen und hat',
+    );
+    return '$names $_temp0 gewonnen';
+  }
+
+  @override
   String noticeCaught(String player) {
     return '$player wurde gefangen';
   }
@@ -735,6 +784,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get undoCatchConfirm => 'Rückgängig machen';
+
+  @override
+  String get lastCatchTitle => 'Letzter Spieler – Hunter gewinnen';
+
+  @override
+  String get lastCatchText =>
+      'Das ist der letzte Spieler, der noch im Spiel ist. Mit diesem Catch haben die Hunter gewonnen.\n\nDas kann nicht rückgängig gemacht werden. Die Runde ist danach noch nicht offiziell beendet, aber alle Hunter und Spieler können sich dann die bisherigen Standorte aller ansehen, bis der Host die Runde beendet.';
+
+  @override
+  String get lastCatchConfirm => 'Ja, Hunter gewinnen';
 
   @override
   String get historyTitle => 'Historie';

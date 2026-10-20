@@ -460,6 +460,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gamePhaseTimeUp => 'Time is up';
 
   @override
+  String get gamePhaseHuntersWon => 'Hunters won';
+
+  @override
+  String gamePhasePlayersWon(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Players win',
+      one: 'Player wins',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get gameTimeUpHint =>
       'The round keeps running so you can look at the locations together. The host ends it.';
 
@@ -620,6 +634,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jokerNoHunters => 'No hunter positions available right now.';
 
   @override
+  String get noticeHuntersWon => 'All players caught – the hunters won!';
+
+  @override
+  String noticePlayersWon(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'have',
+      one: 'has',
+    );
+    return 'Time is up – $names $_temp0 won!';
+  }
+
+  @override
+  String nameList(String rest, String last) {
+    return '$rest and $last';
+  }
+
+  @override
+  String get overviewHuntersWon => 'The hunters won – all players were caught';
+
+  @override
+  String overviewPlayersWon(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'were never caught and have',
+      one: 'was never caught and has',
+    );
+    return '$names $_temp0 won';
+  }
+
+  @override
   String noticeCaught(String player) {
     return '$player was caught';
   }
@@ -728,6 +775,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get undoCatchConfirm => 'Undo catch';
+
+  @override
+  String get lastCatchTitle => 'Last player – hunters win';
+
+  @override
+  String get lastCatchText =>
+      'This is the last player still in the game. With this catch the hunters have won.\n\nThis cannot be undone. The round is not officially over yet, but from then on every hunter and every player can look at the past locations of everyone until the host ends the round.';
+
+  @override
+  String get lastCatchConfirm => 'Yes, hunters win';
 
   @override
   String get historyTitle => 'History';

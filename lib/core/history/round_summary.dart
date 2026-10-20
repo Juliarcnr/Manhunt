@@ -125,6 +125,10 @@ class RoundSummary {
 
     /// The configured round duration; ending before it counts as aborted.
     Duration? plannedDuration,
+
+    /// When the hunters caught everyone (R-GAME-08): such a round was not
+    /// aborted, even though it ended before its time.
+    DateTime? finishedAt,
   }) {
     final names = {for (final m in members) m.id: m.name};
     final sorted = [...catches]..sort((a, b) => a.at.compareTo(b.at));
@@ -145,6 +149,7 @@ class RoundSummary {
       players: [for (final m in members.where((m) => m.isPlayer)) m.name],
       catches: entries,
       abortedEarly:
+          finishedAt == null &&
           plannedDuration != null &&
           endedAt.isBefore(startedAt.add(plannedDuration)),
     );

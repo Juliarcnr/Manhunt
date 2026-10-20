@@ -2,6 +2,7 @@ import '../history/round_summary.dart';
 import '../schedule/speedhunt.dart';
 import 'boundary_watch.dart';
 import 'ping_schedule.dart';
+import 'round_result.dart';
 
 /// Something everyone (or this player) should be told about (R-NOTIF-01).
 sealed class GameNotice {
@@ -32,10 +33,20 @@ class PingSentNotice extends GameNotice {
   final PingKind kind;
 }
 
+/// The round is over – time up or last player caught – and [result] tells
+/// who won (R-GAME-08, R-GAME-09).
+class RoundOverNotice extends GameNotice {
+  const RoundOverNotice(this.result);
+  final RoundResult result;
+}
+
 /// How long the in-app banner for [notice] stays visible. A speedhunt notice
-/// carries more text and matters more, so it stays longer (R-NOTIF-06).
+/// carries more text and matters more, so it stays longer (R-NOTIF-06); so
+/// do the names of the players who won. "Hunters won" is also in the
+/// permanent header, so a short banner is enough (R-GAME-09).
 Duration noticeBannerDuration(GameNotice notice) => switch (notice) {
-  SpeedhuntNotice() => const Duration(seconds: 15),
+  SpeedhuntNotice() ||
+  RoundOverNotice(result: PlayersWon()) => const Duration(seconds: 15),
   _ => const Duration(seconds: 5),
 };
 
@@ -61,6 +72,8 @@ class NoticeTracker {
   Set<String> _caught = const {};
   Set<String>? _speedhunts;
   Set<String>? _outside;
+  var _resultKnown = false;
+  RoundResult? _result;
 
   static String _catchKey(CatchRecord c) =>
       '${c.playerId}@${c.at.toUtc().toIso8601String()}';
@@ -95,6 +108,19 @@ class NoticeTracker {
       for (final s in speedhunts)
         if (!known.contains(_speedhuntKey(s))) SpeedhuntNotice(s),
     ];
+  }
+
+  /// The round's [result], null while the game is on (R-GAME-09): announced
+  /// once when the round becomes over; already over at the first call (app
+  /// reopened) it is not announced again.
+  List<GameNotice> onRoundOver(RoundResult? result) {
+    final known = _resultKnown;
+    final before = _result;
+    _resultKnown = true;
+    _result = result;
+    return known && before == null && result != null
+        ? [RoundOverNotice(result)]
+        : const [];
   }
 
   /// Players outside the play area (ids of the live positions). Unlike the

@@ -47,7 +47,8 @@ Dauert 2–3 Minuten.
   oder statt des Spieler-Jokers „Reguläre Pings an alle Spieler“.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
 - [ ] Nach dem Spiel **„Spiel beenden“** drücken: Erst dann werden alle Standorte gelöscht. Vorher könnt ihr euch die
-  Pings gemeinsam auf der Karte anschauen (nach Ablauf der Zeit haben auch Gefangene wieder ihre eigenen Chips). Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
+  Pings gemeinsam auf der Karte anschauen – nach Ablauf der Zeit oder sobald der letzte Spieler gefangen ist, sehen
+  **alle** (auch Spieler) alle Standorte, und Gefangene haben wieder ihre eigenen Chips. Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
 
 ## 4. Datenschutz in einem Satz
 

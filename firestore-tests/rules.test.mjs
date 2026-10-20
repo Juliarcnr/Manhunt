@@ -919,3 +919,213 @@ describe('anonymous players (R-ANON-01)', () => {
     }
   });
 });
+
+describe('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () => {
+  const gameRef = (db) => doc(db, 'games', GID);
+  const setDoc_ = (path, data) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), ...path), data));
+  const update_ = (path, data) =>
+    env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), ...path), data));
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+
+  // Round started [startedMinutesAgo] ago with a duration of 60 min; admin is
+  // hunter, kim and sam are players, lou is another hunter. One ping and one
+  // hunter position exist.
+  const runningRound = async ({ startedMinutesAgo = 10, durationSec = 3600 } = {}) => {
+    await startRound();
+    await update_(['games', GID], {
+      startAt: minutesAgo(startedMinutesAgo),
+      ...(durationSec == null ? {} : { durationSec }),
+    });
+    await setDoc_(['games', GID, 'members', 'lou'], {
+      name: 'enc', role: 'hunter', caught: false, jokerUsed: false, joinedAt: new Date(),
+    });
+    await setDoc_(['games', GID, 'pings', 'sam_regular_1'], {
+      uid: 'sam', kind: 'regular', slot: 'regular_1', createdAt: new Date(), data: 'enc',
+    });
+    await setDoc_(['games', GID, 'hunterLocs', 'admin'], { updatedAt: new Date(), data: 'enc' });
+  };
+
+  // What a player's device watches once the round is over.
+  const readAll = async (uid) => {
+    const db = as(uid);
+    await getDocs(collection(db, 'games', GID, 'pings'));
+    await getDocs(collection(db, 'games', GID, 'hunterLocs'));
+  };
+
+  // As FirestoreGameRepository.recordCatch(finishes: true): event, member
+  // and the game's finishedAt in one batch.
+  const lastCatch = (uid, player) => {
+    const db = as(uid);
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, 'games', GID, 'events')), {
+      type: 'catch', createdAt: serverTimestamp(), data: 'enc',
+    });
+    batch.update(doc(db, 'games', GID, 'members', player), { caught: true });
+    batch.update(gameRef(db), { finishedAt: serverTimestamp() });
+    return batch.commit();
+  };
+
+  const setRole = (uid, role) => update_(['games', GID, 'members', uid], { role });
+
+  test('a group is created with the plain duration as a number', async () => {
+    const game = {
+      adminUid: 'x',
+      status: 'lobby',
+      settings: 'enc',
+      sharedPings: false,
+      startAt: null,
+      createdAt: serverTimestamp(),
+      expiresAt: new Date(),
+    };
+    await assertSucceeds(setDoc(doc(as('x'), 'games', 'g2'), { ...game, durationSec: 3600 }));
+    await assertFails(setDoc(doc(as('x'), 'games', 'g3'), { ...game, durationSec: '3600' }));
+  });
+
+  test('players cannot read all positions while the time runs', async () => {
+    await runningRound();
+    await assertFails(getDocs(collection(as('kim'), 'games', GID, 'pings')));
+    await assertFails(getDocs(collection(as('kim'), 'games', GID, 'hunterLocs')));
+  });
+
+  test('time up: players read all pings and hunter positions', async () => {
+    await runningRound({ startedMinutesAgo: 61 });
+    await assertSucceeds(readAll('kim'));
+    await assertSucceeds(readAll('sam'));
+  });
+
+  test('time up but no plain duration (older group): still closed', async () => {
+    await runningRound({ startedMinutesAgo: 61, durationSec: null });
+    await assertFails(readAll('kim'));
+  });
+
+  test('strangers never read them, also after the time', async () => {
+    await runningRound({ startedMinutesAgo: 61 });
+    await assertFails(readAll('stranger'));
+  });
+
+  for (const role of ['hunter', 'player', 'unassigned']) {
+    test(`host (${role}) starts a round with the plain duration`, async () => {
+      await setRole('admin', role);
+      await assertSucceeds(
+        updateDoc(gameRef(as('admin')), {
+          status: 'running',
+          startAt: serverTimestamp(),
+          durationSec: 3600,
+          finishedAt: deleteField(),
+          aliases: deleteField(),
+          expiresAt: inDays(180),
+        }),
+      );
+    });
+  }
+
+  test('a hunter (not the host) catches the last player: everyone reads all', async () => {
+    await runningRound();
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('lou', 'kim'));
+    await assertSucceeds(readAll('kim'));
+    await assertSucceeds(readAll('sam'));
+  });
+
+  test('host as hunter catches the last player', async () => {
+    await runningRound();
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('admin', 'kim'));
+    await assertSucceeds(readAll('kim'));
+  });
+
+  test('the last player reports their own catch: everyone reads all', async () => {
+    await runningRound();
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('kim', 'kim'));
+    await assertSucceeds(readAll('sam'));
+  });
+
+  test('host as player reports their own last catch', async () => {
+    await runningRound();
+    await setRole('admin', 'player');
+    await update_(['games', GID, 'members', 'kim'], { caught: true });
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('admin', 'admin'));
+    await assertSucceeds(readAll('kim'));
+  });
+
+  test('a player cannot end the round without their own catch', async () => {
+    await runningRound();
+    await assertFails(updateDoc(gameRef(as('kim')), { finishedAt: serverTimestamp() }));
+    // Not even with someone else's catch.
+    await assertFails(lastCatch('kim', 'sam'));
+    // An already caught player cannot either.
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertFails(updateDoc(gameRef(as('sam')), { finishedAt: serverTimestamp() }));
+    await assertFails(readAll('kim'));
+  });
+
+  test('finishedAt is the server time, set once, only while running', async () => {
+    await runningRound();
+    await assertFails(updateDoc(gameRef(as('lou')), { finishedAt: minutesAgo(5) }));
+    await assertSucceeds(updateDoc(gameRef(as('lou')), { finishedAt: serverTimestamp() }));
+    await assertFails(updateDoc(gameRef(as('lou')), { finishedAt: serverTimestamp() }));
+    await assertFails(updateDoc(gameRef(as('lou')), { finishedAt: deleteField() }));
+    await update_(['games', GID], { status: 'lobby', finishedAt: deleteField() });
+    await assertFails(updateDoc(gameRef(as('lou')), { finishedAt: serverTimestamp() }));
+  });
+
+  test('older app ended and restarted without clearing finishedAt: the leftover does not count', async () => {
+    await runningRound();
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('kim', 'kim'));
+    // Old app version: end + start without touching finishedAt or durationSec.
+    const db = as('admin');
+    await assertSucceeds(
+      updateDoc(gameRef(db), { status: 'lobby', startAt: null, expiresAt: inDays(180) }),
+    );
+    await update_(['games', GID, 'members', 'kim'], { caught: false });
+    await update_(['games', GID, 'members', 'sam'], { caught: false });
+    await new Promise((r) => setTimeout(r, 20));
+    await assertSucceeds(
+      updateDoc(gameRef(db), { status: 'running', startAt: serverTimestamp(), expiresAt: inDays(180) }),
+    );
+    await assertFails(readAll('kim'));
+    // The hunters can still win the new round.
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('kim', 'kim'));
+    await assertSucceeds(readAll('sam'));
+  });
+
+  test('old app version creates and starts a group without the new fields', async () => {
+    await assertSucceeds(
+      setDoc(doc(as('x'), 'games', 'g2'), {
+        adminUid: 'x', status: 'lobby', settings: 'enc', sharedPings: false,
+        startAt: null, createdAt: serverTimestamp(), expiresAt: inDays(180),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(as('x'), 'games', 'g2'), {
+        status: 'running', startAt: serverTimestamp(), expiresAt: inDays(180),
+      }),
+    );
+  });
+
+  test('host ends the round after the hunters won and cleans up; players no longer read', async () => {
+    await runningRound();
+    await update_(['games', GID, 'members', 'sam'], { caught: true });
+    await assertSucceeds(lastCatch('kim', 'kim'));
+    const db = as('admin');
+    await assertSucceeds(
+      updateDoc(gameRef(db), {
+        status: 'lobby',
+        startAt: null,
+        finishedAt: deleteField(),
+        aliases: deleteField(),
+        expiresAt: inDays(180),
+      }),
+    );
+    await assertFails(readAll('kim'));
+    for (const name of ['pings', 'hunterLocs', 'events']) {
+      const snap = await getDocs(collection(db, 'games', GID, name));
+      for (const d of snap.docs) await assertSucceeds(deleteDoc(d.ref));
+    }
+  });
+});
