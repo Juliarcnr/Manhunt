@@ -80,22 +80,6 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
 
   /// Bumped to reset the dropdown after a blocked player was picked.
   int _resets = 0;
-  Timer? _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    // Per-player pauses count down while the dialog is open.
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_blocks().values.any((b) => b.until != null)) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
 
   String _name(Member m) => widget.names[m.id] ?? m.name;
 
@@ -140,7 +124,6 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final now = widget.now();
     final blocks = _blocks();
     // A picked player may have become blocked meanwhile (new speedhunt).
     if (blocks.containsKey(_playerId)) _playerId = null;
@@ -178,17 +161,18 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
                         _name(p),
                         style: const TextStyle(color: AppColors.textMuted),
                       ),
-                      TargetBlock(:final until?) => Text(
-                        l10n.speedhuntPlayerWait(
-                          _name(p),
-                          formatCountdown(until.difference(now)),
-                        ),
-                        style: const TextStyle(color: AppColors.textMuted),
+                      // Ticks by itself: the open menu is a route of its
+                      // own and does not rebuild with the dialog.
+                      TargetBlock(:final until?) => _WaitingPlayer(
+                        name: _name(p),
+                        until: until,
+                        now: widget.now,
                       ),
                     },
                   ),
               ],
-              onChanged: (v) => _pick(v, blocks),
+              // Fresh check: a pause may have run out while the menu was open.
+              onChanged: (v) => _pick(v, _blocks()),
             ),
           ),
           if (_blockedText case final text?) ...[
@@ -231,6 +215,53 @@ class _SpeedhuntDialogState extends State<_SpeedhuntDialog> {
           child: Text(l10n.speedhuntConfirm),
         ),
       ],
+    );
+  }
+}
+
+/// A player in their per-player pause, greyed out with a running countdown;
+/// shown normally once it is over (R-SPEED-12).
+class _WaitingPlayer extends StatefulWidget {
+  const _WaitingPlayer({
+    required this.name,
+    required this.until,
+    required this.now,
+  });
+
+  final String name;
+  final DateTime until;
+  final DateTime Function() now;
+
+  @override
+  State<_WaitingPlayer> createState() => _WaitingPlayerState();
+}
+
+class _WaitingPlayerState extends State<_WaitingPlayer> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {});
+      if (!widget.until.isAfter(widget.now())) _ticker?.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = widget.until.difference(widget.now());
+    if (left <= Duration.zero) return Text(widget.name);
+    return Text(
+      AppLocalizations.of(context)
+          .speedhuntPlayerWait(widget.name, formatCountdown(left)),
+      style: const TextStyle(color: AppColors.textMuted),
     );
   }
 }

@@ -397,7 +397,14 @@ void main() {
         await pumpAs(tester, 'alex', gameSettings: longer);
         expect(find.text('Speedhunt (1)'), findsOneWidget);
         await openPlayerList(tester);
-        // Sam's pause: until minute 70 + 60.
+        // Sam's pause: until minute 70 + 60. It counts down in the open
+        // menu, too.
+        expect(find.text('Sam · 20:00'), findsWidgets);
+        now = now.add(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('Sam · 19:59'), findsWidgets);
+        now = now.subtract(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
         await tester.tap(find.text('Sam · 20:00').last);
         await tester.pumpAndSettle();
         expect(
@@ -409,6 +416,29 @@ void main() {
         await tester.tap(find.byKey(const Key('speedhuntPlayer')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Kim').last);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('speedhuntBlocked')), findsNothing);
+        expect(canConfirm(tester), isTrue);
+      });
+
+      testWidgets('once the pause runs out in the open menu, the player is '
+          'normal and can be picked', (tester) async {
+        // General pause over at minute 80, Sam's only at minute 100.
+        const shortPause = GameSettings(
+          area: area,
+          anonymousPlayers: false,
+          speedhuntCooldown: Duration(minutes: 10),
+        );
+        now = start.add(const Duration(minutes: 99, seconds: 58));
+        await seed(tester, gameSettings: shortPause);
+        await speedhuntOnSam(tester);
+        await pumpAs(tester, 'alex', gameSettings: shortPause);
+        await openPlayerList(tester);
+        expect(find.text('Sam · 00:02'), findsWidgets);
+        now = start.add(const Duration(minutes: 100));
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('Sam · 00:02'), findsNothing);
+        await tester.tap(find.text('Sam').last);
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('speedhuntBlocked')), findsNothing);
         expect(canConfirm(tester), isTrue);
