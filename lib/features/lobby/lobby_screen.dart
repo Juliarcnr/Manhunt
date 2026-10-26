@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/bots/bot_plan.dart';
 import '../../core/models/member.dart';
 import '../../core/teams/start_check.dart';
 import '../../core/teams/team_assignment.dart';
 import '../../data/game_repository.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/bots.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../settings/settings_form.dart';
 import '../history/history_button.dart';
 import '../map/area_card.dart';
 import '../settings/settings_screen.dart';
+import 'bot_lobby_keeper.dart';
 import 'name_field.dart';
 
 /// Waiting room: code, participants, team assignment, start (R-LOBBY-02 … 06).
@@ -27,8 +30,10 @@ class LobbyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final members = ref.watch(membersProvider).value ?? const <Member>[];
+    final loadedMembers = ref.watch(membersProvider).value;
+    final members = loadedMembers ?? const <Member>[];
     final repo = ref.read(gameRepositoryProvider);
+    final botsEnabled = ref.watch(botsEnabledProvider);
     final check = StartCheck(game.settings, members);
 
     Future<void> run(Future<void> Function() action) async {
@@ -42,8 +47,11 @@ class LobbyScreen extends ConsumerWidget {
       }
     }
 
+    // Computer members keep the role of their kind (R-BOT-03).
+    final humans = members.where((m) => !isBot(m)).toList();
+
     void assignRandom() {
-      if (members.length <= game.settings.hunterCount) {
+      if (humans.length <= game.settings.hunterCount) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l10n.errorNotEnoughPlayers)));
         return;
@@ -51,7 +59,7 @@ class LobbyScreen extends ConsumerWidget {
       run(
         () => repo.setRoles(
           session,
-          assignRandomRoles(members, game.settings.hunterCount),
+          assignRandomRoles(humans, game.settings.hunterCount),
         ),
       );
     }
@@ -64,7 +72,7 @@ class LobbyScreen extends ConsumerWidget {
       member: m,
       isAdmin: m.id == game.adminId,
       isMe: m.id == session.userId,
-      onTap: _isAdmin
+      onTap: _isAdmin && !isBot(m)
           ? () => run(() => repo.setRoles(session, toggleRole(members, m.id)))
           : null,
       onRemove: _isAdmin && m.id != session.userId
@@ -84,6 +92,14 @@ class LobbyScreen extends ConsumerWidget {
       if (check.hasUnassigned) l10n.errorUnassigned,
       if (!check.hasUnassigned && check.noHunter) l10n.errorHunterCountInvalid,
       if (!check.hasUnassigned && check.noPlayer) l10n.errorNotEnoughPlayers,
+      if (botsEnabled) ...[
+        if (game.settings.botHunters > 0 &&
+            botCarrier(BotKind.hunter, members) == null)
+          l10n.lobbyBotsNeedHunter,
+        if (game.settings.botPlayers > 0 &&
+            botCarrier(BotKind.player, members) == null)
+          l10n.lobbyBotsNeedPlayer,
+      ],
     ];
 
     final controller = ref.read(sessionControllerProvider.notifier);
@@ -164,79 +180,84 @@ class LobbyScreen extends ConsumerWidget {
             ),
           ],
         ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _CodeCard(code: session.code),
-            const SizedBox(height: 16),
-            AreaCard(
-              area: game.settings.area,
-              onChanged: (area) => run(() => repo.updateArea(session, area)),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
+        body: BotLobbyKeeper(
+          session: session,
+          game: game,
+          members: loadedMembers,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _CodeCard(code: session.code),
+              const SizedBox(height: 16),
+              AreaCard(
+                area: game.settings.area,
+                onChanged: (area) => run(() => repo.updateArea(session, area)),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.lobbyParticipants(members.length),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  if (_isAdmin)
+                    TextButton.icon(
+                      key: const Key('randomButton'),
+                      onPressed: assignRandom,
+                      icon: const Icon(Icons.casino_outlined),
+                      label: Text(l10n.lobbyAssignRandom),
+                    ),
+                ],
+              ),
+              if (_isAdmin)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    l10n.lobbyParticipants(members.length),
-                    style: Theme.of(context).textTheme.titleMedium,
+                    l10n.lobbyTapToSwitch,
+                    style: const TextStyle(color: AppColors.textMuted),
                   ),
                 ),
-                if (_isAdmin)
-                  TextButton.icon(
-                    key: const Key('randomButton'),
-                    onPressed: assignRandom,
-                    icon: const Icon(Icons.casino_outlined),
-                    label: Text(l10n.lobbyAssignRandom),
+              if (unassigned.isNotEmpty)
+                _RoleSection(
+                  title: l10n.roleUnassigned,
+                  color: AppColors.textMuted,
+                  icon: Icons.help_outline,
+                  children: unassigned.map(memberTile).toList(),
+                ),
+              _RoleSection(
+                title: l10n.roleHunters,
+                color: AppColors.hunter,
+                icon: Icons.track_changes,
+                children: hunters.map(memberTile).toList(),
+              ),
+              _RoleSection(
+                title: l10n.rolePlayers,
+                color: AppColors.player,
+                icon: Icons.directions_run,
+                children: players.map(memberTile).toList(),
+              ),
+              if (_isAdmin && problems.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final p in problems)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: AppColors.speedhunt,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(p)),
+                      ],
+                    ),
                   ),
               ],
-            ),
-            if (_isAdmin)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  l10n.lobbyTapToSwitch,
-                  style: const TextStyle(color: AppColors.textMuted),
-                ),
-              ),
-            if (unassigned.isNotEmpty)
-              _RoleSection(
-                title: l10n.roleUnassigned,
-                color: AppColors.textMuted,
-                icon: Icons.help_outline,
-                children: unassigned.map(memberTile).toList(),
-              ),
-            _RoleSection(
-              title: l10n.roleHunters,
-              color: AppColors.hunter,
-              icon: Icons.track_changes,
-              children: hunters.map(memberTile).toList(),
-            ),
-            _RoleSection(
-              title: l10n.rolePlayers,
-              color: AppColors.player,
-              icon: Icons.directions_run,
-              children: players.map(memberTile).toList(),
-            ),
-            if (_isAdmin && problems.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              for (final p in problems)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: AppColors.speedhunt,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(p)),
-                    ],
-                  ),
-                ),
             ],
-          ],
+          ),
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
@@ -488,7 +509,9 @@ class _MemberTile extends StatelessWidget {
         backgroundColor: color.withValues(alpha: 0.18),
         foregroundColor: color,
         child: Text(
-          member.name.isEmpty ? '?' : member.name[0].toUpperCase(),
+          member.name.isEmpty
+              ? '?'
+              : member.name.characters.first.toUpperCase(),
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),

@@ -222,7 +222,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
           backgroundColor: AppColors.hunter.withValues(alpha: 0.18),
           foregroundColor: AppColors.hunter,
           child: Text(
-            name.isEmpty ? '?' : name[0].toUpperCase(),
+            name.isEmpty ? '?' : name.characters.first.toUpperCase(),
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),

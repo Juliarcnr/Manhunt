@@ -638,6 +638,30 @@ abstract class AppLocalizations {
   /// **'If a player is clearly outside the play area (at least 30 m plus GPS inaccuracy) for 30 s, the hunters see their live location – until they are back, plus 1 minute. The player is warned first.'**
   String get settingsOutsideLiveHint;
 
+  /// No description provided for @settingsSectionBots.
+  ///
+  /// In en, this message translates to:
+  /// **'Test (debug)'**
+  String get settingsSectionBots;
+
+  /// No description provided for @settingsBotsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer members walk randomly within 30 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.'**
+  String get settingsBotsHint;
+
+  /// No description provided for @settingsBotHunters.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer hunters'**
+  String get settingsBotHunters;
+
+  /// No description provided for @settingsBotPlayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer players'**
+  String get settingsBotPlayers;
+
   /// No description provided for @settingsArea.
   ///
   /// In en, this message translates to:
@@ -853,6 +877,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for the host to start…'**
   String get lobbyWaitingForAdmin;
+
+  /// No description provided for @lobbyBotsNeedHunter.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer hunters appear as soon as a person is a hunter.'**
+  String get lobbyBotsNeedHunter;
+
+  /// No description provided for @lobbyBotsNeedPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer players appear as soon as a person is a player.'**
+  String get lobbyBotsNeedPlayer;
 
   /// No description provided for @lobbyAdminBadge.
   ///

@@ -80,6 +80,7 @@ class RoundEngine {
     this.tickInterval = const Duration(seconds: 5),
     this.hunterUploadInterval = const Duration(seconds: 15),
     this.outsideUploadInterval = const Duration(seconds: 5),
+    this.onLog,
   }) : _now = now ?? DateTime.now;
 
   /// A position older than this is not used for a ping; a fresh one is
@@ -94,6 +95,10 @@ class RoundEngine {
   final Duration hunterUploadInterval;
   final Duration outsideUploadInterval;
   final DateTime Function() _now;
+
+  /// Gets every [log] message too – computer members report into their
+  /// carrier's log (R-BOT-05).
+  final void Function(String message)? onLog;
 
   GameInfo? _game;
   Member? _me;
@@ -195,7 +200,11 @@ class RoundEngine {
   /// view (long-press on the header) to analyse problems in the field.
   final log = ValueNotifier<List<String>>(const []);
 
+  /// Adds a line from elsewhere (e.g. a computer member) to [log].
+  void note(String message) => _log(message);
+
   void _log(String message) {
+    onLog?.call(message);
     final t = _now().toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
     final line = '${two(t.hour)}:${two(t.minute)}:${two(t.second)} $message';

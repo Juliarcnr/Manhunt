@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/groups/group_list.dart';
 import '../../core/models/game_settings.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/bots.dart';
 import '../../state/providers.dart';
 import '../settings/settings_form.dart';
 import 'name_field.dart';
@@ -71,6 +72,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             SettingsForm(
               settings: _settings,
               onChanged: (s) => setState(() => _settings = s),
+              showBots: ref.watch(botsEnabledProvider),
             ),
           ],
         ),

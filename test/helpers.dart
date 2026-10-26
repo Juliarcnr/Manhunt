@@ -6,6 +6,7 @@ import 'package:manhunt/core/crypto/group_crypto.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
+import 'package:manhunt/data/bot_backend.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
@@ -13,6 +14,7 @@ import 'package:manhunt/data/joker_store.dart';
 import 'package:manhunt/data/location_service.dart';
 import 'package:manhunt/data/notification_service.dart';
 import 'package:manhunt/data/session_store.dart';
+import 'package:manhunt/state/bots.dart';
 import 'package:manhunt/state/providers.dart';
 
 /// Fast key derivation for tests.
@@ -36,7 +38,11 @@ List<Override> deviceOverrides({
   LocationService? location,
   NotificationService? notifications,
   JokerStore? jokers,
+  BotBackend? bots,
 }) => [
+  // Computer members only where a test asks for them (R-BOT-01).
+  botsEnabledProvider.overrideWithValue(bots != null),
+  if (bots != null) botBackendProvider.overrideWithValue(bots),
   gameRepositoryProvider.overrideWithValue(
     FirestoreGameRepository(db, now: now),
   ),
@@ -50,6 +56,31 @@ List<Override> deviceOverrides({
     notifications ?? SilentNotificationService(),
   ),
 ];
+
+/// Computer members on a shared fake backend: slot n signs in as
+/// `bot-n-<owner>` on first use (one backend per simulated phone).
+class FakeBotBackend implements BotBackend {
+  FakeBotBackend(this.db, {required this.owner});
+
+  final FakeFirebaseFirestore db;
+  final String owner;
+  final _signedIn = <int, String>{};
+  var opened = 0;
+
+  @override
+  Future<Map<int, String>> knownIds() async => {..._signedIn};
+
+  @override
+  Future<BotDevice> open(int slot) async {
+    opened++;
+    final id = _signedIn[slot] ??= 'bot-$slot-$owner';
+    return BotDevice(
+      id: id,
+      games: FirestoreGameRepository(db),
+      rounds: FirestoreRoundRepository(db),
+    );
+  }
+}
 
 /// Controllable location: [position] for one-off lookups, [emit] to feed the
 /// tracking stream. Records whether tracking is active.

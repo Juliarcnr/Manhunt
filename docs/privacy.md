@@ -24,6 +24,14 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | IP-Adresse | Google (technisch bei jeder Verbindung) | ja | nach Google-Richtlinie |
 | Kartenkacheln-Anfragen (Karte oder Satellit) | MapTiler | ja (welcher Kartenausschnitt, IP) | nach MapTiler-Richtlinie |
 
+### Nur zum Testen: Computer-Mitglieder (R-BOT-01 … R-BOT-06)
+Nur in Debug-Builds bzw. mit `--dart-define=MANHUNT_BOTS=true`. Das Handy, das sie betreibt, legt pro
+Computer-Mitglied ein zusätzliches **anonymes Firebase-Konto** an (höchstens 8 pro Handy, wiederverwendet; verwaist
+bei Deinstallation). Sie erzeugen dieselben Daten wie ein echtes Mitglied (Name „🤖 …“ verschlüsselt, Rolle, Pings,
+Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 30 m – also
+ebenfalls verschlüsselt, aber sinngemäß ein weiterer Standort dieser Person. Die gewünschte Anzahl steht verschlüsselt
+in den Einstellungen.
+
 ## Nur auf dem Gerät
 - **Gruppenliste** (R-GROUPS-01): bis zu 5 Einträge mit Code, Gruppen-ID, Gruppenname (Kopie) und „bin Host“, dazu
   die zuletzt geöffnete Gruppe – im Schlüsselspeicher des Betriebssystems. Verlassen/Löschen entfernt den Eintrag.

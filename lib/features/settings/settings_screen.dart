@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/game_settings.dart';
 import '../../data/game_repository.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/bots.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import 'settings_form.dart';
@@ -80,6 +81,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           SettingsForm(
             settings: settings,
+            showBots: ref.watch(botsEnabledProvider),
             onChanged: widget.readOnly
                 ? null
                 : (s) => setState(() => _settings = s),

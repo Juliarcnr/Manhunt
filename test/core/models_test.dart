@@ -66,6 +66,20 @@ void main() {
       expect(GameSettings.fromJson(legacy).sharedPings, isFalse);
     });
 
+    test('computer members: none by default, also for older groups '
+        '(R-BOT-02)', () {
+      const s = GameSettings();
+      expect((s.botHunters, s.botPlayers), (0, 0));
+      final back = GameSettings.fromJson(
+        const GameSettings(botHunters: 2, botPlayers: 3).toJson(),
+      );
+      expect((back.botHunters, back.botPlayers), (2, 3));
+      final legacy = s.toJson()
+        ..remove('botHunters')
+        ..remove('botPlayers');
+      expect(GameSettings.fromJson(legacy).botPlayers, 0);
+    });
+
     test('anonymous players are on by default, also for older groups '
         '(R-SET-16)', () {
       const s = GameSettings();

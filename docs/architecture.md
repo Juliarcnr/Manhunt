@@ -154,6 +154,23 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Schwelle `outsideThresholdM` = 30 m + 2 × Genauigkeit; Debug-Log über `describeFix` (Wechsel mit Grund,
   „not counted“ höchstens alle 10 s) zum Kalibrieren im Feldtest (R-OUT-07).
 
+## Computer-Mitglieder zum Testen (R-BOT-01 … R-BOT-06)
+- Aktiv über `botsEnabledProvider` (`kDebugMode` oder `--dart-define=MANHUNT_BOTS=true`); Anzahl in
+  `GameSettings.botHunters/botPlayers`.
+- Jedes Computer-Mitglied ist ein eigenes „Gerät“: `FirebaseBotBackend` öffnet pro Slot eine zweite FirebaseApp
+  `bot-<n>` (n = 1 … 8) mit eigener anonymer UID und eigener Firestore-Instanz; die UID bleibt pro App-Name erhalten.
+  Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
+  gehören: Slot-UID ∈ Mitgliederliste.
+- Art steht im Namen (`🤖 Hunter n` / `🤖 Player n`, `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
+  Mensch mit dieser Rolle. `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
+  aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
+- Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
+  `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:
+  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 30 m) um `engine.position` des Handys. Bot-Logs gehen per
+  `RoundEngine.onLog` → `note` ins Debug-Log des Handys.
+- Grenze: Verlässt das Träger-Handy die Gruppe oder ist offline, bleiben seine Bots als verwaiste Mitglieder stehen;
+  der Host kann sie wie jedes Mitglied entfernen.
+
 ## App-Icon (R-UI-04)
 - Quellen: `assets/icon/*.svg` (1024×1024), daraus gerenderte PNGs. Plattform-Icons erzeugen mit
   `dart run flutter_launcher_icons` (Config in `pubspec.yaml`).

@@ -316,6 +316,19 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ist ein Spieler 30 s lang eindeutig außerhalb des Spielfelds (mind. 30 m plus GPS-Ungenauigkeit), sehen die Hunter seinen Live-Standort – bis er zurück ist, plus 1 Minute. Vorher wird er gewarnt.';
 
   @override
+  String get settingsSectionBots => 'Test (Debug)';
+
+  @override
+  String get settingsBotsHint =>
+      'Computer-Mitglieder laufen zufällig in max. 30 m um die erste Person mit ihrer Rolle und pingen wie echte Handys. Sie laufen auf deren Handy, solange dort der Spielbildschirm offen ist.';
+
+  @override
+  String get settingsBotHunters => 'Computer-Hunter';
+
+  @override
+  String get settingsBotPlayers => 'Computer-Spieler';
+
+  @override
   String get settingsArea => 'Spielfeld';
 
   @override
@@ -444,6 +457,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get lobbyWaitingForAdmin =>
       'Warte darauf, dass das Spiel gestartet wird…';
+
+  @override
+  String get lobbyBotsNeedHunter =>
+      'Computer-Hunter erscheinen, sobald ein Mensch Hunter ist.';
+
+  @override
+  String get lobbyBotsNeedPlayer =>
+      'Computer-Spieler erscheinen, sobald ein Mensch Spieler ist.';
 
   @override
   String get lobbyAdminBadge => 'Host';

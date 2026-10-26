@@ -1,7 +1,8 @@
 import 'geo_point.dart';
 
 /// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
-/// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19).
+/// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19,
+/// R-BOT-02).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -21,6 +22,8 @@ class GameSettings {
     this.sharedPings = false,
     this.anonymousPlayers = true,
     this.outsideLiveLocation = true,
+    this.botHunters = 0,
+    this.botPlayers = 0,
     this.area = const [],
   });
 
@@ -68,6 +71,11 @@ class GameSettings {
   /// Hunters see the live location of a player who left the play area
   /// (R-SET-17, R-OUT-01).
   final bool outsideLiveLocation;
+
+  /// Computer hunters and players for testing with few phones (R-BOT-02);
+  /// only offered in debug builds.
+  final int botHunters;
+  final int botPlayers;
 
   /// The joker "player positions" is only offered without [sharedPings].
   bool get playerJokerAvailable => playerJokerEnabled && !sharedPings;
@@ -126,6 +134,8 @@ class GameSettings {
     bool? sharedPings,
     bool? anonymousPlayers,
     bool? outsideLiveLocation,
+    int? botHunters,
+    int? botPlayers,
     List<GeoPoint>? area,
   }) => GameSettings(
     duration: duration ?? this.duration,
@@ -146,6 +156,8 @@ class GameSettings {
     sharedPings: sharedPings ?? this.sharedPings,
     anonymousPlayers: anonymousPlayers ?? this.anonymousPlayers,
     outsideLiveLocation: outsideLiveLocation ?? this.outsideLiveLocation,
+    botHunters: botHunters ?? this.botHunters,
+    botPlayers: botPlayers ?? this.botPlayers,
     area: area ?? this.area,
   );
 
@@ -167,6 +179,8 @@ class GameSettings {
     'sharedPings': sharedPings,
     'anonymousPlayers': anonymousPlayers,
     'outsideLiveLocation': outsideLiveLocation,
+    'botHunters': botHunters,
+    'botPlayers': botPlayers,
     'area': [for (final p in area) p.toJson()],
   };
 
@@ -196,6 +210,8 @@ class GameSettings {
     sharedPings: json['sharedPings'] as bool? ?? false,
     anonymousPlayers: json['anonymousPlayers'] as bool? ?? true,
     outsideLiveLocation: json['outsideLiveLocation'] as bool? ?? true,
+    botHunters: json['botHunters'] as int? ?? 0,
+    botPlayers: json['botPlayers'] as int? ?? 0,
     area: [
       for (final p in json['area']! as List<Object?>)
         GeoPoint.fromJson(p! as Map<String, Object?>),

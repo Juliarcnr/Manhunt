@@ -96,7 +96,9 @@ class OverviewSheet extends StatelessWidget {
         radius: 16,
         backgroundColor: color.withValues(alpha: m.caught ? 0.08 : 0.18),
         foregroundColor: m.caught ? AppColors.textMuted : color,
-        child: Text(m.name.isEmpty ? '?' : m.name[0].toUpperCase()),
+        child: Text(
+          m.name.isEmpty ? '?' : m.name.characters.first.toUpperCase(),
+        ),
       ),
       title: Text(
         m.id == myId ? '${m.name} (${l10n.lobbyYouBadge})' : m.name,

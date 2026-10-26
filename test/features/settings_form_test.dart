@@ -260,4 +260,54 @@ void main() {
       expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isFalse);
     });
   });
+
+  group('number of computer members, debug only (R-BOT-01, R-BOT-02)', () {
+    Future<GameSettings Function()> pump(
+      WidgetTester tester, {
+      required bool showBots,
+    }) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (context, setState) => SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                  showBots: showBots,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return () => settings;
+    }
+
+    testWidgets('hidden unless enabled', (tester) async {
+      await pump(tester, showBots: false);
+      expect(find.byKey(const Key('botSettings')), findsNothing);
+      expect(find.text('Computer-Spieler'), findsNothing);
+    });
+
+    testWidgets('hunters and players are set separately', (tester) async {
+      final settings = await pump(tester, showBots: true);
+      Finder plus(String label) => find.descendant(
+        of: find.ancestor(of: find.text(label), matching: find.byType(Row)),
+        matching: find.byTooltip('+'),
+      );
+      await tester.ensureVisible(find.text('Computer-Spieler'));
+      await tester.tap(plus('Computer-Spieler'));
+      await tester.pump();
+      await tester.tap(plus('Computer-Spieler'));
+      await tester.pump();
+      await tester.tap(plus('Computer-Hunter'));
+      await tester.pump();
+      expect((settings().botHunters, settings().botPlayers), (1, 2));
+    });
+  });
 }

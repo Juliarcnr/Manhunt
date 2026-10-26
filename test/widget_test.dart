@@ -34,6 +34,7 @@ void main() {
     WidgetTester tester, {
     required FakeFirebaseFirestore db,
     required String userId,
+    FakeBotBackend? bots,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -41,6 +42,7 @@ void main() {
           db: db,
           userId: userId,
           store: MemorySessionStore.withGroup('ABCDE-FGHJK'),
+          bots: bots,
         ),
         child: const ManhuntApp(locale: Locale('en')),
       ),
@@ -288,6 +290,70 @@ void main() {
     await tester.tap(find.text('Remove'));
     await settleAsync(tester);
     expect(find.text('Kim'), findsNothing);
+  });
+
+  testWidgets('computer members keep their role in the lobby (R-BOT-03)', (
+    tester,
+  ) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    final guest = await tester.runAsync(
+      () => testSession('ABCDE-FGHJK', 'guest'),
+    );
+    final bot = await tester.runAsync(
+      () => testSession('ABCDE-FGHJK', 'bot-x'),
+    );
+    await tester.runAsync(() async {
+      await deviceRepo(db).createGame(
+        me!,
+        name: 'Julia',
+        settings: defaultSettings.copyWith(botHunters: 1, botPlayers: 1),
+      );
+      await deviceRepo(db).joinGame(guest!, name: 'Kim');
+      // Carried by another phone; the host gives it its role.
+      await deviceRepo(db).joinGame(bot!, name: '🤖 Player 1');
+    });
+    await pumpAppWithSession(
+      tester,
+      db: db,
+      userId: 'me',
+      bots: FakeBotBackend(db, owner: 'me'),
+    );
+
+    Future<String?> role(String id) async =>
+        (await tester.runAsync(
+              () => db
+                  .collection('games')
+                  .doc(me!.groupId)
+                  .collection('members')
+                  .doc(id)
+                  .get(),
+            ))!.data()?['role']
+            as String?;
+
+    expect(await role('bot-x'), 'player');
+    const hint = 'Computer hunters appear as soon as a person is a hunter.';
+    Future<void> toBottom() async {
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+    }
+
+    await toBottom();
+    expect(find.text(hint), findsOneWidget);
+
+    // Not switchable by tapping, untouched by the random assignment.
+    await tester.ensureVisible(find.text('🤖 Player 1'));
+    await tester.tap(find.text('🤖 Player 1'));
+    await settleAsync(tester);
+    expect(await role('bot-x'), 'player');
+    await tester.drag(find.byType(ListView), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('randomButton')));
+    await settleAsync(tester);
+    expect(await role('bot-x'), 'player');
+    expect({await role('me'), await role('guest')}, {'hunter', 'player'});
+    await toBottom();
+    expect(find.text(hint), findsNothing);
   });
 
   testWidgets('removed member is told and can go back home (R-LOBBY-09)', (

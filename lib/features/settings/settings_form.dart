@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/bots/bot_plan.dart';
 import '../../core/models/game_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
@@ -12,10 +13,14 @@ class SettingsForm extends StatelessWidget {
     super.key,
     required this.settings,
     required this.onChanged,
+    this.showBots = false,
   });
 
   final GameSettings settings;
   final ValueChanged<GameSettings>? onChanged;
+
+  /// Debug builds: number of computer members (R-BOT-02).
+  final bool showBots;
 
   @override
   Widget build(BuildContext context) {
@@ -288,6 +293,31 @@ class SettingsForm extends StatelessWidget {
             ),
           ],
         ),
+        if (showBots)
+          SectionCard(
+            key: const Key('botSettings'),
+            title: l10n.settingsSectionBots,
+            children: [
+              Text(
+                l10n.settingsBotsHint,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              count(
+                label: l10n.settingsBotHunters,
+                value: s.botHunters,
+                min: 0,
+                max: maxBotsPerKind,
+                apply: (v) => s.copyWith(botHunters: v),
+              ),
+              count(
+                label: l10n.settingsBotPlayers,
+                value: s.botPlayers,
+                min: 0,
+                max: maxBotsPerKind,
+                apply: (v) => s.copyWith(botPlayers: v),
+              ),
+            ],
+          ),
       ],
     );
   }

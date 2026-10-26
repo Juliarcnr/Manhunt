@@ -313,6 +313,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'If a player is clearly outside the play area (at least 30 m plus GPS inaccuracy) for 30 s, the hunters see their live location – until they are back, plus 1 minute. The player is warned first.';
 
   @override
+  String get settingsSectionBots => 'Test (debug)';
+
+  @override
+  String get settingsBotsHint =>
+      'Computer members walk randomly within 30 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.';
+
+  @override
+  String get settingsBotHunters => 'Computer hunters';
+
+  @override
+  String get settingsBotPlayers => 'Computer players';
+
+  @override
   String get settingsArea => 'Play area';
 
   @override
@@ -438,6 +451,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lobbyWaitingForAdmin => 'Waiting for the host to start…';
+
+  @override
+  String get lobbyBotsNeedHunter =>
+      'Computer hunters appear as soon as a person is a hunter.';
+
+  @override
+  String get lobbyBotsNeedPlayer =>
+      'Computer players appear as soon as a person is a player.';
 
   @override
   String get lobbyAdminBadge => 'Host';

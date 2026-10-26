@@ -220,6 +220,19 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-DEV-03 | Projektwissen wird in md-Dateien gepflegt (`CLAUDE.md`, `docs/`), wiederkehrende Abläufe als Skills. |
 | R-DEV-04 | Versionsname bleibt vorerst `0.1.0`; die Buildnummer startet bei 1 und wird vor jedem Store-/Test-Build mit `dart run tool/bump_build.dart` hochgezählt. |
 
+## 12a. Test-Hilfen: Computer-Mitglieder (2026-10-26)
+
+Zum Testen mit nur zwei Handys.
+
+| ID | Anforderung |
+|---|---|
+| R-BOT-01 | Computer-Mitglieder gibt es nur in Debug-Builds und in Release-Builds mit `--dart-define=MANHUNT_BOTS=true` – nie in TestFlight/Store-Builds ohne diesen Schalter. |
+| R-BOT-02 | Der Host stellt in den Einstellungen (Abschnitt „Test (Debug)“) die Anzahl Computer-Hunter und Computer-Spieler ein (je 0–4, Standard 0). |
+| R-BOT-03 | Computer-Mitglieder heißen „🤖 Hunter n“ / „🤖 Player n“. Sie laufen auf dem Handy des ersten Menschen mit ihrer Rolle (Beitrittsreihenfolge); gibt es keinen, gibt es (noch) keine Computer-Mitglieder dieser Art und die Lobby zeigt dem Host einen Hinweis. Ändern sich Anzahl oder Rollen, gleichen die Handys das in der Lobby automatisch an; der Host gibt ihnen automatisch ihre Rolle, die Zufallseinteilung und das Antippen ändern sie nicht. |
+| R-BOT-04 | Ein Computer-Mitglied läuft zufällig (ca. 1,3 m/s, mit Pausen) in höchstens 30 m um den aktuellen Standort seines Handys; ist der weg (z.B. gefangen), bleibt es um den letzten. |
+| R-BOT-05 | Ein Computer-Mitglied verhält sich wie ein echtes Handy: reguläre Pings, Speedhunt-Pings als Ziel, Joker-Anfragen beantworten, Spielfeld verlassen, nach dem Catch stoppen; Computer-Hunter teilen ihren Live-Standort. Das läuft, solange auf seinem Handy der Spielbildschirm offen ist. Seine Protokollzeilen erscheinen im Debug-Log dieses Handys. |
+| R-BOT-06 | Jedes Computer-Mitglied hat ein eigenes anonymes Firebase-Konto und nutzt nur die normalen Abläufe – keine Änderung an den Sicherheitsregeln. |
+
 ## 13. Technische Entscheidungen
 
 | Thema | Entscheidung |

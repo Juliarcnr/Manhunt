@@ -20,6 +20,7 @@ import '../../data/game_repository.dart';
 import '../../data/joker_store.dart';
 import '../../data/location_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/bots.dart';
 import '../../state/providers.dart';
 import '../../state/round_engine.dart';
 import '../../theme/app_theme.dart';
@@ -58,6 +59,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
   var _ending = false;
   RoundEngine? _engine;
   final _notices = NoticeTracker();
+
+  BotSquad? _bots;
 
   final _map = MapController();
   final _subscriptions = <ProviderSubscription<Object?>>[];
@@ -100,6 +103,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
     _engine = engine;
     engine.log.value = ['screen opened'];
+    // Computer members carried by this phone walk around it (R-BOT-05).
+    if (ref.read(botsEnabledProvider)) {
+      _bots = BotSquad(
+        session: widget.session,
+        backend: ref.read(botBackendProvider),
+        anchor: () => _engine?.position.value,
+        notice: engine.notice,
+        now: widget.now,
+        onLog: engine.note,
+      );
+    }
     _pingsSentSub = engine.pingsSent.listen(
       (slot) => _notify(PingSentNotice(slot.kind)),
     );
@@ -113,7 +127,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
     _subscriptions
       ..add(
-        ref.listenManual(membersProvider, (_, _) {
+        ref.listenManual<AsyncValue<List<Member>>>(membersProvider, (_, next) {
+          if (next.value case final members?) unawaited(_bots?.update(members));
           _feedEngine();
           _checkRoundOver();
         }, fireImmediately: true),
@@ -313,7 +328,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
     }
     unawaited(_pingsSentSub?.cancel());
     unawaited(_boundarySub?.cancel());
-    unawaited(_engine?.dispose());
+    // The bots first: they report into the own engine's log.
+    final bots = _bots;
+    final engine = _engine;
+    unawaited(() async {
+      await bots?.dispose();
+      await engine?.dispose();
+    }());
     super.dispose();
   }
 
