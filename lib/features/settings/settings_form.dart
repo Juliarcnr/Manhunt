@@ -24,7 +24,10 @@ class SettingsForm extends StatelessWidget {
     final readOnly = onChanged == null;
     void change(GameSettings next) => onChanged?.call(next);
 
+    /// Below [floor] (min ≤ floor) the − button stays active but only shows
+    /// [floorMessage] instead of changing the value.
     Widget minutes({
+      Key? key,
       required String label,
       String? hint,
       required Duration value,
@@ -32,13 +35,25 @@ class SettingsForm extends StatelessWidget {
       required int min,
       required int max,
       required GameSettings Function(Duration) apply,
+      Duration floor = Duration.zero,
+      String? floorMessage,
     }) => StepperTile(
+      key: key,
       label: label,
       hint: hint,
       valueText: formatDuration(l10n, value),
       canDecrease: value.inMinutes - step >= min,
       canIncrease: value.inMinutes + step <= max,
-      onDecrease: () => change(apply(value - Duration(minutes: step))),
+      onDecrease: () {
+        final next = value - Duration(minutes: step);
+        if (next < floor && floorMessage != null) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(floorMessage)));
+          return;
+        }
+        change(apply(next));
+      },
       onIncrease: () => change(apply(value + Duration(minutes: step))),
       readOnly: readOnly,
     );
@@ -115,6 +130,50 @@ class SettingsForm extends StatelessWidget {
               max: 600,
               apply: (v) => s.copyWith(speedhuntEarliest: v),
             ),
+            minutes(
+              key: const Key('speedhuntCooldown'),
+              label: l10n.settingsSpeedhuntCooldown,
+              hint: l10n.settingsSpeedhuntCooldownHint,
+              value: s.speedhuntCooldown,
+              step: 5,
+              min: 0,
+              max: 180,
+              // The per-player pause is never shorter (R-SET-19).
+              apply: (v) => s.copyWith(
+                speedhuntCooldown: v,
+                speedhuntRepeatCooldown: v > s.speedhuntRepeatCooldown
+                    ? v
+                    : null,
+              ),
+            ),
+            SwitchListTile(
+              key: const Key('speedhuntRepeatSwitch'),
+              contentPadding: const EdgeInsets.only(right: 8),
+              title: Text(l10n.settingsSpeedhuntRepeat),
+              subtitle: Text(
+                s.speedhuntRepeatTarget
+                    ? l10n.settingsSpeedhuntRepeatOnHint
+                    : l10n.settingsSpeedhuntRepeatOffHint,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              value: s.speedhuntRepeatTarget,
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(speedhuntRepeatTarget: v)),
+            ),
+            if (s.speedhuntRepeatTarget)
+              minutes(
+                key: const Key('speedhuntRepeatCooldown'),
+                label: l10n.settingsSpeedhuntRepeatCooldown,
+                hint: l10n.settingsSpeedhuntRepeatCooldownHint,
+                value: s.speedhuntRepeatCooldown,
+                step: 5,
+                min: 0,
+                max: 180,
+                floor: s.speedhuntCooldown,
+                floorMessage: l10n.settingsSpeedhuntRepeatCooldownMin,
+                apply: (v) => s.copyWith(speedhuntRepeatCooldown: v),
+              ),
             count(
               label: l10n.settingsSpeedhuntPings,
               value: s.speedhuntPings,
@@ -247,7 +306,8 @@ String settingsErrorText(AppLocalizations l10n, SettingsError e) => switch (e) {
   SettingsError.pingIntervalTooShort => l10n.errorPingIntervalTooShort,
   SettingsError.speedhuntCountInvalid ||
   SettingsError.speedhuntPingsInvalid ||
-  SettingsError.speedhuntIntervalTooShort => l10n.errorSpeedhuntInvalid,
+  SettingsError.speedhuntIntervalTooShort ||
+  SettingsError.speedhuntRepeatCooldownTooShort => l10n.errorSpeedhuntInvalid,
   SettingsError.hunterCountInvalid => l10n.errorHunterCountInvalid,
   SettingsError.notEnoughPlayers => l10n.errorNotEnoughPlayers,
   SettingsError.areaMissing => l10n.errorAreaMissing,

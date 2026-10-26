@@ -64,7 +64,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/outsideLocs/{uid}` | updatedAt, `data` (live, alle 5 s) – nur solange der Spieler außerhalb des Spielfelds ist + 60 s (R-OUT-03/04); nur Hunter lesen, nur der Spieler selbst schreibt/löscht | Standort | ✔ |
 | `games/{groupId}/events/{auto}` | type (catch/speedhunt), createdAt, `data` – Speedhunt-Event **ohne** Ziel | Inhalt | ✔ |
-| `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar | – | ✔ |
+| `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar (Hunter listen alle für R-SET-19) | – | ✔ |
 | `games/{groupId}/jokerRequests/{id}` | uid (Fragender), createdAt – nur Spieler lesbar; nur zusammen mit `playerJokerUsed` | – | ✔ |
 | `games/{groupId}/jokerAnswers/{requestId}_{uid}` | request, requester, uid, createdAt, `data` – nur der Fragende liest | Standort | ✔ |
 | `games/{groupId}/history/{auto}` | endedAt, `data` (RoundSummary) – überlebt Rundenende | Inhalt | ✔ |
@@ -82,6 +82,11 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 ## Bestätigte Regeln (Julia, 2026-10-04)
 - Speedhunt: erster Ping sofort beim Auslösen, dann alle `speedhuntInterval`.
 - Höchstens ein Speedhunt gleichzeitig; nur auf nicht gefangene Spieler.
+- Pausen (2026-10-26): `nextSpeedhuntAt` = max(Vorlaufende, Start + `speedhuntEarliest`, Ende des letzten Speedhunts +
+  `speedhuntCooldown`) – Button grau mit Countdown (R-SET-18, R-SPEED-11). Pro Spieler (R-SET-19) `speedhuntTargetBlock`:
+  ohne Wiederholung ist das Ziel des letzten Speedhunts gesperrt, mit Wiederholung bis Ende des letzten Speedhunts auf
+  ihn + `speedhuntRepeatCooldown` (≥ `speedhuntCooldown`). Die Ziele lesen nur Hunter (`speedhuntsWithTargetsProvider`
+  → `watchSpeedhuntsWithTargets`).
 - Wird das Ziel während des Speedhunts gefangen, endet er sofort (R-SPEED-10): Der Melder (Hunter oder Ziel selbst, beide
   kennen das Ziel) schreibt den Speedhunt-Start ins verschlüsselte Catch-Event (`CatchRecord.endsSpeedhunt`); alle
   Geräte setzen daraus `Speedhunt.endedAt` (`applyCatches` in den Providern) → keine weiteren Pings/⚡-Pings, Banner aus.
@@ -164,7 +169,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Handys < 1 s ab; nur bei manuell verstellter Uhr verschieben sich Pings (Checkliste in `docs/BeforeYourGame.md`).
   Weicht eine Handy-Uhr stark ab,
   verschieben sich ihre Pings. Ein Server-Zeit-Ausgleich wäre möglich, ist aber bisher nicht nötig.
-- **Speedhunt-Limit** wird nur in der App geprüft (Regeln können nicht zählen) – unter Freunden ausreichend.
+- **Speedhunt-Limit und -Pausen** werden nur in der App geprüft (Regeln können nicht zählen) – unter Freunden ausreichend.
 - **Gefangene Spieler** tracken nicht mehr; ihre App kann im Hintergrund pausiert werden, Benachrichtigungen kommen
   dann erst beim Öffnen.
 - iOS-Hintergrundbetrieb ist ungetestet (Build nur auf dem Mac).

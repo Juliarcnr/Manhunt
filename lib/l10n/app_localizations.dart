@@ -524,6 +524,54 @@ abstract class AppLocalizations {
   /// **'Time between triggering a speedhunt and its first ping.'**
   String get settingsSpeedhuntFirstDelayHint;
 
+  /// No description provided for @settingsSpeedhuntCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause between speedhunts'**
+  String get settingsSpeedhuntCooldown;
+
+  /// No description provided for @settingsSpeedhuntCooldownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted from the end of a speedhunt. Until then hunters cannot start another one.'**
+  String get settingsSpeedhuntCooldownHint;
+
+  /// No description provided for @settingsSpeedhuntRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Same player several times in a row'**
+  String get settingsSpeedhuntRepeat;
+
+  /// No description provided for @settingsSpeedhuntRepeatOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The same player can only be picked again after their own pause.'**
+  String get settingsSpeedhuntRepeatOnHint;
+
+  /// No description provided for @settingsSpeedhuntRepeatOffHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The target of the last speedhunt cannot be picked for the next one.'**
+  String get settingsSpeedhuntRepeatOffHint;
+
+  /// No description provided for @settingsSpeedhuntRepeatCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause for the same player'**
+  String get settingsSpeedhuntRepeatCooldown;
+
+  /// No description provided for @settingsSpeedhuntRepeatCooldownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted from the end of the last speedhunt on that player.'**
+  String get settingsSpeedhuntRepeatCooldownHint;
+
+  /// No description provided for @settingsSpeedhuntRepeatCooldownMin.
+  ///
+  /// In en, this message translates to:
+  /// **'The pause for the same player cannot be shorter than the pause between speedhunts. Shorten that one first.'**
+  String get settingsSpeedhuntRepeatCooldownMin;
+
   /// No description provided for @settingsHunterCount.
   ///
   /// In en, this message translates to:
@@ -1082,11 +1130,17 @@ abstract class AppLocalizations {
   /// **'Speedhunts are possible once the hunters are released.'**
   String get speedhuntNotHunting;
 
-  /// No description provided for @speedhuntTooEarly.
+  /// No description provided for @speedhuntNotYet.
   ///
   /// In en, this message translates to:
-  /// **'The first speedhunt is possible {minutes} min after the start.'**
-  String speedhuntTooEarly(int minutes);
+  /// **'The next speedhunt is possible in {time} min.'**
+  String speedhuntNotYet(String time);
+
+  /// No description provided for @speedhuntButtonWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Speedhunt ({left}) · {time}'**
+  String speedhuntButtonWait(int left, String time);
 
   /// No description provided for @speedhuntNoneLeft.
   ///
@@ -1105,6 +1159,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This player cannot be speedhunted.'**
   String get speedhuntInvalidTarget;
+
+  /// No description provided for @speedhuntSameTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Several speedhunts in a row on the same player are not allowed.'**
+  String get speedhuntSameTarget;
+
+  /// No description provided for @speedhuntTargetCoolingDown.
+  ///
+  /// In en, this message translates to:
+  /// **'A speedhunt on {name} is possible again in {time} min.'**
+  String speedhuntTargetCoolingDown(String name, String time);
+
+  /// No description provided for @speedhuntPlayerWait.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · {time}'**
+  String speedhuntPlayerWait(String name, String time);
 
   /// No description provided for @jokerButton.
   ///

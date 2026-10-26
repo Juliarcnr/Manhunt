@@ -87,6 +87,43 @@ void main() {
       expect(GameSettings.fromJson(legacy).outsideLiveLocation, isTrue);
     });
 
+    test('speedhunt pauses: 30 min each with repeats, also for older groups; '
+        'the per-player pause is never shorter (R-SET-18, R-SET-19)', () {
+      const custom = GameSettings(
+        speedhuntCooldown: Duration(minutes: 45),
+        speedhuntRepeatTarget: false,
+        speedhuntRepeatCooldown: Duration(minutes: 50),
+      );
+      final back = GameSettings.fromJson(custom.toJson());
+      expect(back.speedhuntCooldown, const Duration(minutes: 45));
+      expect(back.speedhuntRepeatTarget, isFalse);
+      expect(back.speedhuntRepeatCooldown, const Duration(minutes: 50));
+      expect(custom.copyWith(hunterCount: 2).speedhuntRepeatTarget, isFalse);
+
+      final legacy = const GameSettings().toJson()
+        ..remove('speedhuntCooldownSec')
+        ..remove('speedhuntRepeatTarget')
+        ..remove('speedhuntRepeatCooldownSec');
+      final old = GameSettings.fromJson(legacy);
+      expect(old.speedhuntCooldown, const Duration(minutes: 30));
+      expect(old.speedhuntRepeatTarget, isTrue);
+      expect(old.speedhuntRepeatCooldown, const Duration(minutes: 30));
+
+      const shorter = GameSettings(
+        area: square,
+        speedhuntRepeatCooldown: Duration(minutes: 20),
+      );
+      expect(
+        shorter.validate(),
+        contains(SettingsError.speedhuntRepeatCooldownTooShort),
+      );
+      // Without repeats the per-player pause does not matter.
+      expect(
+        shorter.copyWith(speedhuntRepeatTarget: false).validate(),
+        isEmpty,
+      );
+    });
+
     test('json roundtrip', () {
       const s = GameSettings(hunterCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());

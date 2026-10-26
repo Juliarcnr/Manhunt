@@ -246,6 +246,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Time between triggering a speedhunt and its first ping.';
 
   @override
+  String get settingsSpeedhuntCooldown => 'Pause between speedhunts';
+
+  @override
+  String get settingsSpeedhuntCooldownHint =>
+      'Counted from the end of a speedhunt. Until then hunters cannot start another one.';
+
+  @override
+  String get settingsSpeedhuntRepeat => 'Same player several times in a row';
+
+  @override
+  String get settingsSpeedhuntRepeatOnHint =>
+      'The same player can only be picked again after their own pause.';
+
+  @override
+  String get settingsSpeedhuntRepeatOffHint =>
+      'The target of the last speedhunt cannot be picked for the next one.';
+
+  @override
+  String get settingsSpeedhuntRepeatCooldown => 'Pause for the same player';
+
+  @override
+  String get settingsSpeedhuntRepeatCooldownHint =>
+      'Counted from the end of the last speedhunt on that player.';
+
+  @override
+  String get settingsSpeedhuntRepeatCooldownMin =>
+      'The pause for the same player cannot be shorter than the pause between speedhunts. Shorten that one first.';
+
+  @override
   String get settingsHunterCount => 'Number of hunters';
 
   @override
@@ -581,8 +610,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Speedhunts are possible once the hunters are released.';
 
   @override
-  String speedhuntTooEarly(int minutes) {
-    return 'The first speedhunt is possible $minutes min after the start.';
+  String speedhuntNotYet(String time) {
+    return 'The next speedhunt is possible in $time min.';
+  }
+
+  @override
+  String speedhuntButtonWait(int left, String time) {
+    return 'Speedhunt ($left) · $time';
   }
 
   @override
@@ -593,6 +627,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get speedhuntInvalidTarget => 'This player cannot be speedhunted.';
+
+  @override
+  String get speedhuntSameTarget =>
+      'Several speedhunts in a row on the same player are not allowed.';
+
+  @override
+  String speedhuntTargetCoolingDown(String name, String time) {
+    return 'A speedhunt on $name is possible again in $time min.';
+  }
+
+  @override
+  String speedhuntPlayerWait(String name, String time) {
+    return '$name · $time';
+  }
 
   @override
   String get jokerButton => 'Joker';

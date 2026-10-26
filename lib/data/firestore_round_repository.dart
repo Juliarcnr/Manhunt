@@ -282,6 +282,13 @@ class FirestoreRoundRepository implements RoundRepository {
         .get(),
   );
 
+  @override
+  Stream<List<Speedhunt>> watchSpeedhuntsWithTargets(GroupSession session) =>
+      _game(session)
+          .collection('speedhuntTargets')
+          .snapshots()
+          .asyncMap((targets) => _speedhuntsOf(session, targets));
+
   Future<List<Speedhunt>> _speedhuntsOf(
     GroupSession session,
     QuerySnapshot<Map<String, dynamic>> targets,

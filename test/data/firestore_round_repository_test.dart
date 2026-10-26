@@ -228,6 +228,24 @@ void main() {
       expect(ended.single.endedAt, caughtAt);
       expect(ended.single.pingTimes(), sh.pingTimes().take(2));
     });
+
+    test('hunters see all speedhunts with their targets (R-SET-19)', () async {
+      await rounds.startSpeedhunt(hunter, sh);
+      final later = t0.add(const Duration(minutes: 50));
+      await rounds.startSpeedhunt(
+        hunter,
+        Speedhunt.fromSettings(
+          targetId: 'sam',
+          startedAt: later,
+          settings: const GameSettings(),
+        ),
+      );
+      final all = await rounds.watchSpeedhuntsWithTargets(hunter).first;
+      expect(
+        {for (final s in all) s.targetId: s.startedAt},
+        {'kim': t0, 'sam': later},
+      );
+    });
   });
 
   group('catches (R-CATCH-01, R-CATCH-02, R-NOTIF-02)', () {

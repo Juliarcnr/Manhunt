@@ -544,7 +544,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         icon: Icons.warning_amber_rounded,
         color: AppColors.speedhunt,
         title: l10n.gameAbortTitle,
-        text: l10n.gameAbortText(_formatCountdown(endAt.difference(now))),
+        text: l10n.gameAbortText(formatCountdown(endAt.difference(now))),
         action: l10n.gameAbortContinue,
         actionKey: const Key('confirmAbortFirst'),
       )) {
@@ -652,14 +652,37 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   /// [members]: players in the order and with the [names] hunters see them
-  /// (R-ANON-01).
+  /// (R-ANON-01). [targeted]: [previous] with their targets (R-SET-19).
   Future<void> _startSpeedhunt(
     GameClock clock,
     List<Member> members,
     Map<String, String> names,
     List<Speedhunt> previous,
+    List<Speedhunt> targeted,
   ) async {
     final l10n = AppLocalizations.of(context);
+    String denialText(SpeedhuntDenial d, [String? targetId]) {
+      final now = widget.now();
+      final until = switch (d) {
+        SpeedhuntDenial.targetCoolingDown => speedhuntTargetBlock(
+          settings: clock.settings,
+          previous: targeted,
+          targetId: targetId!,
+          now: now,
+        )?.until,
+        _ => nextSpeedhuntAt(clock, previous),
+      };
+      return speedhuntDenialText(
+        l10n,
+        d,
+        remaining: until?.difference(now) ?? Duration.zero,
+        targetName:
+            names[targetId] ??
+            members.where((m) => m.id == targetId).firstOrNull?.name ??
+            '',
+      );
+    }
+
     // Check time/count/running first, so nobody picks a target in vain.
     final early = canStartSpeedhunt(
       clock: clock,
@@ -668,7 +691,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       target: const Member(id: '', name: '', role: Role.player),
     );
     if (early != null) {
-      _snack(speedhuntDenialText(l10n, early, widget.game.settings));
+      _snack(denialText(early));
       return;
     }
     final targetId = await showSpeedhuntDialog(
@@ -676,6 +699,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
       members: members,
       names: names,
       settings: widget.game.settings,
+      targeted: targeted,
+      now: widget.now,
     );
     if (targetId == null || !mounted) return;
     final denial = canStartSpeedhunt(
@@ -683,9 +708,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
       now: widget.now(),
       previous: previous,
       target: members.firstWhere((m) => m.id == targetId),
+      targeted: targeted,
     );
     if (denial != null) {
-      _snack(speedhuntDenialText(l10n, denial, widget.game.settings));
+      _snack(denialText(denial, targetId));
       return;
     }
     await _run(
@@ -1206,9 +1232,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final nextRegular = isHunter ? clock?.nextRegularPing(now) : null;
     final infoLines = [
       if (nextSlot != null)
-        l10n.gameNextPing(_formatCountdown(nextSlot.at.difference(now))),
+        l10n.gameNextPing(formatCountdown(nextSlot.at.difference(now))),
       if (nextRegular != null)
-        l10n.gameNextPings(_formatCountdown(nextRegular.difference(now))),
+        l10n.gameNextPings(formatCountdown(nextRegular.difference(now))),
       // Once the round is over the time-up hint says enough.
       if ((me?.caught ?? false) && phase != GamePhase.ended)
         l10n.gameCaughtSelf,
@@ -1223,6 +1249,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
     ];
     final speedhuntsLeft =
         widget.game.settings.speedhuntCount - speedhunts.length;
+    // Until the next speedhunt is possible the button is greyed out with a
+    // countdown, but stays tappable to tell why (R-SPEED-11).
+    final speedhuntWait = switch (clock) {
+      final clock? when speedhuntsLeft > 0 && phase != GamePhase.ended =>
+        nextSpeedhuntAt(clock, speedhunts).difference(now),
+      _ => Duration.zero,
+    };
+    // Targets for the per-player rules (R-SET-19); hunters only.
+    final targeted = isHunter
+        ? ref.watch(speedhuntsWithTargetsProvider).value ?? const <Speedhunt>[]
+        : const <Speedhunt>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -1251,7 +1288,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
               if (until != null) ...[
                 const SizedBox(width: 10),
                 Text(
-                  _formatCountdown(until.difference(now)),
+                  formatCountdown(until.difference(now)),
                   key: const Key('gameCountdown'),
                   style: const TextStyle(
                     fontSize: 20,
@@ -1365,7 +1402,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       (:final number, :final at) => l10n.gameSpeedhuntNext(
                         number,
                         running.pings,
-                        _formatCountdown(at.difference(now)),
+                        formatCountdown(at.difference(now)),
                       ),
                       null => l10n.speedhuntActive,
                     },
@@ -1439,10 +1476,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
                                   ],
                                   names,
                                   speedhunts,
+                                  targeted,
+                                )
+                              : null,
+                          style: speedhuntWait > Duration.zero
+                              ? OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.textMuted,
                                 )
                               : null,
                           icon: const Icon(Icons.bolt),
-                          label: Text(l10n.speedhuntButton(speedhuntsLeft)),
+                          label: Text(
+                            speedhuntWait > Duration.zero
+                                ? l10n.speedhuntButtonWait(
+                                    speedhuntsLeft,
+                                    formatCountdown(speedhuntWait),
+                                  )
+                                : l10n.speedhuntButton(speedhuntsLeft),
+                          ),
                         ),
                       ),
                     ],
@@ -1478,15 +1528,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             ),
     );
   }
-}
-
-String _formatCountdown(Duration d) {
-  if (d.isNegative) d = Duration.zero;
-  String two(int n) => n.toString().padLeft(2, '0');
-  final h = d.inHours;
-  final m = two(d.inMinutes % 60);
-  final s = two(d.inSeconds % 60);
-  return h > 0 ? '$h:$m:$s' : '$m:$s';
 }
 
 /// Visible to everyone while a speedhunt runs (R-SPEED-05).
@@ -1538,13 +1579,13 @@ class _OutsideBanner extends StatelessWidget {
       BoundaryPhase.inside => (null, null),
       BoundaryPhase.warning => (
         Icons.warning_amber_rounded,
-        l10n.outsideWarning(_formatCountdown(state.liveAt!.difference(now))),
+        l10n.outsideWarning(formatCountdown(state.liveAt!.difference(now))),
       ),
       BoundaryPhase.live => (Icons.wifi_tethering, l10n.outsideLive),
       BoundaryPhase.afterglow => (
         Icons.wifi_tethering,
         l10n.outsideAfterglow(
-          _formatCountdown(state.afterglowUntil!.difference(now)),
+          formatCountdown(state.afterglowUntil!.difference(now)),
         ),
       ),
     };

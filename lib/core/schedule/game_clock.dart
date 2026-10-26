@@ -63,3 +63,13 @@ class GameClock {
     return null;
   }
 }
+
+/// "mm:ss", or "h:mm:ss" from one hour on; negative counts as zero.
+String formatCountdown(Duration d) {
+  if (d.isNegative) d = Duration.zero;
+  String two(int n) => n.toString().padLeft(2, '0');
+  final h = d.inHours;
+  final m = two(d.inMinutes % 60);
+  final s = two(d.inSeconds % 60);
+  return h > 0 ? '$h:$m:$s' : '$m:$s';
+}

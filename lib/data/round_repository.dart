@@ -76,4 +76,8 @@ abstract interface class RoundRepository {
   /// Speedhunts targeting [playerId], with target set. Only for hunters and
   /// the player themself – to find the speedhunt a catch ends (R-SPEED-10).
   Future<List<Speedhunt>> speedhuntsOn(GroupSession session, String playerId);
+
+  /// All speedhunts with target set. Hunters only – for the per-player rules
+  /// of the next speedhunt (R-SET-19).
+  Stream<List<Speedhunt>> watchSpeedhuntsWithTargets(GroupSession session);
 }

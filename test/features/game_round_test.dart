@@ -129,7 +129,8 @@ void main() {
       await seed(tester);
       await pumpAs(tester, 'alex');
       expect(find.byKey(const Key('catchButton')), findsOneWidget);
-      expect(find.text('Speedhunt (2)'), findsOneWidget);
+      // Minute 30: greyed out until minute 60 (R-SET-11, R-SPEED-11).
+      expect(find.text('Speedhunt (2) · 30:00'), findsOneWidget);
       expect(find.byKey(const Key('jokerButton')), findsNothing);
       expect(location.isTracking, isTrue);
     });
@@ -174,7 +175,8 @@ void main() {
       expect(find.byKey(const Key('speedhuntBanner')), findsOneWidget);
       // 1st ping goes out immediately, so the countdown shows the 2nd one.
       expect(find.text('Speedhunt active · ping 2/3 in 05:00'), findsOneWidget);
-      expect(find.text('Speedhunt (1)'), findsOneWidget);
+      // Ends at minute 80, then 30 min pause (R-SET-18, R-SPEED-11).
+      expect(find.text('Speedhunt (1) · 40:00'), findsOneWidget);
       expect(find.text('Speedhunt started!'), findsOneWidget); // notice
       // Hunters know the target, so no "whom is unclear" hint (R-NOTIF-06).
       expect(find.textContaining('Nobody knows whom'), findsNothing);
@@ -191,7 +193,10 @@ void main() {
       await pumpAs(tester, 'alex'); // minute 30
       await tester.tap(find.byKey(const Key('speedhuntButton')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('60 min after the start'), findsOne);
+      expect(
+        find.text('The next speedhunt is possible in 30:00 min.'),
+        findsOne,
+      );
       expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
     });
 
@@ -204,6 +209,24 @@ void main() {
         ),
       ),
     );
+
+    testWidgets('caught players cannot be picked for a speedhunt '
+        '(R-SPEED-02)', (tester) async {
+      now = start.add(const Duration(minutes: 70)); // after R-SET-11
+      await seed(tester);
+      await catchSam(tester);
+      await pumpAs(tester, 'alex');
+      await tester.tap(find.byKey(const Key('speedhuntButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('speedhuntPlayer')));
+      await tester.pumpAndSettle();
+
+      Finder option(String id) => find.byWidgetPredicate(
+        (w) => w is DropdownMenuItem<String> && w.value == id,
+      );
+      expect(option('kim'), findsWidgets);
+      expect(option('sam'), findsNothing);
+    });
 
     testWidgets('host undoes a catch via the overview, nobody is removed '
         'during a round (R-CATCH-04, R-LOBBY-09)', (tester) async {
@@ -303,7 +326,117 @@ void main() {
       await pumpAs(tester, 'alex');
       await tester.tap(find.byKey(const Key('speedhuntButton')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('once the hunters are released'), findsOne);
+      // Counts down to minute 60 already during the head start (R-SPEED-11).
+      expect(
+        find.text('The next speedhunt is possible in 55:00 min.'),
+        findsOne,
+      );
+      expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
+    });
+
+    group('pauses between speedhunts (R-SET-18, R-SET-19, R-SPEED-11, '
+        'R-SPEED-12)', () {
+      /// Speedhunt on Sam from minute 60 to 70.
+      Future<void> speedhuntOnSam(WidgetTester tester) => tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 60)),
+            settings: settings,
+          ),
+        ),
+      );
+
+      Future<void> openPlayerList(WidgetTester tester) async {
+        await tester.tap(find.byKey(const Key('speedhuntButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('speedhuntPlayer')));
+        await tester.pumpAndSettle();
+      }
+
+      bool canConfirm(WidgetTester tester) =>
+          tester
+              .widget<FilledButton>(find.byKey(const Key('confirmSpeedhunt')))
+              .onPressed !=
+          null;
+
+      testWidgets('button greyed out with countdown; tapping tells how long', (
+        tester,
+      ) async {
+        now = start.add(const Duration(minutes: 80));
+        await seed(tester);
+        await speedhuntOnSam(tester);
+        await pumpAs(tester, 'alex');
+        // Ended at minute 70 + 30 min pause.
+        expect(find.text('Speedhunt (1) · 20:00'), findsOneWidget);
+        final button = tester.widget<OutlinedButton>(
+          find.byKey(const Key('speedhuntButton')),
+        );
+        expect(button.style?.foregroundColor?.resolve({}), AppColors.textMuted);
+        await tester.tap(find.byKey(const Key('speedhuntButton')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('The next speedhunt is possible in 20:00 min.'),
+          findsOne,
+        );
+        expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
+      });
+
+      testWidgets('same player again only after their own pause', (
+        tester,
+      ) async {
+        const longer = GameSettings(
+          area: area,
+          anonymousPlayers: false,
+          speedhuntRepeatCooldown: Duration(minutes: 60),
+        );
+        now = start.add(const Duration(minutes: 110));
+        await seed(tester, gameSettings: longer);
+        await speedhuntOnSam(tester);
+        await pumpAs(tester, 'alex', gameSettings: longer);
+        expect(find.text('Speedhunt (1)'), findsOneWidget);
+        await openPlayerList(tester);
+        // Sam's pause: until minute 70 + 60.
+        await tester.tap(find.text('Sam · 20:00').last);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('A speedhunt on Sam is possible again in 20:00 min.'),
+          findsOne,
+        );
+        expect(canConfirm(tester), isFalse);
+
+        await tester.tap(find.byKey(const Key('speedhuntPlayer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Kim').last);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('speedhuntBlocked')), findsNothing);
+        expect(canConfirm(tester), isTrue);
+      });
+
+      testWidgets('without repeats the last target is blocked', (tester) async {
+        const noRepeat = GameSettings(
+          area: area,
+          anonymousPlayers: false,
+          speedhuntRepeatTarget: false,
+        );
+        now = start.add(const Duration(minutes: 150));
+        await seed(tester, gameSettings: noRepeat);
+        await speedhuntOnSam(tester);
+        await pumpAs(tester, 'alex', gameSettings: noRepeat);
+        await openPlayerList(tester);
+        final sam = tester.widget<Text>(find.text('Sam').last);
+        expect(sam.style?.color, AppColors.textMuted);
+        await tester.tap(find.text('Sam').last);
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            'Several speedhunts in a row on the same player are not allowed.',
+          ),
+          findsOne,
+        );
+        expect(canConfirm(tester), isFalse);
+      });
     });
 
     testWidgets('reporting a catch notifies and marks the player', (

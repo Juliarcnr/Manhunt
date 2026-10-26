@@ -614,6 +614,42 @@ describe('running round (phase 5)', () => {
       await startOnKim();
       assert.equal(await assertSucceeds(catchFlow('sam', 'sam')), 0);
     });
+
+    // The hunters' flow for the per-player rules of the next speedhunt
+    // (R-SET-19): list all targets, then read each speedhunt's event.
+    const targetsFlow = async (uid) => {
+      const db = as(uid);
+      const targets = await getDocs(collection(db, 'games', GID, 'speedhuntTargets'));
+      for (const t of targets.docs) await getDoc(doc(db, 'games', GID, 'events', t.id));
+      return targets.size;
+    };
+
+    test('hunters list all targets, players and others cannot (R-SET-19)', async () => {
+      await startOnKim();
+      await env.withSecurityRulesDisabled((ctx) =>
+        Promise.all([
+          // A hunter who is not the host, and an unassigned member.
+          setDoc(doc(ctx.firestore(), 'games', GID, 'members', 'tom'), {
+            name: 'enc', role: 'hunter', caught: false, jokerUsed: false, joinedAt: new Date(),
+          }),
+          setDoc(doc(ctx.firestore(), 'games', GID, 'members', 'lee'), {
+            name: 'enc', role: 'unassigned', caught: false, jokerUsed: false, joinedAt: new Date(),
+          }),
+        ]),
+      );
+      // Host as hunter and another hunter.
+      assert.equal(await assertSucceeds(targetsFlow('admin')), 1);
+      assert.equal(await assertSucceeds(targetsFlow('tom')), 1);
+      // Players – also the target –, unassigned members and strangers.
+      for (const uid of ['kim', 'sam', 'lee', 'stranger']) {
+        await assertFails(targetsFlow(uid));
+      }
+      // Host as player.
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role: 'player' }),
+      );
+      await assertFails(targetsFlow('admin'));
+    });
   });
 });
 

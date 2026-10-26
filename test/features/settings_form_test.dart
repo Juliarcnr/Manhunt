@@ -43,6 +43,91 @@ void main() {
     });
   });
 
+  group('pauses between speedhunts (R-SET-18, R-SET-19)', () {
+    /// Editable form; returns the current settings.
+    Future<GameSettings Function()> pumpEditable(WidgetTester tester) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (context, setState) => SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return () => settings;
+    }
+
+    Finder button(String tile, String tooltip) => find.descendant(
+      of: find.byKey(Key(tile)),
+      matching: find.byTooltip(tooltip),
+    );
+
+    Future<void> tap(WidgetTester tester, Finder f) async {
+      await tester.ensureVisible(f);
+      await tester.tap(f);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('both 30 min by default, repeats allowed', (tester) async {
+      await pumpEditable(tester);
+      expect(find.text('Pause zwischen Speedhunts'), findsOneWidget);
+      expect(find.text('Pause für denselben Spieler'), findsOneWidget);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const Key('speedhuntRepeatSwitch')),
+            )
+            .value,
+        isTrue,
+      );
+    });
+
+    testWidgets('the per-player pause cannot go below the general one', (
+      tester,
+    ) async {
+      final current = await pumpEditable(tester);
+      await tap(tester, button('speedhuntRepeatCooldown', '−'));
+      expect(current().speedhuntRepeatCooldown, const Duration(minutes: 30));
+      expect(find.textContaining('Verkürze zuerst diese'), findsOneWidget);
+
+      // Lowering the general pause first makes room.
+      await tap(tester, button('speedhuntCooldown', '−'));
+      await tap(tester, button('speedhuntRepeatCooldown', '−'));
+      expect(current().speedhuntCooldown, const Duration(minutes: 25));
+      expect(current().speedhuntRepeatCooldown, const Duration(minutes: 25));
+    });
+
+    testWidgets('raising the general pause raises the per-player one', (
+      tester,
+    ) async {
+      final current = await pumpEditable(tester);
+      await tap(tester, button('speedhuntCooldown', '+'));
+      expect(current().speedhuntCooldown, const Duration(minutes: 35));
+      expect(current().speedhuntRepeatCooldown, const Duration(minutes: 35));
+    });
+
+    testWidgets('without repeats there is no per-player pause', (tester) async {
+      final current = await pumpEditable(tester);
+      await tap(tester, find.byKey(const Key('speedhuntRepeatSwitch')));
+      expect(current().speedhuntRepeatTarget, isFalse);
+      expect(find.byKey(const Key('speedhuntRepeatCooldown')), findsNothing);
+      expect(
+        find.textContaining('Ziel des letzten Speedhunts'),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('read-only form (R-SET-14)', () {
     testWidgets('without onChanged there are no controls to edit', (
       tester,

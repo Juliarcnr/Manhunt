@@ -1,7 +1,7 @@
 import 'geo_point.dart';
 
 /// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
-/// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17).
+/// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -12,6 +12,9 @@ class GameSettings {
     this.speedhuntInterval = const Duration(minutes: 5),
     this.speedhuntEarliest = const Duration(minutes: 60),
     this.speedhuntFirstDelay = Duration.zero,
+    this.speedhuntCooldown = const Duration(minutes: 30),
+    this.speedhuntRepeatTarget = true,
+    this.speedhuntRepeatCooldown = const Duration(minutes: 30),
     this.hunterCount = 1,
     this.jokerEnabled = true,
     this.playerJokerEnabled = true,
@@ -33,6 +36,17 @@ class GameSettings {
 
   /// Delay between triggering a speedhunt and its first ping (R-SET-13).
   final Duration speedhuntFirstDelay;
+
+  /// Pause after the end of a speedhunt before the next one (R-SET-18).
+  final Duration speedhuntCooldown;
+
+  /// Whether two speedhunts in a row may target the same player (R-SET-19).
+  final bool speedhuntRepeatTarget;
+
+  /// With [speedhuntRepeatTarget]: pause after the end of a speedhunt on a
+  /// player before the next one on them; never below [speedhuntCooldown]
+  /// (R-SET-19).
+  final Duration speedhuntRepeatCooldown;
   final int hunterCount;
 
   /// Joker "hunter positions": each player may see the hunters once
@@ -76,6 +90,12 @@ class GameSettings {
         speedhuntFirstDelay < Duration.zero) {
       errors.add(SettingsError.speedhuntCountInvalid);
     }
+    if (speedhuntCooldown < Duration.zero) {
+      errors.add(SettingsError.speedhuntCountInvalid);
+    }
+    if (speedhuntRepeatTarget && speedhuntRepeatCooldown < speedhuntCooldown) {
+      errors.add(SettingsError.speedhuntRepeatCooldownTooShort);
+    }
     if (speedhuntPings < 1) errors.add(SettingsError.speedhuntPingsInvalid);
     if (speedhuntInterval < const Duration(minutes: 1)) {
       errors.add(SettingsError.speedhuntIntervalTooShort);
@@ -97,6 +117,9 @@ class GameSettings {
     Duration? speedhuntInterval,
     Duration? speedhuntEarliest,
     Duration? speedhuntFirstDelay,
+    Duration? speedhuntCooldown,
+    bool? speedhuntRepeatTarget,
+    Duration? speedhuntRepeatCooldown,
     int? hunterCount,
     bool? jokerEnabled,
     bool? playerJokerEnabled,
@@ -113,6 +136,10 @@ class GameSettings {
     speedhuntInterval: speedhuntInterval ?? this.speedhuntInterval,
     speedhuntEarliest: speedhuntEarliest ?? this.speedhuntEarliest,
     speedhuntFirstDelay: speedhuntFirstDelay ?? this.speedhuntFirstDelay,
+    speedhuntCooldown: speedhuntCooldown ?? this.speedhuntCooldown,
+    speedhuntRepeatTarget: speedhuntRepeatTarget ?? this.speedhuntRepeatTarget,
+    speedhuntRepeatCooldown:
+        speedhuntRepeatCooldown ?? this.speedhuntRepeatCooldown,
     hunterCount: hunterCount ?? this.hunterCount,
     jokerEnabled: jokerEnabled ?? this.jokerEnabled,
     playerJokerEnabled: playerJokerEnabled ?? this.playerJokerEnabled,
@@ -131,6 +158,9 @@ class GameSettings {
     'speedhuntIntervalSec': speedhuntInterval.inSeconds,
     'speedhuntEarliestSec': speedhuntEarliest.inSeconds,
     'speedhuntFirstDelaySec': speedhuntFirstDelay.inSeconds,
+    'speedhuntCooldownSec': speedhuntCooldown.inSeconds,
+    'speedhuntRepeatTarget': speedhuntRepeatTarget,
+    'speedhuntRepeatCooldownSec': speedhuntRepeatCooldown.inSeconds,
     'hunterCount': hunterCount,
     'jokerEnabled': jokerEnabled,
     'playerJokerEnabled': playerJokerEnabled,
@@ -153,6 +183,13 @@ class GameSettings {
     speedhuntFirstDelay: Duration(
       seconds: json['speedhuntFirstDelaySec'] as int? ?? 0,
     ),
+    speedhuntCooldown: Duration(
+      seconds: json['speedhuntCooldownSec'] as int? ?? 1800,
+    ),
+    speedhuntRepeatTarget: json['speedhuntRepeatTarget'] as bool? ?? true,
+    speedhuntRepeatCooldown: Duration(
+      seconds: json['speedhuntRepeatCooldownSec'] as int? ?? 1800,
+    ),
     hunterCount: json['hunterCount']! as int,
     jokerEnabled: json['jokerEnabled'] as bool? ?? true,
     playerJokerEnabled: json['playerJokerEnabled'] as bool? ?? true,
@@ -173,6 +210,7 @@ enum SettingsError {
   speedhuntCountInvalid,
   speedhuntPingsInvalid,
   speedhuntIntervalTooShort,
+  speedhuntRepeatCooldownTooShort,
   hunterCountInvalid,
   notEnoughPlayers,
   areaMissing,

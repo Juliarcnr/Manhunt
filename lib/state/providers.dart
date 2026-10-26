@@ -146,6 +146,24 @@ final speedhuntsOnMeProvider = Provider<AsyncValue<List<Speedhunt>>>(
       ),
 );
 
+final _storedSpeedhuntsWithTargetsProvider = StreamProvider<List<Speedhunt>>(
+  (ref) => _sessionStream(
+    ref,
+    const [],
+    ref.watch(roundRepositoryProvider).watchSpeedhuntsWithTargets,
+  ),
+);
+
+/// Hunters only: all speedhunts with their targets, ended by catches – for
+/// the per-player rules of the next speedhunt (R-SET-19).
+final speedhuntsWithTargetsProvider = Provider<AsyncValue<List<Speedhunt>>>(
+  (ref) => ref
+      .watch(_storedSpeedhuntsWithTargetsProvider)
+      .whenData(
+        (all) => applyCatches(all, ref.watch(catchesProvider).value ?? []),
+      ),
+);
+
 /// Hunters only.
 final allPingsProvider = StreamProvider<List<PingRecord>>(
   (ref) => _sessionStream(

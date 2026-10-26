@@ -117,28 +117,80 @@ List<Speedhunt> speedhuntsWithFirstPing(List<Speedhunt> all, DateTime now) => [
     if (s.pingTimes() case [final first, ...] when !first.isAfter(now)) s,
 ]..sort((a, b) => a.startedAt.compareTo(b.startedAt));
 
+/// Earliest time for the next speedhunt: not during the head start, not
+/// before the configured minute after the round start (R-SET-11), nor within
+/// the cooldown after the end of any previous one (R-SET-18). A catch ends a
+/// speedhunt early, so [previous] should have [applyCatches] applied.
+DateTime nextSpeedhuntAt(GameClock clock, List<Speedhunt> previous) {
+  var at = clock.startAt.add(clock.settings.speedhuntEarliest);
+  if (clock.huntersReleaseAt.isAfter(at)) at = clock.huntersReleaseAt;
+  for (final s in previous) {
+    final ready = s.endsAt.add(clock.settings.speedhuntCooldown);
+    if (ready.isAfter(at)) at = ready;
+  }
+  return at;
+}
+
+/// Why a player cannot be the target of the next speedhunt (R-SET-19).
+class TargetBlock {
+  const TargetBlock({this.until});
+
+  /// End of the per-player cooldown; null without repeats: the target of the
+  /// last speedhunt is out until another player was targeted.
+  final DateTime? until;
+}
+
+/// Whether [targetId] is blocked as the next speedhunt target (R-SET-19).
+/// [previous] must carry the targets (hunters only). Without repeats the
+/// target of the last speedhunt is blocked; with repeats a player is blocked
+/// until [GameSettings.speedhuntRepeatCooldown] after the end of the last
+/// speedhunt on them – even with other speedhunts in between.
+TargetBlock? speedhuntTargetBlock({
+  required GameSettings settings,
+  required List<Speedhunt> previous,
+  required String targetId,
+  required DateTime now,
+}) {
+  if (previous.isEmpty) return null;
+  if (!settings.speedhuntRepeatTarget) {
+    final last = previous.reduce(
+      (a, b) => b.startedAt.isAfter(a.startedAt) ? b : a,
+    );
+    return last.targetId == targetId ? const TargetBlock() : null;
+  }
+  DateTime? until;
+  for (final s in previous) {
+    if (s.targetId != targetId) continue;
+    final end = s.endsAt.add(settings.speedhuntRepeatCooldown);
+    if (until == null || end.isAfter(until)) until = end;
+  }
+  return until != null && until.isAfter(now) ? TargetBlock(until: until) : null;
+}
+
 enum SpeedhuntDenial {
   notHunting,
   tooEarly,
+  coolingDown,
   noneLeft,
   alreadyRunning,
   invalidTarget,
+  sameTarget,
+  targetCoolingDown,
 }
 
 /// Checks whether a hunter may start a speedhunt on [target] right now.
-/// Returns null if allowed.
+/// Returns null if allowed. [targeted] are the previous speedhunts with their
+/// targets, for the per-player rules (R-SET-19); empty skips those.
 SpeedhuntDenial? canStartSpeedhunt({
   required GameClock clock,
   required DateTime now,
   required List<Speedhunt> previous,
   required Member target,
+  List<Speedhunt> targeted = const [],
 }) {
-  if (clock.phaseAt(now) != GamePhase.hunting) {
+  // The head start counts as "not yet", with a countdown (R-SPEED-11).
+  if (clock.phaseAt(now) case GamePhase.notStarted || GamePhase.ended) {
     return SpeedhuntDenial.notHunting;
-  }
-  // R-SET-11: not before the configured minute after the round start.
-  if (now.isBefore(clock.startAt.add(clock.settings.speedhuntEarliest))) {
-    return SpeedhuntDenial.tooEarly;
   }
   if (previous.length >= clock.settings.speedhuntCount) {
     return SpeedhuntDenial.noneLeft;
@@ -146,6 +198,22 @@ SpeedhuntDenial? canStartSpeedhunt({
   if (previous.any((s) => s.isActiveAt(now))) {
     return SpeedhuntDenial.alreadyRunning;
   }
+  // R-SET-11: not before the configured minute after the round start;
+  // R-SET-18: not within the cooldown after the previous one.
+  if (now.isBefore(nextSpeedhuntAt(clock, previous))) {
+    return previous.isEmpty
+        ? SpeedhuntDenial.tooEarly
+        : SpeedhuntDenial.coolingDown;
+  }
   if (!target.isPlayer || target.caught) return SpeedhuntDenial.invalidTarget;
-  return null;
+  return switch (speedhuntTargetBlock(
+    settings: clock.settings,
+    previous: targeted,
+    targetId: target.id,
+    now: now,
+  )) {
+    null => null,
+    TargetBlock(until: null) => SpeedhuntDenial.sameTarget,
+    TargetBlock() => SpeedhuntDenial.targetCoolingDown,
+  };
 }
