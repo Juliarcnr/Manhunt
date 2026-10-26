@@ -19,7 +19,7 @@ void main() {
   group('computer members walk around their carrier (R-BOT-04)', () {
     const anchor = GeoPoint(52.52, 13.405);
 
-    test('never more than 30 m away over a long walk', () {
+    test('never more than 100 m away over a long walk', () {
       final random = Random(7);
       var walk = BotWalk.random(random);
       for (var i = 0; i < 10000; i++) {
@@ -66,12 +66,26 @@ void main() {
 
   group('bot names carry the kind (R-BOT-03)', () {
     test('round trip', () {
-      expect(botName(BotKind.hunter, 2), '🤖 Hunter 2');
+      expect(botName(BotKind.hunter, 2), '🤖 Knorbert');
       expect(botKindOf(botName(BotKind.hunter, 2)), BotKind.hunter);
-      expect(botKindOf(botName(BotKind.player, 11)), BotKind.player);
+      expect(botKindOf(botName(BotKind.player, 8)), BotKind.player);
       expect(botKindOf('Kim'), isNull);
       expect(botKindOf('🤖 Hunter'), isNull);
+      expect(botKindOf('Stromius'), isNull); // a human may be called that
       expect(isBot(Member(id: 'b', name: botName(BotKind.player, 1))), isTrue);
+    });
+
+    test('enough distinct names for each kind', () {
+      final names = {
+        for (final kind in BotKind.values)
+          for (var n = 1; n <= maxBotsPerKind; n++) botName(kind, n),
+      };
+      expect(names, hasLength(2 * maxBotsPerKind));
+      for (final kind in BotKind.values) {
+        for (var n = 1; n <= maxBotsPerKind; n++) {
+          expect(botKindOf(botName(kind, n)), kind);
+        }
+      }
     });
   });
 
@@ -109,11 +123,11 @@ void main() {
 
     test('carriers create the missing bots, numbered uniquely', () {
       expect(plan([host, kim, sam], 'h').create, [
-        (kind: BotKind.hunter, name: '🤖 Hunter 1'),
+        (kind: BotKind.hunter, name: '🤖 Stromius'),
       ]);
       final members = [host, kim, sam, bot('b1', BotKind.player, 1)];
       expect(plan(members, 'k', mine: {'b1'}).create, [
-        (kind: BotKind.player, name: '🤖 Player 2'),
+        (kind: BotKind.player, name: '🤖 Pankratius'),
       ]);
       expect(plan(members, 's').isEmpty, isTrue);
     });
@@ -145,8 +159,8 @@ void main() {
       ];
       expect(plan(members, 'k', mine: {'b1'}).remove, ['b1']);
       expect(plan(members, 's').create, [
-        (kind: BotKind.player, name: '🤖 Player 2'),
-        (kind: BotKind.player, name: '🤖 Player 3'),
+        (kind: BotKind.player, name: '🤖 Pankratius'),
+        (kind: BotKind.player, name: '🤖 Notburga'),
       ]);
     });
 

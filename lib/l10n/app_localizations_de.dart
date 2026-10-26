@@ -320,7 +320,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer-Mitglieder laufen zufällig in max. 30 m um die erste Person mit ihrer Rolle und pingen wie echte Handys. Sie laufen auf deren Handy, solange dort der Spielbildschirm offen ist.';
+      'Computer-Mitglieder laufen zufällig in max. 100 m um die erste Person mit ihrer Rolle und pingen wie echte Handys. Sie laufen auf deren Handy, solange dort der Spielbildschirm offen ist.';
 
   @override
   String get settingsBotHunters => 'Computer-Hunter';

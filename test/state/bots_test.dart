@@ -92,14 +92,14 @@ void main() {
       await settle();
       final all = await members();
       expect(bots(all), {
-        '🤖 Hunter 1': Role.hunter,
-        '🤖 Player 1': Role.player,
-        '🤖 Player 2': Role.player,
+        '🤖 Stromius': Role.hunter,
+        '🤖 Adelgunde': Role.player,
+        '🤖 Pankratius': Role.player,
       });
       final ids = {for (final m in all) m.name: m.id};
-      expect(ids['🤖 Hunter 1'], endsWith('-h'));
-      expect(ids['🤖 Player 1'], endsWith('-k'));
-      expect(ids['🤖 Player 2'], endsWith('-k'));
+      expect(ids['🤖 Stromius'], endsWith('-h'));
+      expect(ids['🤖 Adelgunde'], endsWith('-k'));
+      expect(ids['🤖 Pankratius'], endsWith('-k'));
 
       // Fewer computer players: the carrier removes one.
       await games.updateSettings(
@@ -108,8 +108,8 @@ void main() {
       );
       await settle();
       expect(bots(await members()), {
-        '🤖 Hunter 1': Role.hunter,
-        '🤖 Player 1': Role.player,
+        '🤖 Stromius': Role.hunter,
+        '🤖 Adelgunde': Role.player,
       });
 
       // Roles swapped: the bots move to the other phone.

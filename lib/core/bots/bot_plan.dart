@@ -17,21 +17,51 @@ enum BotKind {
 /// Upper limit of each setting (R-BOT-02).
 const maxBotsPerKind = 4;
 
-/// Language-neutral, so every phone recognises a bot and its kind from the
-/// (encrypted) name alone – no extra field, no rules change (R-BOT-03).
-String botName(BotKind kind, int number) =>
-    '🤖 ${kind == BotKind.hunter ? 'Hunter' : 'Player'} $number';
-
-final _botName = RegExp(r'^🤖 (Hunter|Player) (\d+)$');
-
-BotKind? botKindOf(String name) => switch (_botName.firstMatch(name)?[1]) {
-  'Hunter' => BotKind.hunter,
-  'Player' => BotKind.player,
-  _ => null,
+/// Rare, gloriously ugly names – one list per kind, so every phone recognises
+/// a bot and its kind from the (encrypted) name alone: no extra field, no
+/// rules change (R-BOT-03). At least [maxBotsPerKind] each.
+const _botNames = {
+  BotKind.hunter: [
+    'Stromius',
+    'Knorbert',
+    'Kunibald',
+    'Rumpold',
+    'Hadubrand',
+    'Gisbrecht',
+    'Wulfhart',
+    'Ottokar',
+  ],
+  BotKind.player: [
+    'Adelgunde',
+    'Pankratius',
+    'Notburga',
+    'Ulfbert',
+    'Mechthildis',
+    'Waltrudis',
+    'Hildebold',
+    'Radegundis',
+  ],
 };
 
-int? _botNumber(String name) =>
-    int.tryParse(_botName.firstMatch(name)?[2] ?? '');
+const _botPrefix = '🤖 ';
+
+/// The [number]th name (from 1) of [kind].
+String botName(BotKind kind, int number) =>
+    '$_botPrefix${_botNames[kind]![number - 1]}';
+
+BotKind? botKindOf(String name) => _botNumberOf(name)?.kind;
+
+int? _botNumber(String name) => _botNumberOf(name)?.number;
+
+({BotKind kind, int number})? _botNumberOf(String name) {
+  if (!name.startsWith(_botPrefix)) return null;
+  final bare = name.substring(_botPrefix.length);
+  for (final MapEntry(key: kind, value: names) in _botNames.entries) {
+    final i = names.indexOf(bare);
+    if (i >= 0) return (kind: kind, number: i + 1);
+  }
+  return null;
+}
 
 bool isBot(Member m) => botKindOf(m.name) != null;
 

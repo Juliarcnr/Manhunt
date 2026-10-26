@@ -311,7 +311,7 @@ void main() {
       );
       await deviceRepo(db).joinGame(guest!, name: 'Kim');
       // Carried by another phone; the host gives it its role.
-      await deviceRepo(db).joinGame(bot!, name: '🤖 Player 1');
+      await deviceRepo(db).joinGame(bot!, name: '🤖 Adelgunde');
     });
     await pumpAppWithSession(
       tester,
@@ -342,8 +342,8 @@ void main() {
     expect(find.text(hint), findsOneWidget);
 
     // Not switchable by tapping, untouched by the random assignment.
-    await tester.ensureVisible(find.text('🤖 Player 1'));
-    await tester.tap(find.text('🤖 Player 1'));
+    await tester.ensureVisible(find.text('🤖 Adelgunde'));
+    await tester.tap(find.text('🤖 Adelgunde'));
     await settleAsync(tester);
     expect(await role('bot-x'), 'player');
     await tester.drag(find.byType(ListView), const Offset(0, 3000));

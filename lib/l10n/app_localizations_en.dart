@@ -317,7 +317,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer members walk randomly within 30 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.';
+      'Computer members walk randomly within 100 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.';
 
   @override
   String get settingsBotHunters => 'Computer hunters';

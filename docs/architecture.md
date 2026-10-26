@@ -161,12 +161,12 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   `bot-<n>` (n = 1 … 8) mit eigener anonymer UID und eigener Firestore-Instanz; die UID bleibt pro App-Name erhalten.
   Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
   gehören: Slot-UID ∈ Mitgliederliste.
-- Art steht im Namen (`🤖 Hunter n` / `🤖 Player n`, `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
+- Art steht im Namen (je Art eine eigene Namensliste, z.B. `🤖 Stromius` = Hunter, `🤖 Adelgunde` = Spieler; `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
   Mensch mit dieser Rolle. `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
   aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
 - Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
   `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:
-  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 30 m) um `engine.position` des Handys. Bot-Logs gehen per
+  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 100 m) um `engine.position` des Handys. Bot-Logs gehen per
   `RoundEngine.onLog` → `note` ins Debug-Log des Handys.
 - Grenze: Verlässt das Träger-Handy die Gruppe oder ist offline, bleiben seine Bots als verwaiste Mitglieder stehen;
   der Host kann sie wie jedes Mitglied entfernen.

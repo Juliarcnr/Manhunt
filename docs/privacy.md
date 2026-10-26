@@ -28,7 +28,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 Nur in Debug-Builds bzw. mit `--dart-define=MANHUNT_BOTS=true`. Das Handy, das sie betreibt, legt pro
 Computer-Mitglied ein zusätzliches **anonymes Firebase-Konto** an (höchstens 8 pro Handy, wiederverwendet; verwaist
 bei Deinstallation). Sie erzeugen dieselben Daten wie ein echtes Mitglied (Name „🤖 …“ verschlüsselt, Rolle, Pings,
-Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 30 m – also
+Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 100 m – also
 ebenfalls verschlüsselt, aber sinngemäß ein weiterer Standort dieser Person. Die gewünschte Anzahl steht verschlüsselt
 in den Einstellungen.
 
