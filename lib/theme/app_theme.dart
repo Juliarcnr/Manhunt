@@ -33,6 +33,13 @@ abstract final class AppColors {
 
   /// Outside the play area: warning and live location (R-OUT-05, R-OUT-06).
   static const outside = Color(0xFFFF1744);
+
+  /// Pen colours of the hunters' drawing mode (R-DRAW-03), chosen to stand
+  /// out on the light OSM map.
+  static const drawRed = Color(0xFFE53935);
+  static const drawBlue = Color(0xFF1E63E9);
+  static const drawGreen = Color(0xFF2E9E3E);
+  static const drawBlack = Color(0xFF111111);
 }
 
 abstract final class AppTheme {

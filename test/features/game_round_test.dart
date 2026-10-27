@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -87,6 +88,7 @@ void main() {
         overrides: deviceOverrides(
           db: db,
           userId: userId,
+          now: () => now,
           store: MemorySessionStore.withGroup(code),
           location: location,
           notifications: notifications,
@@ -493,6 +495,33 @@ void main() {
       expect(members!.firstWhere((m) => m.id == 'sam').caught, isTrue);
     });
 
+    testWidgets('overview tells hunters whom the speedhunt is on '
+        '(R-OVER-04)', (tester) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 70)),
+            settings: settings,
+          ),
+        ),
+      );
+      await pumpAs(tester, 'alex');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('overviewSpeedhunt')),
+          matching: find.text('Speedhunt on Sam'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('catching the speedhunt target ends the speedhunt '
         '(R-SPEED-10)', (tester) async {
       now = start.add(const Duration(minutes: 72));
@@ -856,6 +885,18 @@ void main() {
       await pumpAs(tester, 'kim');
       expect(find.text('Speedhunt active · ping 2/3 in 03:00'), findsOneWidget);
       expect(find.textContaining('Sam'), findsNothing);
+
+      // Nor in the overview (R-OVER-04).
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('overviewSpeedhunt')),
+          matching: find.text('Speedhunt active'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Speedhunt on'), findsNothing);
     });
 
     testWidgets('players see the speedhunt end when its target is caught '
@@ -1733,6 +1774,31 @@ void main() {
       Finder label(String key, String text) =>
           find.descendant(of: find.byKey(Key(key)), matching: find.text(text));
 
+      testWidgets('the overview names the speedhunt target by number '
+          '(R-OVER-04)', (tester) async {
+        now = start.add(const Duration(minutes: 72));
+        await seed(tester, gameSettings: anon);
+        final numbers = await aliases(tester);
+        await tester.runAsync(
+          () async => FirestoreRoundRepository(db).startSpeedhunt(
+            await testSession(code, 'alex'),
+            Speedhunt.fromSettings(
+              targetId: 'sam',
+              startedAt: start.add(const Duration(minutes: 70)),
+              settings: anon,
+            ),
+          ),
+        );
+        await pumpAs(tester, 'alex', gameSettings: anon);
+        await tester.tap(find.byKey(const Key('overviewButton')));
+        await tester.pumpAndSettle();
+
+        expect(
+          label('overviewSpeedhunt', 'Speedhunt on Player ${numbers['sam']}'),
+          findsOneWidget,
+        );
+      });
+
       testWidgets('hunters see "Player n" on pins and chips, ordered and '
           'coloured by number (R-ANON-01)', (tester) async {
         final sh = start
@@ -2014,7 +2080,8 @@ void main() {
   group('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () {
     const timeUpHint =
         'The round keeps running so you can look at the '
-        'locations together. The host ends it.';
+        'locations together. The host ends it – otherwise it ends '
+        'automatically at ';
 
     Future<void> regularPing(WidgetTester tester, String player) =>
         tester.runAsync(
@@ -2085,8 +2152,39 @@ void main() {
       expect(find.byKey(const Key('filter_myPings')), findsNothing);
       // Sam's ping, which Kim could not see during the game.
       expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
-      expect(find.text(timeUpHint), findsOneWidget);
+      expect(find.textContaining(timeUpHint), findsOneWidget);
       expect(find.byKey(const Key('jokerButton')), findsNothing);
+    });
+
+    testWidgets('3 h after the end the game screen ends the round by itself, '
+        'on any phone (R-GAME-10)', (tester) async {
+      await seed(tester);
+      await regularPing(tester, 'sam');
+      final autoEndAt = start.add(settings.duration + const Duration(hours: 3));
+      // Fake Firestore stores serverTimestamp as real time; pin it.
+      final groupId = (await tester.runAsync(() => testSession(code, 'kim')))!
+          .groupId;
+      await tester.runAsync(
+        () => db.collection('games').doc(groupId).update({
+          'startAt': Timestamp.fromDate(start),
+        }),
+      );
+      now = autoEndAt.subtract(const Duration(seconds: 2));
+      await pumpAs(tester, 'kim');
+      final time = DateFormat.Hm('en').format(autoEndAt.toLocal());
+      expect(find.text('$timeUpHint$time.'), findsOneWidget);
+      expect((await gameDoc(tester))['status'], 'running');
+
+      now = autoEndAt;
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      final game = await gameDoc(tester);
+      expect(game['status'], 'lobby');
+      expect(game['startAt'], isNull);
+      final pings = await tester.runAsync(
+        () => db.collection('games').doc(groupId).collection('pings').get(),
+      );
+      expect(pings!.docs, isEmpty);
     });
 
     testWidgets('while the game is on players keep their own view', (
@@ -2162,7 +2260,7 @@ void main() {
         finishedAt: now.subtract(const Duration(minutes: 1)),
       );
       expect(find.text('HUNTERS WON'), findsOneWidget);
-      expect(find.text(timeUpHint), findsOneWidget);
+      expect(find.textContaining(timeUpHint), findsOneWidget);
       // Kim was caught, but now the time-up hint is enough.
       expect(find.textContaining('You were caught'), findsNothing);
       // Caught players split up again, like after the time (R-HUNT-11).
@@ -2230,7 +2328,7 @@ void main() {
         find.text('You were caught – your location is no longer shared.'),
         findsOneWidget,
       );
-      expect(find.text(timeUpHint), findsNothing);
+      expect(find.textContaining(timeUpHint), findsNothing);
       for (final id in ['hunters', 'lastPings', 'player_sam']) {
         expect(find.byKey(Key('filter_$id')), findsNothing, reason: id);
       }

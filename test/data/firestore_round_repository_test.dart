@@ -1,5 +1,6 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:manhunt/core/drawing/stroke.dart';
 import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
@@ -93,6 +94,67 @@ void main() {
       expect(await rounds.watchAllPings(hunter).first, isEmpty);
       expect(await rounds.watchHunterLocations(hunter).first, isEmpty);
       expect(await rounds.watchOutsideLocations(hunter).first, isEmpty);
+    });
+  });
+
+  group('drawings (R-DRAW-06, R-DRAW-07)', () {
+    Stroke stroke(StrokeColor color, List<GeoPoint> points) =>
+        Stroke(id: '', uid: '', color: color, points: points);
+
+    test('another hunter sees the strokes, encrypted', () async {
+      await rounds.addStrokes(hunter, [
+        stroke(StrokeColor.blue, const [
+          GeoPoint(52.123456, 13.4),
+          GeoPoint(52.2, 13.5),
+        ]),
+      ]);
+      final seen = await rounds.watchDrawings(kim).first;
+      expect(seen.single.uid, 'hunter');
+      expect(seen.single.color, StrokeColor.blue);
+      expect(seen.single.points.first, const GeoPoint(52.123456, 13.4));
+      expect(seen.single.id, isNotEmpty);
+      expect(db.dump(), isNot(contains('52.123456')));
+    });
+
+    test('erasing replaces a stroke of someone else by its pieces '
+        '(R-DRAW-04)', () async {
+      await rounds.addStrokes(hunter, [
+        stroke(StrokeColor.red, const [GeoPoint(52, 13), GeoPoint(52, 14)]),
+      ]);
+      final original = (await rounds.watchDrawings(kim).first).single;
+      await rounds.replaceStrokes(
+        kim,
+        removeIds: [original.id],
+        add: [
+          stroke(StrokeColor.red, const [GeoPoint(52, 13), GeoPoint(52, 13.4)]),
+          stroke(StrokeColor.red, const [GeoPoint(52, 13.6), GeoPoint(52, 14)]),
+        ],
+      );
+      final after = await rounds.watchDrawings(hunter).first;
+      expect(after, hasLength(2));
+      expect(after.map((s) => s.id), isNot(contains(original.id)));
+      expect(after.every((s) => s.color == StrokeColor.red), isTrue);
+    });
+
+    test('the trash can deletes all strokes (R-DRAW-04)', () async {
+      await rounds.addStrokes(hunter, [
+        for (var i = 0; i < 3; i++)
+          stroke(StrokeColor.black, [
+            GeoPoint(52, 13.0 + i),
+            const GeoPoint(53, 13),
+          ]),
+      ]);
+      await rounds.clearDrawings(kim);
+      expect(await rounds.watchDrawings(hunter).first, isEmpty);
+    });
+
+    test('drawings are deleted when the round ends (R-PRIV-03)', () async {
+      await games.startGame(hunter);
+      await rounds.addStrokes(hunter, [
+        stroke(StrokeColor.red, const [GeoPoint(52, 13), GeoPoint(52, 14)]),
+      ]);
+      await games.endRound(hunter);
+      expect(await rounds.watchDrawings(hunter).first, isEmpty);
     });
   });
 

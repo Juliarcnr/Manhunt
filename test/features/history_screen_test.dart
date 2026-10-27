@@ -76,6 +76,24 @@ void main() {
     expect(find.text('vorzeitig abgebrochen'), findsOneWidget);
   });
 
+  testWidgets('automatically ended rounds are marked (R-GAME-10)', (
+    tester,
+  ) async {
+    await pump(tester, [
+      RoundSummary(
+        round: 2,
+        startedAt: start,
+        endedAt: start.add(const Duration(hours: 6)),
+        hunters: const ['Alex'],
+        players: const ['Kim'],
+        catches: const [],
+        autoEnded: true,
+      ),
+    ]);
+    expect(find.text('automatisch beendet'), findsOneWidget);
+    expect(find.text('vorzeitig abgebrochen'), findsNothing);
+  });
+
   testWidgets('all caught is celebrated', (tester) async {
     await pump(tester, [
       RoundSummary(

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 import 'package:intl/intl.dart';
 
+import '../../core/drawing/stroke.dart';
 import '../../core/history/round_summary.dart';
 import '../../core/models/member.dart';
 import '../../core/round/boundary_watch.dart';
@@ -27,6 +28,7 @@ import '../../theme/app_theme.dart';
 import 'overview_sheet.dart';
 import '../map/base_map.dart';
 import 'catch_dialog.dart';
+import 'drawing.dart';
 import 'filter_bar.dart';
 import 'joker_sheet.dart';
 import 'map_filters.dart';
@@ -73,6 +75,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
   ({DateTime at, String requestId})? _playerReveal;
   var _filters = const MapFilters();
 
+  /// Hunters' drawing mode (R-DRAW-01), created on first use.
+  DrawingController? _drawingOrNull;
+  DrawingController get _drawing => _drawingOrNull ??= DrawingController(
+    session: widget.session,
+    rounds: ref.read(roundRepositoryProvider),
+    server: () => ref.read(drawingsProvider).value ?? const [],
+    onError: (_) {
+      if (mounted) _snack(AppLocalizations.of(context).drawFailed);
+    },
+  );
+
   bool get _isAdmin => widget.game.adminId == widget.session.userId;
 
   @override
@@ -82,6 +95,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       // The time running out is no event, so check every second.
       _checkRoundOver();
+      _checkAutoEnd();
       setState(() {});
     });
   }
@@ -318,6 +332,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     WidgetsBinding.instance.removeObserver(this);
     _engine?.speedhuntSnapshots.removeListener(_onSpeedhuntSnapshots);
     _ticker?.cancel();
+    _drawingOrNull?.dispose();
     _map.dispose();
     _bannerTimer?.cancel();
     for (final t in _retryTimers.values) {
@@ -376,6 +391,38 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   GamePhase _phaseNow() =>
       _clock()?.phaseAt(widget.now()) ?? GamePhase.notStarted;
+
+  /// The round is over; the host ends it, or a device at [GameClock.autoEndAt].
+  String _timeUpHint(AppLocalizations l10n) {
+    final at = (_clock()?.autoEndAt ?? widget.now()).toLocal();
+    final locale = Localizations.localeOf(context).toString();
+    return l10n.gameTimeUpHint(DateFormat.Hm(locale).format(at));
+  }
+
+  DateTime? _autoEndTriedAt;
+
+  /// Ends a round the host left running for 3 h after it was over
+  /// (R-GAME-10). Every device tries; the first one wins, the others are
+  /// refused (or find the lobby) and try again a minute later at most.
+  void _checkAutoEnd() {
+    final clock = _clock();
+    final now = widget.now();
+    if (clock == null || now.isBefore(clock.autoEndAt)) return;
+    final last = _autoEndTriedAt;
+    if (last != null && now.difference(last) < const Duration(minutes: 1)) {
+      return;
+    }
+    _autoEndTriedAt = now;
+    unawaited(
+      ref
+          .read(gameRepositoryProvider)
+          .autoEndRound(widget.session)
+          .then<void>((_) {})
+          .catchError((Object e) {
+            _engine?.note('auto end failed: $e');
+          }),
+    );
+  }
 
   final _retryTimers = <ProviderOrFamily, Timer>{};
 
@@ -472,14 +519,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
       },
       RoundOverNotice(result: HuntersWon()) => (
         l10n.noticeHuntersWon,
-        l10n.gameTimeUpHint,
+        _timeUpHint(l10n),
       ),
       RoundOverNotice(result: final PlayersWon result) => (
         l10n.noticePlayersWon(
           _winnerNames(result, members ?? const []),
           result.playerIds.length,
         ),
-        l10n.gameTimeUpHint,
+        _timeUpHint(l10n),
       ),
     };
     // The own boundary state has its own permanent banner (R-OUT-06).
@@ -930,6 +977,21 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // (the security rules reject it for players) – and by everyone once the
     // round is over: then all see what the hunters see (R-GAME-06).
     final layers = <Widget>[...areaLayers(widget.game.settings.area)];
+    // Hunters' drawings (R-DRAW-05), above the play area, below the markers.
+    // Players never see them (R-DRAW-06).
+    final drawing = isHunter && _drawing.active;
+    if (isHunter) {
+      final strokes = ref.watch(drawingsProvider).value ?? const <Stroke>[];
+      ref.listen(drawingsProvider, (_, next) {
+        if (next.value case final server?) _drawing.prune(server);
+      });
+      layers.add(
+        ListenableBuilder(
+          listenable: _drawing,
+          builder: (_, _) => drawingsLayer(_drawing.visible(strokes)),
+        ),
+      );
+    }
     final filters = _filters;
     final filterItems = <FilterItem>[];
     if (isHunter || (isPlayer && phase == GamePhase.ended)) {
@@ -1259,7 +1321,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       // Once the round is over the time-up hint says enough.
       if ((me?.caught ?? false) && phase != GamePhase.ended)
         l10n.gameCaughtSelf,
-      if (phase == GamePhase.ended) l10n.gameTimeUpHint,
+      if (phase == GamePhase.ended) _timeUpHint(l10n),
     ];
     // Below the filters the same gap as above them: the info lines if any,
     // the app bar (top inset of the overlay) otherwise.
@@ -1335,6 +1397,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
                   ? l10n.playerAlias(aliases[widget.session.userId]!)
                   : null,
               speedhuntRunning: running != null,
+              // Whom it is on – hunters only (R-OVER-04).
+              speedhuntTarget: switch (activeSpeedhunt(targeted, now)) {
+                final s? when isHunter =>
+                  names[s.targetId] ?? membersById[s.targetId]?.name,
+                _ => null,
+              },
               // Who won, once the round is over (R-GAME-09).
               winner: switch (_result(members)) {
                 null => null,
@@ -1365,23 +1433,28 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
       body: Stack(
         children: [
-          BaseMap(
-            controller: _map,
-            options: MapOptions(
-              interactionOptions: northUp,
-              initialCenter: fallbackCenter,
-              initialZoom: 6,
-              initialCameraFit: fitArea(widget.game.settings.area),
+          DrawingGestures(
+            controller: _drawing,
+            map: _map,
+            enabled: drawing,
+            child: BaseMap(
+              controller: _map,
+              options: MapOptions(
+                interactionOptions: drawing ? drawingInteraction : northUp,
+                initialCenter: fallbackCenter,
+                initialZoom: 6,
+                initialCameraFit: fitArea(widget.game.settings.area),
+              ),
+              children: [
+                ...layers,
+                if (engine != null)
+                  ValueListenableBuilder(
+                    valueListenable: engine.position,
+                    builder: (_, fix, _) =>
+                        fix == null ? const SizedBox.shrink() : selfLayer(fix),
+                  ),
+              ],
             ),
-            children: [
-              ...layers,
-              if (engine != null)
-                ValueListenableBuilder(
-                  valueListenable: engine.position,
-                  builder: (_, fix, _) =>
-                      fix == null ? const SizedBox.shrink() : selfLayer(fix),
-                ),
-            ],
           ),
           Positioned(
             left: 12,
@@ -1437,6 +1510,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (isHunter) ...[
+                  FloatingActionButton.small(
+                    key: const Key('drawModeButton'),
+                    heroTag: 'drawMode',
+                    tooltip: l10n.drawMode,
+                    backgroundColor: drawing
+                        ? AppColors.hunter
+                        : AppColors.surface,
+                    onPressed: () => setState(_drawing.toggle),
+                    child: const Icon(Icons.draw_outlined),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 const MapStyleButton(),
                 const SizedBox(height: 8),
                 FloatingActionButton.small(
@@ -1459,11 +1545,20 @@ class _GameScreenState extends ConsumerState<GameScreen>
               ],
             ),
           ),
+          if (drawing)
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: DrawingToolbar(
+                controller: _drawing,
+                onClear: _drawing.clear,
+              ),
+            ),
           if (_banner case final banner?)
             Positioned(
               left: 12,
               right: 68, // leave room for the map buttons
-              bottom: 12,
+              bottom: drawing ? 76 : 12, // above the drawing tools
               child: _NoticeBanner(title: banner.title, body: banner.body),
             ),
         ],

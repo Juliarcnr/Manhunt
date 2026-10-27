@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/crypto/group_crypto.dart';
+import '../core/drawing/stroke.dart';
 import '../core/groups/group_list.dart';
 import '../core/history/round_summary.dart';
 import '../core/models/member.dart';
@@ -207,6 +208,15 @@ final outsideLocationsProvider = StreamProvider<Map<String, LocationFix>>(
     ref,
     const {},
     ref.watch(roundRepositoryProvider).watchOutsideLocations,
+  ),
+);
+
+/// The hunters' drawings on the map – hunters only (R-DRAW-06).
+final drawingsProvider = StreamProvider<List<Stroke>>(
+  (ref) => _sessionStream(
+    ref,
+    const [],
+    ref.watch(roundRepositoryProvider).watchDrawings,
   ),
 );
 

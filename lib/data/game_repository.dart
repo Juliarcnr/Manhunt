@@ -83,6 +83,9 @@ abstract interface class GameRepository {
   /// Host only (R-GROUPS-04).
   Future<void> renameGroup(GroupSession session, String name);
 
+  /// Any member, own display name only (R-LOBBY-10).
+  Future<void> renameMe(GroupSession session, String name);
+
   /// Any member, in the lobby (R-SET-10).
   Future<void> updateArea(GroupSession session, List<GeoPoint> area);
   Future<void> setRoles(GroupSession session, List<Member> members);
@@ -115,6 +118,12 @@ abstract interface class GameRepository {
   /// caught/joker and returns the group to the lobby.
   Future<void> endRound(GroupSession session);
 
+  /// Any member: ends the round like [endRound] if the host left it running
+  /// for 3 h (`GameClock.autoEndDelay`) after it was over (R-GAME-10); otherwise
+  /// does nothing. Safe to call from several devices at once: the round is
+  /// saved to the history only once. Returns whether it ended the round.
+  Future<bool> autoEndRound(GroupSession session);
+
   /// Finished rounds, newest first (R-HIST-03).
   Stream<List<RoundSummary>> watchHistory(GroupSession session);
 
@@ -122,7 +131,8 @@ abstract interface class GameRepository {
   Future<void> deleteGame(GroupSession session);
 
   /// Called when a member opens the group (R-PRIV-05): deletes it if nobody
-  /// opened it for 180 days, otherwise extends its lifetime. Returns false if
-  /// the group is gone afterwards.
+  /// opened it for 180 days, otherwise extends its lifetime and ends a round
+  /// left running too long (R-GAME-10). Returns false if the group is gone
+  /// afterwards.
   Future<bool> checkIn(GroupSession session);
 }

@@ -67,6 +67,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 | `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar (Hunter listen alle für R-SET-19) | – | ✔ |
 | `games/{groupId}/jokerRequests/{id}` | uid (Fragender), createdAt – nur Spieler lesbar; nur zusammen mit `playerJokerUsed` | – | ✔ |
 | `games/{groupId}/jokerAnswers/{requestId}_{uid}` | request, requester, uid, createdAt, `data` – nur der Fragende liest | Standort | ✔ |
+| `games/{groupId}/drawings/{id}` | uid (Autor), createdAt, `data` (Farbe + Punkte, `Stroke`) – nur Hunter lesen/schreiben/löschen (jeder Hunter jeden Strich, R-DRAW-06); Radieren = Strich löschen + Reststücke neu anlegen in einem Batch; Dokument-IDs vergibt das Gerät | Linien (Orte) | ✔ |
 | `games/{groupId}/history/{auto}` | endedAt, `data` (RoundSummary) – überlebt Rundenende | Inhalt | ✔ |
 
 Security Rules (`firestore.rules`, getestet in `firestore-tests/`): Spiele nur per ID abrufbar (nicht auflistbar),
@@ -75,7 +76,14 @@ in der Lobby, Beitritt nur als „unassigned“,
 Umbenennen nur sich selbst. Deploy: `firebase deploy --only firestore:rules`.
 
 **Lebenszyklus**: Eine Gruppe lebt über viele Runden (`status`: lobby ↔ running). „Spiel beenden“ (Host)
-löscht `pings`/`hunterLocs`/`outsideLocs`/`events`, setzt caught/jokerUsed zurück und geht in die Lobby. Jede Host-Aktion setzt
+löscht alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`, `outsideLocs`, `events`,
+`speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`), setzt caught/jokerUsed zurück und geht in die Lobby.
+**Automatisches Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 3 h) beendet jedes Mitgliedsgerät die Runde
+selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. 1×
+pro Minute). Reihenfolge anders als beim Host: Historie unter fester ID `history/auto_{startAt ms}` (zweites Gerät bzw.
+Wiederholung legt nichts doppelt an; Überschreiben verbieten die Regeln), dann Rundendaten löschen, **zuletzt** Lobby –
+denn Nicht-Hosts dürfen die Rundendaten nur lesen/löschen, solange die Runde noch läuft (`canAutoEnd` in den Regeln,
+gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 3 h). Jede Host-Aktion setzt
 `expiresAt` = jetzt + 180 Tage; zusätzlich verlängert jedes Öffnen durch ein Mitglied (`checkIn`, max. 1× pro Tag). **TTL gibt es im Spark-Tarif nicht**; stattdessen ruft `SessionController.build`
 beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlängern (Regeln: Mitglieder dürfen nur `expiresAt` setzen, max. +181 Tage; löschen erst nach Ablauf).
 
@@ -125,6 +133,12 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Gesten: flutter_map beansprucht horizontale/vertikale Drags ab 18 px. Ziehbare Marker brauchen eine kleinere
   `touchSlop` (siehe `_CornerHandle`), sonst bewegt sich die Karte statt des Markers.
 - Taps auf die Karte kommen erst nach dem Doppeltipp-Timeout; in Widget-Tests nach `tapAt` ~400 ms pumpen.
+- Zeichenmodus (R-DRAW-*, `lib/features/game/drawing.dart`): `DrawingGestures` ist ein `Listener` um die Karte – er
+  nimmt nicht an der Gesture-Arena teil, bekommt also alle Pointer. Im Modus hat die Karte nur
+  `pinchZoom | pinchMove` (`drawingInteraction`), ein Finger bewegt sie nicht; ein zweiter Finger bricht den Strich ab.
+  Strich wird beim Loslassen vereinfacht (Punkte < 2 px Abstand weg), ab 400 Punkten auf mehrere Dokumente verteilt.
+  Radierer: 16 px Radius, Geometrie in `lib/core/drawing/stroke_geometry.dart`. `DrawingController` zeigt eigene
+  Änderungen sofort an (`_pending`/`_hidden`), bis der Stream sie liefert.
 
 ## Runde auf dem Gerät (Phase 5)
 - Standort-Stream: Android `intervalDuration` 1 s, iOS ohne `distanceFilter` → ca. 1 Fix/s; der eigene Punkt und die
@@ -162,11 +176,11 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
   gehören: Slot-UID ∈ Mitgliederliste.
 - Art steht im Namen (je Art eine eigene Namensliste, z.B. `🤖 Stromius` = Hunter, `🤖 Adelgunde` = Spieler; `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
-  Mensch mit dieser Rolle. `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
+  Mensch mit dieser Rolle, sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
   aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
 - Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
   `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:
-  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 100 m) um `engine.position` des Handys. Bot-Logs gehen per
+  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 200 m) um `engine.position` des Handys. Bot-Logs gehen per
   `RoundEngine.onLog` → `note` ins Debug-Log des Handys.
 - Grenze: Verlässt das Träger-Handy die Gruppe oder ist offline, bleiben seine Bots als verwaiste Mitglieder stehen;
   der Host kann sie wie jedes Mitglied entfernen.

@@ -8,7 +8,6 @@ import '../../core/teams/start_check.dart';
 import '../../core/teams/team_assignment.dart';
 import '../../data/game_repository.dart';
 import '../../l10n/app_localizations.dart';
-import '../../state/bots.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../settings/settings_form.dart';
@@ -33,7 +32,6 @@ class LobbyScreen extends ConsumerWidget {
     final loadedMembers = ref.watch(membersProvider).value;
     final members = loadedMembers ?? const <Member>[];
     final repo = ref.read(gameRepositoryProvider);
-    final botsEnabled = ref.watch(botsEnabledProvider);
     final check = StartCheck(game.settings, members);
 
     Future<void> run(Future<void> Function() action) async {
@@ -72,6 +70,14 @@ class LobbyScreen extends ConsumerWidget {
       member: m,
       isAdmin: m.id == game.adminId,
       isMe: m.id == session.userId,
+      onRename: m.id == session.userId
+          ? () async {
+              final newName = await _askMyName(context, m.name);
+              if (newName != null && newName != m.name) {
+                await run(() => repo.renameMe(session, newName));
+              }
+            }
+          : null,
       onTap: _isAdmin && !isBot(m)
           ? () => run(() => repo.setRoles(session, toggleRole(members, m.id)))
           : null,
@@ -92,14 +98,6 @@ class LobbyScreen extends ConsumerWidget {
       if (check.hasUnassigned) l10n.errorUnassigned,
       if (!check.hasUnassigned && check.noHunter) l10n.errorHunterCountInvalid,
       if (!check.hasUnassigned && check.noPlayer) l10n.errorNotEnoughPlayers,
-      if (botsEnabled) ...[
-        if (game.settings.botHunters > 0 &&
-            botCarrier(BotKind.hunter, members) == null)
-          l10n.lobbyBotsNeedHunter,
-        if (game.settings.botPlayers > 0 &&
-            botCarrier(BotKind.player, members) == null)
-          l10n.lobbyBotsNeedPlayer,
-      ],
     ];
 
     final controller = ref.read(sessionControllerProvider.notifier);
@@ -287,19 +285,50 @@ class LobbyScreen extends ConsumerWidget {
 Future<String?> _askGroupName(BuildContext context, String current) =>
     showDialog<String>(
       context: context,
-      builder: (_) => _GroupNameDialog(current: current),
+      builder: (ctx) => _RenameDialog(
+        title: AppLocalizations.of(ctx).lobbyRename,
+        current: current,
+        field: (controller, submit) => GroupNameField(
+          controller: controller,
+          autofocus: true,
+          onSubmitted: (_) => submit(),
+        ),
+      ),
     );
 
-class _GroupNameDialog extends StatefulWidget {
-  const _GroupNameDialog({required this.current});
+/// Anyone changes their own display name (R-LOBBY-10). Returns null if
+/// cancelled.
+Future<String?> _askMyName(BuildContext context, String current) =>
+    showDialog<String>(
+      context: context,
+      builder: (ctx) => _RenameDialog(
+        title: AppLocalizations.of(ctx).lobbyRenameMe,
+        current: current,
+        field: (controller, submit) => NameField(
+          controller: controller,
+          autofocus: true,
+          onSubmitted: (_) => submit(),
+        ),
+      ),
+    );
 
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({
+    required this.title,
+    required this.current,
+    required this.field,
+  });
+
+  final String title;
   final String current;
+  final Widget Function(TextEditingController controller, VoidCallback submit)
+  field;
 
   @override
-  State<_GroupNameDialog> createState() => _GroupNameDialogState();
+  State<_RenameDialog> createState() => _RenameDialogState();
 }
 
-class _GroupNameDialogState extends State<_GroupNameDialog> {
+class _RenameDialogState extends State<_RenameDialog> {
   final _formKey = GlobalKey<FormState>();
   late final _controller = TextEditingController(text: widget.current);
 
@@ -319,15 +348,8 @@ class _GroupNameDialogState extends State<_GroupNameDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text(l10n.lobbyRename),
-      content: Form(
-        key: _formKey,
-        child: GroupNameField(
-          controller: _controller,
-          autofocus: true,
-          onSubmitted: (_) => _submit(),
-        ),
-      ),
+      title: Text(widget.title),
+      content: Form(key: _formKey, child: widget.field(_controller, _submit)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -482,6 +504,7 @@ class _MemberTile extends StatelessWidget {
     required this.member,
     required this.isAdmin,
     required this.isMe,
+    this.onRename,
     this.onTap,
     this.onRemove,
   });
@@ -489,6 +512,9 @@ class _MemberTile extends StatelessWidget {
   final Member member;
   final bool isAdmin;
   final bool isMe;
+
+  /// Only for oneself: change the own display name (R-LOBBY-10).
+  final VoidCallback? onRename;
   final VoidCallback? onTap;
 
   /// Host only, not for oneself: remove from the group (R-LOBBY-09).
@@ -519,6 +545,19 @@ class _MemberTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Right next to the badges, not after the name (R-LOBBY-10).
+          if (onRename != null)
+            IconButton(
+              key: const Key('renameMeButton'),
+              tooltip: l10n.lobbyRenameMe,
+              onPressed: onRename,
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: AppColors.textMuted,
+              ),
+            ),
           if (isAdmin) _Badge(l10n.lobbyAdminBadge),
           if (isMe) _Badge(l10n.lobbyYouBadge),
           if (onTap != null)

@@ -3,7 +3,7 @@ import 'dart:math';
 import '../models/geo_point.dart';
 
 /// How far a computer member walks from its carrier's position (R-BOT-04).
-const botRadiusM = 100.0;
+const botRadiusM = 200.0;
 
 /// Random walk of a computer member around an anchor (its carrier's
 /// position), in metres east/north of it. Never leaves [botRadiusM].

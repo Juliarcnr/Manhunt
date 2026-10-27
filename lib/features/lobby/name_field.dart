@@ -8,9 +8,16 @@ void dismissKeyboard(PointerDownEvent _) =>
     FocusManager.instance.primaryFocus?.unfocus();
 
 class NameField extends StatelessWidget {
-  const NameField({super.key, required this.controller});
+  const NameField({
+    super.key,
+    required this.controller,
+    this.autofocus = false,
+    this.onSubmitted,
+  });
 
   final TextEditingController controller;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +25,11 @@ class NameField extends StatelessWidget {
     return TextFormField(
       key: const Key('nameField'),
       controller: controller,
+      autofocus: autofocus,
       maxLength: 20,
       textCapitalization: TextCapitalization.words,
       textInputAction: TextInputAction.done,
+      onFieldSubmitted: onSubmitted,
       onTapOutside: dismissKeyboard,
       decoration: InputDecoration(
         labelText: l10n.yourName,

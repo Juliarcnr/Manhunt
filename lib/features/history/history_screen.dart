@@ -106,6 +106,25 @@ class RoundCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (summary.autoEnded)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.timer_off_outlined,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      l10n.historyAutoEnded,
+                      key: const Key('autoEnded'),
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 12),
             _Team(
               icon: Icons.track_changes,

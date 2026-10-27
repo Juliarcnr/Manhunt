@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'Rename group'**
   String get lobbyRename;
 
+  /// No description provided for @lobbyRenameMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Change your name'**
+  String get lobbyRenameMe;
+
   /// No description provided for @roleHunter.
   ///
   /// In en, this message translates to:
@@ -295,6 +301,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No speedhunt running'**
   String get overviewNoSpeedhunt;
+
+  /// No description provided for @overviewSpeedhuntOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Speedhunt on {name}'**
+  String overviewSpeedhuntOn(String name);
 
   /// No description provided for @overviewStillFree.
   ///
@@ -647,7 +659,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBotsHint.
   ///
   /// In en, this message translates to:
-  /// **'Computer members walk randomly within 100 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.'**
+  /// **'Computer members are assigned as hunters or players right away and walk randomly within 200 m of a real phone: computer players around the first player\'s, computer hunters around the first hunter\'s – without one, around the group\'s first phone. They ping like real phones while the game screen is open there.'**
   String get settingsBotsHint;
 
   /// No description provided for @settingsBotHunters.
@@ -878,18 +890,6 @@ abstract class AppLocalizations {
   /// **'Waiting for the host to start…'**
   String get lobbyWaitingForAdmin;
 
-  /// No description provided for @lobbyBotsNeedHunter.
-  ///
-  /// In en, this message translates to:
-  /// **'Computer hunters appear as soon as a person is a hunter.'**
-  String get lobbyBotsNeedHunter;
-
-  /// No description provided for @lobbyBotsNeedPlayer.
-  ///
-  /// In en, this message translates to:
-  /// **'Computer players appear as soon as a person is a player.'**
-  String get lobbyBotsNeedPlayer;
-
   /// No description provided for @lobbyAdminBadge.
   ///
   /// In en, this message translates to:
@@ -995,8 +995,8 @@ abstract class AppLocalizations {
   /// No description provided for @gameTimeUpHint.
   ///
   /// In en, this message translates to:
-  /// **'The round keeps running so you can look at the locations together. The host ends it.'**
-  String get gameTimeUpHint;
+  /// **'The round keeps running so you can look at the locations together. The host ends it – otherwise it ends automatically at {time}.'**
+  String gameTimeUpHint(String time);
 
   /// No description provided for @gameEndButton.
   ///
@@ -1057,6 +1057,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'aborted early'**
   String get historyAborted;
+
+  /// No description provided for @historyAutoEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'ended automatically'**
+  String get historyAutoEnded;
 
   /// No description provided for @gameNextPing.
   ///
@@ -1549,6 +1555,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All players caught!'**
   String get historyAllCaught;
+
+  /// No description provided for @drawMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing mode'**
+  String get drawMode;
+
+  /// No description provided for @drawColorRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get drawColorRed;
+
+  /// No description provided for @drawColorBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get drawColorBlue;
+
+  /// No description provided for @drawColorGreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get drawColorGreen;
+
+  /// No description provided for @drawColorBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get drawColorBlack;
+
+  /// No description provided for @drawEraser.
+  ///
+  /// In en, this message translates to:
+  /// **'Eraser'**
+  String get drawEraser;
+
+  /// No description provided for @drawClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all drawings'**
+  String get drawClear;
+
+  /// No description provided for @drawFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing could not be saved.'**
+  String get drawFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -83,6 +83,26 @@ void main() {
       expect(s.abortedEarly, isFalse);
     });
 
+    test('an automatically ended round is marked as such (R-GAME-10)', () {
+      final s = RoundSummary.build(
+        round: 1,
+        startedAt: start,
+        endedAt: at(360),
+        members: members,
+        catches: const [],
+        plannedDuration: const Duration(hours: 3),
+        autoEnded: true,
+      );
+      expect(s.autoEnded, isTrue);
+      expect(s.abortedEarly, isFalse);
+      expect(RoundSummary.fromJson(s.toJson()).autoEnded, isTrue);
+      expect(build(const []).autoEnded, isFalse);
+      expect(
+        RoundSummary.fromJson(build(const []).toJson()).autoEnded,
+        isFalse,
+      );
+    });
+
     test('catches of people who left the group are skipped', () {
       final s = build([CatchRecord(playerId: 'gone', at: at(30))]);
       expect(s.catches, isEmpty);

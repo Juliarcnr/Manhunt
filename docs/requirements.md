@@ -21,6 +21,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-GAME-07 | Der Host kann eine Runde auch vorzeitig abbrechen. Solange die Spielzeit noch läuft, muss das **zweimal** bestätigt werden (1. „Spiel vorzeitig abbrechen?“ mit Restzeit, 2. „Wirklich abbrechen?“ mit Lösch-Hinweis). Die Runde erscheint in der Historie als „vorzeitig abgebrochen“. |
 | R-GAME-08 | Wird der **letzte** noch nicht gefangene Spieler als gefangen gemeldet (vom Hunter oder vom Spieler selbst), erscheint vorher ein Bestätigungsdialog: Es ist der letzte Spieler, die Hunter haben damit gewonnen; das kann nicht rückgängig gemacht werden; die Runde ist danach noch nicht offiziell beendet, aber alle Hunter und Spieler können sich die bisherigen Standorte aller ansehen. Abbrechen = kein Catch. Nach Bestätigung gilt die Runde als vorbei wie nach Ablauf der Spielzeit (R-GAME-06, R-HUNT-11, R-ANON-02; keine Pings mehr), die Kopfzeile zeigt „Hunter haben gewonnen“, alle bekommen die Benachrichtigung „Alle Spieler gefangen – die Hunter haben gewonnen!“. „Catch rückgängig“ (R-CATCH-04) gibt es dann nicht mehr; der Host beendet mit nur einer Bestätigung, die Historie zeigt die Runde nicht als „vorzeitig abgebrochen“. Melden zwei Handys gleichzeitig die letzten beiden Spieler, gibt es keinen Hunter-Sieg (Runde läuft bis Zeitablauf). (2026-10-20) |
 | R-GAME-09 | Ist die Runde vorbei, erscheint bei allen einmal ein Banner (mit Benachrichtigung; 5 s bei Hunter-Sieg, da die Kopfzeile es dauerhaft zeigt, 15 s mit Spielernamen), wer gewonnen hat: nach dem letzten Catch oder wenn bei Zeitablauf alle gefangen sind „Alle Spieler gefangen – die Hunter haben gewonnen!“, sonst „Zeit abgelaufen – Kim und Sam haben gewonnen!“ mit den echten Namen aller nie gefangenen Spieler. Wer die App erst danach öffnet, bekommt das Banner nicht nachträglich. In der Übersicht steht bis zum Beenden der Runde dauerhaft, wer gewonnen hat (mit Namen); die Gewinner haben dort einen Pokal. Die Kopfzeile zeigt „Hunter haben gewonnen“ bzw. ohne Namen „Spieler gewinnen“ („Spieler gewinnt“ bei einem). Gefangene sehen nach Rundenende statt „Du wurdest gefangen …“ nur noch den Hinweis, dass die Runde wegen der Standorte weiterläuft. (2026-10-20) |
+| R-GAME-10 | Sicherheitsmechanismus: Beendet der Host eine Runde, die vorbei ist, nicht offiziell, endet sie **3 h nach Ablauf der Spielzeit bzw. 3 h nach dem letzten Catch** (R-GAME-08) automatisch – genau wie mit „Spiel beenden“ (Historie, alle Rundendaten inkl. Standorte gelöscht, gefangen/Joker zurückgesetzt, zurück in die Lobby). Mangels Server erledigt das das erste Gerät eines Mitglieds, das die Runde danach sieht (offene Spielansicht oder App-Start); mehrere Geräte gleichzeitig erzeugen nur einen Historie-Eintrag. Der Hinweis nach Rundenende nennt die Uhrzeit („… sonst endet sie um 20:00 Uhr automatisch“), die Historie markiert solche Runden als „automatisch beendet“. Feste Frist, nicht einstellbar. (2026-10-27) |
 
 ## 2. Gruppe & Einstellungen
 
@@ -45,6 +46,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-17 | Einstellbar: „Live-Standort beim Verlassen des Spielfelds“ (Standard: an, auch für bestehende Gruppen). Siehe R-OUT-01 … 06. (2026-10-08) |
 | R-SET-18 | Einstellbar: „Pause zwischen Speedhunts“ (Standard: 30 min, auch für bestehende Gruppen). Gezählt ab dem Ende des vorigen Speedhunts (letzter Speedhunt-Ping bzw. Catch des Ziels, R-SPEED-10); so lange ist kein weiterer Speedhunt möglich (R-SPEED-11). (2026-10-26) |
 | R-SET-19 | Einstellbar: „Mehrmals in Folge auf denselben Spieler“ (Standard: ja, mit 30 min „Pause für denselben Spieler“). **Ja:** Ein Spieler ist erst wieder wählbar, wenn seit dem Ende des letzten Speedhunts auf ihn die Spieler-Pause vergangen ist – auch wenn dazwischen andere Spieler dran waren. Die Spieler-Pause ist nie kürzer als R-SET-18; wer sie darunter senken will, bekommt den Hinweis, zuerst R-SET-18 zu verkürzen; Verlängern von R-SET-18 zieht sie mit. **Nein:** Das Ziel des letzten Speedhunts ist beim nächsten nicht wählbar. Siehe R-SPEED-12. (2026-10-26) |
+| R-SET-20 | Oben in den Einstellungen steht der vollständige Gruppenname (in der Gruppenübersicht und Lobby wird er bei Platzmangel abgekürzt). (2026-10-27) |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -60,6 +62,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
 | R-LOBBY-09 | Der Host kann Mitglieder in der Lobby aus der Gruppe entfernen (Symbol neben der Person, mit Rückfrage). Während einer Runde nicht mehr – dort gibt es stattdessen „Catch rückgängig“ (R-CATCH-04, geändert am 2026-10-10). Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
+| R-LOBBY-10 | Jede Person kann ihren eigenen Anzeigenamen in der Lobby nachträglich ändern (Stift-Symbol neben dem eigenen Namen). Der Name bleibt verschlüsselt gespeichert. |
 
 ### Mehrere Gruppen
 
@@ -120,6 +123,18 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-HUNT-09 | Wird ein Spieler gefangen, verschwinden sein Spieler-Chip und seine Speedhunt-Chips. Stattdessen gibt es (ab dem ersten Catch) einen Chip „Gefangen“, anfangs aus und nur per Tippen einschaltbar – er geht nie von selbst an (anders als R-HUNT-08). Eingeschaltet zeigt er die normale nummerierte Ping-Historie aller Gefangenen (in ihren Farben) und alle ihre Speedhunt-Pings. Ihr letzter Ping verschwindet sofort aus „Letzte Pings“ (geändert 2026-10-08; vorher grau). Nach Ablauf der Spielzeit siehe R-HUNT-11. |
 | R-HUNT-10 | Hunter sehen wie die Spieler über den Filtern einen Countdown bis zu den nächsten regulären Pings („Nächste Pings in 04:12“). Nach dem letzten regulären Ping der Runde verschwindet er. |
 | R-HUNT-11 | Ist die Spielzeit abgelaufen, die Runde aber noch nicht vom Host beendet, werden Gefangene wieder wie alle anderen angezeigt: kein Chip „Gefangen“, wieder eigene Spieler- und Speedhunt-Chips, letzter Ping wieder unter „Letzte Pings“ in Spielerfarbe – zum gemeinsamen Anschauen nach dem Spiel. (2026-10-08) |
+
+### Zeichnen (Hunter, 2026-10-27)
+
+| ID | Anforderung |
+|---|---|
+| R-DRAW-01 | Hunter haben auf der Karte einen Button „Zeichenmodus“. Ein Tipp schaltet ihn ein (Button hervorgehoben), ein weiterer wieder aus. Spieler haben ihn nicht. |
+| R-DRAW-02 | Im Zeichenmodus zeichnet **ein** Finger einen Strich auf die Karte; mit **zwei** Fingern wird weiterhin gezoomt und verschoben. Kommt ein zweiter Finger dazu, wird der angefangene Strich verworfen. Außerhalb des Modus verhält sich die Karte wie immer. |
+| R-DRAW-03 | Vier Farben: Rot (Standard), Blau, Grün, Schwarz. Die Strichdicke ist fest (gut sichtbar, nicht einstellbar). Die Striche liegen auf der Karte (zoomen mit). |
+| R-DRAW-04 | Radiergummi: radiert nur den überfahrenen Teil eines Strichs weg, der Rest bleibt (ggf. in zwei Stücken). Mülleimer: löscht sofort (ohne Rückfrage) alle Zeichnungen aller Hunter, egal von wem sie sind (geändert 2026-10-27). |
+| R-DRAW-05 | Zeichnungen bleiben nach dem Verlassen des Zeichenmodus sichtbar. Ändern/Löschen geht nur im Zeichenmodus. |
+| R-DRAW-06 | Ein Strich wird beim Loslassen des Fingers an alle Hunter übertragen und erscheint dort direkt. Jeder Hunter darf alle Striche radieren oder löschen und gleichzeitig selbst zeichnen. Spieler sehen die Zeichnungen nie. |
+| R-DRAW-07 | Zeichnungen werden verschlüsselt gespeichert (wie Standorte) und beim Beenden der Runde gelöscht. |
 
 ### Spieler-View
 
@@ -189,6 +204,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-OVER-01 | Für alle gibt es einen Übersichtsbereich, im Spiel über das Gruppen-Symbol oben rechts erreichbar (statt der Historie, die nur in der Lobby angeboten wird). |
 | R-OVER-02 | Liste aller Teilnehmenden, unterteilt in Hunter und Spieler; gefangene Spieler durchgestrichen. |
 | R-OVER-03 | Anzeige, ob aktuell ein Speedhunt läuft. |
+| R-OVER-04 | Nur Hunter sehen dort zusätzlich, auf wen der laufende Speedhunt geht (bei anonymen Spielern als Nummer, R-ANON-02). Spieler sehen weiterhin nur, dass einer läuft. (2026-10-27) |
 
 ## 10. Plattform, Sprache, Design
 
@@ -228,8 +244,8 @@ Zum Testen mit nur zwei Handys.
 |---|---|
 | R-BOT-01 | Computer-Mitglieder gibt es nur in Debug-Builds und in Release-Builds mit `--dart-define=MANHUNT_BOTS=true` – nie in TestFlight/Store-Builds ohne diesen Schalter. |
 | R-BOT-02 | Der Host stellt in den Einstellungen (Abschnitt „Test (Debug)“) die Anzahl Computer-Hunter und Computer-Spieler ein (je 0–4, Standard 0). |
-| R-BOT-03 | Computer-Mitglieder haben seltene, herrlich hässliche Namen mit 🤖 („🤖 Stromius“, „🤖 Adelgunde“ …); Hunter und Spieler haben getrennte Namenslisten, so ist die Art am Namen erkennbar (2026-10-26). Sie laufen auf dem Handy des ersten Menschen mit ihrer Rolle (Beitrittsreihenfolge); gibt es keinen, gibt es (noch) keine Computer-Mitglieder dieser Art und die Lobby zeigt dem Host einen Hinweis. Ändern sich Anzahl oder Rollen, gleichen die Handys das in der Lobby automatisch an; der Host gibt ihnen automatisch ihre Rolle, die Zufallseinteilung und das Antippen ändern sie nicht. |
-| R-BOT-04 | Ein Computer-Mitglied läuft zufällig (ca. 1,3 m/s, mit Pausen) in höchstens 100 m (2026-10-26, vorher 30 m) um den aktuellen Standort seines Handys; ist der weg (z.B. gefangen), bleibt es um den letzten. |
+| R-BOT-03 | Computer-Mitglieder haben seltene, herrlich hässliche Namen mit 🤖 („🤖 Stromius“, „🤖 Adelgunde“ …); Hunter und Spieler haben getrennte Namenslisten, so ist die Art am Namen erkennbar (2026-10-26). Sie sind sofort da und direkt als Hunter bzw. Spieler eingeteilt – auch wenn nur ein echtes Handy in der Gruppe ist; die Menschen teilt der Host wie gewohnt ein. Sie laufen auf dem Handy des ersten Menschen mit ihrer Rolle (Beitrittsreihenfolge), gibt es keinen, auf dem des ersten Menschen überhaupt (2026-10-27): mit einem Handy bewegen sich also alle um dieses, mit Spieler- und Hunter-Handy die Computer-Spieler um das Spieler- und die Computer-Hunter um das Hunter-Handy. Ändern sich Anzahl oder Rollen, gleichen die Handys das in der Lobby automatisch an; der Host gibt ihnen automatisch ihre Rolle, die Zufallseinteilung und das Antippen ändern sie nicht. |
+| R-BOT-04 | Ein Computer-Mitglied läuft zufällig (ca. 1,3 m/s, mit Pausen) in höchstens 200 m (2026-10-27, vorher 100 m bzw. 30 m) um den aktuellen Standort seines Handys; ist der weg (z.B. gefangen), bleibt es um den letzten. |
 | R-BOT-05 | Ein Computer-Mitglied verhält sich wie ein echtes Handy: reguläre Pings, Speedhunt-Pings als Ziel, Joker-Anfragen beantworten, Spielfeld verlassen, nach dem Catch stoppen; Computer-Hunter teilen ihren Live-Standort. Das läuft, solange auf seinem Handy der Spielbildschirm offen ist. Seine Protokollzeilen erscheinen im Debug-Log dieses Handys. |
 | R-BOT-06 | Jedes Computer-Mitglied hat ein eigenes anonymes Firebase-Konto und nutzt nur die normalen Abläufe – keine Änderung an den Sicherheitsregeln. |
 

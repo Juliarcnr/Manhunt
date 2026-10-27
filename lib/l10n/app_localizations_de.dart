@@ -68,6 +68,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyRename => 'Gruppe umbenennen';
 
   @override
+  String get lobbyRenameMe => 'Namen ändern';
+
+  @override
   String get roleHunter => 'Hunter';
 
   @override
@@ -120,6 +123,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get overviewNoSpeedhunt => 'Kein Speedhunt aktiv';
+
+  @override
+  String overviewSpeedhuntOn(String name) {
+    return 'Speedhunt auf $name';
+  }
 
   @override
   String overviewStillFree(int free, int total) {
@@ -320,7 +328,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer-Mitglieder laufen zufällig in max. 100 m um die erste Person mit ihrer Rolle und pingen wie echte Handys. Sie laufen auf deren Handy, solange dort der Spielbildschirm offen ist.';
+      'Computer-Mitglieder sind direkt als Hunter bzw. Spieler eingeteilt und laufen zufällig in max. 200 m um ein echtes Handy: Computer-Spieler um das des ersten Spielers, Computer-Hunter um das des ersten Hunters – gibt es keins, um das erste Handy der Gruppe. Sie pingen wie echte Handys, solange dort der Spielbildschirm offen ist.';
 
   @override
   String get settingsBotHunters => 'Computer-Hunter';
@@ -459,14 +467,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Warte darauf, dass das Spiel gestartet wird…';
 
   @override
-  String get lobbyBotsNeedHunter =>
-      'Computer-Hunter erscheinen, sobald ein Mensch Hunter ist.';
-
-  @override
-  String get lobbyBotsNeedPlayer =>
-      'Computer-Spieler erscheinen, sobald ein Mensch Spieler ist.';
-
-  @override
   String get lobbyAdminBadge => 'Host';
 
   @override
@@ -530,8 +530,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get gameTimeUpHint =>
-      'Die Runde läuft weiter, damit ihr euch die Standorte noch gemeinsam anschauen könnt. Der Host beendet sie.';
+  String gameTimeUpHint(String time) {
+    return 'Die Runde läuft weiter, damit ihr euch die Standorte noch gemeinsam anschauen könnt. Der Host beendet sie – sonst endet sie um $time Uhr automatisch.';
+  }
 
   @override
   String get gameEndButton => 'Spiel beenden';
@@ -565,6 +566,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get historyAborted => 'vorzeitig abgebrochen';
+
+  @override
+  String get historyAutoEnded => 'automatisch beendet';
 
   @override
   String gameNextPing(String time) {
@@ -888,4 +892,28 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get historyAllCaught => 'Alle Spieler gefangen!';
+
+  @override
+  String get drawMode => 'Zeichenmodus';
+
+  @override
+  String get drawColorRed => 'Rot';
+
+  @override
+  String get drawColorBlue => 'Blau';
+
+  @override
+  String get drawColorGreen => 'Grün';
+
+  @override
+  String get drawColorBlack => 'Schwarz';
+
+  @override
+  String get drawEraser => 'Radiergummi';
+
+  @override
+  String get drawClear => 'Alle Zeichnungen löschen';
+
+  @override
+  String get drawFailed => 'Zeichnung konnte nicht gespeichert werden.';
 }

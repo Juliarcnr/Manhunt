@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide GeoPoint;
 
+import '../core/drawing/stroke.dart';
 import '../core/round/joker.dart';
 import '../core/round/ping_schedule.dart';
 import '../core/schedule/speedhunt.dart';
@@ -15,6 +16,7 @@ import 'round_repository.dart';
 /// - `speedhuntTargets/{eventId}`: uid (target), createdAt
 /// - `jokerRequests/{id}`: uid (requester), createdAt
 /// - `jokerAnswers/{requestId}_{uid}`: request, requester, uid, createdAt, data
+/// - `drawings/{id}`: uid (author), createdAt, data (Stroke) – hunters only
 class FirestoreRoundRepository implements RoundRepository {
   FirestoreRoundRepository(this._db);
 
@@ -307,5 +309,65 @@ class FirestoreRoundRepository implements RoundRepository {
       );
     }
     return result;
+  }
+
+  CollectionReference<Map<String, dynamic>> _drawings(GroupSession s) =>
+      _game(s).collection('drawings');
+
+  @override
+  Stream<List<Stroke>> watchDrawings(GroupSession session) =>
+      _drawings(session).snapshots().asyncMap(
+        (snap) => Future.wait([
+          for (final doc in snap.docs)
+            session.crypto
+                .decryptJson(doc.data()['data'] as String)
+                .then(
+                  (json) => Stroke.fromJson(
+                    json! as Map<String, Object?>,
+                    id: doc.id,
+                    uid: doc.data()['uid'] as String,
+                  ),
+                ),
+        ]),
+      );
+
+  @override
+  Future<void> addStrokes(GroupSession session, List<Stroke> strokes) =>
+      replaceStrokes(session, removeIds: const [], add: strokes);
+
+  @override
+  Future<void> replaceStrokes(
+    GroupSession session, {
+    required Iterable<String> removeIds,
+    required List<Stroke> add,
+  }) async {
+    final batch = _db.batch();
+    for (final id in removeIds) {
+      batch.delete(_drawings(session).doc(id));
+    }
+    for (final stroke in add) {
+      final ref = stroke.id.isEmpty
+          ? _drawings(session).doc()
+          : _drawings(session).doc(stroke.id);
+      batch.set(ref, {
+        'uid': session.userId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': await session.crypto.encryptJson(stroke.toJson()),
+      });
+    }
+    await batch.commit();
+  }
+
+  @override
+  Future<void> clearDrawings(GroupSession session) async {
+    final docs = (await _drawings(session).get()).docs;
+    // Firestore allows at most 500 writes per batch.
+    for (var i = 0; i < docs.length; i += 400) {
+      final batch = _db.batch();
+      for (final doc in docs.skip(i).take(400)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
   }
 }

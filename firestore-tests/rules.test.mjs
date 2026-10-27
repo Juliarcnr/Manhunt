@@ -11,6 +11,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   collection,
@@ -219,7 +220,7 @@ describe('rounds & cleanup', () => {
   const seedRoundData = () =>
     env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
-      for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets']) {
+      for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'drawings']) {
         await setDoc(doc(db, 'games', GID, name, 'd1'), { data: 'enc' });
       }
     });
@@ -247,7 +248,7 @@ describe('rounds & cleanup', () => {
     await assertSucceeds(getDocs(collection(as('kim'), 'games', GID, 'events')));
     await assertFails(getDocs(collection(as('stranger'), 'games', GID, 'events')));
     await assertFails(deleteDoc(doc(as('kim'), 'games', GID, 'pings', 'd1')));
-    for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets']) {
+    for (const name of ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'drawings']) {
       await assertSucceeds(deleteDoc(doc(as('admin'), 'games', GID, name, 'd1')));
     }
   });
@@ -653,6 +654,102 @@ describe('running round (phase 5)', () => {
   });
 });
 
+// Flows as FirestoreRoundRepository runs them: add (batch of creates),
+// erase (batch: delete + create pieces), trash (list, then batch delete).
+describe('drawings (R-DRAW-06)', () => {
+  const stroke = (uid) => ({ uid, createdAt: serverTimestamp(), data: 'enc' });
+  const addStroke = async (uid, id) => {
+    const db = as(uid);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'games', GID, 'drawings', id), stroke(uid));
+    await batch.commit();
+  };
+  const erase = async (uid, id) => {
+    const db = as(uid);
+    const snap = await getDocs(collection(db, 'games', GID, 'drawings'));
+    assert.ok(snap.docs.some((d) => d.id === id));
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'games', GID, 'drawings', id));
+    batch.set(doc(db, 'games', GID, 'drawings', `${id}a`), stroke(uid));
+    batch.set(doc(db, 'games', GID, 'drawings', `${id}b`), stroke(uid));
+    await batch.commit();
+  };
+  const clearAll = async (uid) => {
+    const db = as(uid);
+    const snap = await getDocs(collection(db, 'games', GID, 'drawings'));
+    const batch = writeBatch(db);
+    for (const d of snap.docs) batch.delete(d.ref);
+    await batch.commit();
+    return snap.size;
+  };
+  const seedStroke = (id = 's1', uid = 'admin') =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'drawings', id), { uid, createdAt: new Date(), data: 'enc' }),
+    );
+  const setRole = (uid, role) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'members', uid), {
+        name: 'enc', role, caught: false, jokerUsed: false, joinedAt: new Date(),
+      }),
+    );
+
+  beforeEach(async () => {
+    await startRound(); // admin hunter, kim + sam players
+    await setRole('tom', 'hunter');
+    await setRole('lee', 'unassigned');
+  });
+
+  test('hunters draw, erase each other\'s strokes and clear everything', async () => {
+    await assertSucceeds(addStroke('admin', 's1'));
+    await assertSucceeds(addStroke('tom', 's2'));
+    await assertSucceeds(erase('tom', 's1')); // a stroke of the host
+    await assertSucceeds(erase('admin', 's2'));
+    assert.equal(await assertSucceeds(clearAll('tom')), 4);
+  });
+
+  test('host who is a hunter can clear as well', async () => {
+    await seedStroke('s1', 'tom');
+    assert.equal(await assertSucceeds(clearAll('admin')), 1);
+  });
+
+  test('players, unassigned members and strangers see nothing and cannot draw', async () => {
+    await seedStroke();
+    for (const uid of ['kim', 'lee', 'stranger']) {
+      await assertFails(getDocs(collection(as(uid), 'games', GID, 'drawings')));
+      await assertFails(getDoc(doc(as(uid), 'games', GID, 'drawings', 's1')));
+      await assertFails(addStroke(uid, 'x'));
+      await assertFails(deleteDoc(doc(as(uid), 'games', GID, 'drawings', 's1')));
+    }
+  });
+
+  test('host who is a player cannot read or draw during the round', async () => {
+    await setRole('admin', 'player');
+    await seedStroke('s1', 'tom');
+    await assertFails(getDocs(collection(as('admin'), 'games', GID, 'drawings')));
+    await assertFails(addStroke('admin', 'x'));
+  });
+
+  test('strokes carry the own uid and only the known fields', async () => {
+    const ref = doc(as('admin'), 'games', GID, 'drawings', 'x');
+    await assertFails(setDoc(ref, stroke('tom')));
+    await assertFails(setDoc(ref, { ...stroke('admin'), color: 'red' }));
+    await assertFails(setDoc(ref, { ...stroke('admin'), data: 42 }));
+    await assertFails(setDoc(ref, { ...stroke('admin'), data: 'x'.repeat(200000) }));
+  });
+
+  test('strokes cannot be edited in place, only replaced', async () => {
+    await seedStroke();
+    await assertFails(updateDoc(doc(as('admin'), 'games', GID, 'drawings', 's1'), { data: 'enc2' }));
+  });
+
+  test('no drawing in the lobby', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID), { status: 'lobby' }),
+    );
+    await assertFails(addStroke('tom', 'x'));
+  });
+});
+
 describe('regular pings to all players (R-SET-15, R-PLAY-05)', () => {
   const pingsOf = (uid, kind = 'regular') =>
     getDocs(query(collection(as(uid), 'games', GID, 'pings'), where('kind', '==', kind)));
@@ -811,7 +908,10 @@ describe('player joker (R-PLAY-03)', () => {
 // before deleting. This failed with "permission denied" for a host who was
 // not a hunter (bug found in the first field test, 2026-10-05).
 describe('clean-up flows list before deleting', () => {
-  const ROUND = ['pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers'];
+  const ROUND = [
+    'pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
+    'drawings',
+  ];
 
   const seed = () =>
     env.withSecurityRulesDisabled(async (ctx) => {
@@ -1163,5 +1263,169 @@ describe('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () =>
       const snap = await getDocs(collection(db, 'games', GID, name));
       for (const d of snap.docs) await assertSucceeds(deleteDoc(d.ref));
     }
+  });
+});
+
+describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
+  const ROUND = [
+    'pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
+    'drawings',
+  ];
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+  const ENTRY = 'auto_123';
+
+  // Round of 60 min started [startedMinutesAgo] ago, optionally won by the
+  // hunters [finishedMinutesAgo] ago; admin is hunter (or [hostRole]), kim
+  // and sam players, lou another hunter. Every round collection holds a doc.
+  const round = async ({ startedMinutesAgo, finishedMinutesAgo = null, hostRole = 'hunter' }) => {
+    await startRound();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'games', GID), {
+        startAt: minutesAgo(startedMinutesAgo),
+        durationSec: 3600,
+        aliases: 'enc',
+        ...(finishedMinutesAgo == null ? {} : { finishedAt: minutesAgo(finishedMinutesAgo) }),
+      });
+      await updateDoc(doc(db, 'games', GID, 'members', 'admin'), { role: hostRole });
+      await updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true, jokerUsed: true });
+      await setDoc(doc(db, 'games', GID, 'members', 'lou'), {
+        name: 'enc', role: 'hunter', caught: false, jokerUsed: false, joinedAt: new Date(),
+      });
+      for (const name of ROUND) {
+        await setDoc(doc(db, 'games', GID, name, 'd1'), {
+          uid: 'sam', requester: 'sam', type: 'catch', data: 'enc',
+        });
+      }
+    });
+  };
+
+  // As FirestoreGameRepository.autoEndRound: check the history entry, read
+  // what the summary needs and save it, delete all round data, then reset
+  // the members and go back to the lobby in one batch.
+  const autoEnd = async (uid) => {
+    const db = as(uid);
+    const entry = doc(db, 'games', GID, 'history', ENTRY);
+    if (!(await getDoc(entry)).exists()) {
+      await getDoc(doc(db, 'games', GID));
+      await getDocs(collection(db, 'games', GID, 'members'));
+      await getDocs(query(collection(db, 'games', GID, 'events'), where('type', '==', 'catch')));
+      await getCountFromServer(collection(db, 'games', GID, 'history'));
+      await setDoc(entry, { endedAt: new Date(), data: 'enc' });
+    }
+    for (const name of ROUND) {
+      const snap = await getDocs(collection(db, 'games', GID, name));
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    }
+    const members = await getDocs(collection(db, 'games', GID, 'members'));
+    const batch = writeBatch(db);
+    for (const m of members.docs) {
+      batch.update(m.ref, { caught: false, jokerUsed: false, playerJokerUsed: false });
+    }
+    batch.update(doc(db, 'games', GID), {
+      status: 'lobby',
+      startAt: null,
+      finishedAt: deleteField(),
+      aliases: deleteField(),
+      expiresAt: inDays(180),
+    });
+    await batch.commit();
+  };
+
+  const roundDocsLeft = async () => {
+    let count = 0;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      for (const name of ROUND) {
+        count += (await getDocs(collection(ctx.firestore(), 'games', GID, name))).size;
+      }
+    });
+    return count;
+  };
+
+  const expectEnded = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const game = (await getDoc(doc(db, 'games', GID))).data();
+      assert.equal(game.status, 'lobby');
+      assert.equal(game.startAt, null);
+      assert.equal(game.finishedAt, undefined);
+      assert.equal(game.aliases, undefined);
+      const kim = (await getDoc(doc(db, 'games', GID, 'members', 'kim'))).data();
+      assert.equal(kim.caught, false);
+      assert.equal(kim.jokerUsed, false);
+      assert.equal((await getDocs(collection(db, 'games', GID, 'history'))).size, 1);
+    });
+
+  const cases = [
+    ['host as hunter', 'admin', 'hunter'],
+    ['host as player', 'admin', 'player'],
+    ['host unassigned', 'admin', 'unassigned'],
+    ['a player', 'kim', 'hunter'],
+    ['a hunter', 'lou', 'hunter'],
+  ];
+  for (const [label, uid, hostRole] of cases) {
+    test(`${label} ends the round 3 h after the time is up, end to end`, async () => {
+      await round({ startedMinutesAgo: 60 + 181, hostRole });
+      await assertSucceeds(autoEnd(uid));
+      assert.equal(await roundDocsLeft(), 0);
+      await expectEnded();
+    });
+  }
+
+  test('3 h after the hunters won, although the planned time is not up yet', async () => {
+    await round({ startedMinutesAgo: 200, finishedMinutesAgo: 181 });
+    await assertSucceeds(autoEnd('kim'));
+    await expectEnded();
+  });
+
+  test('not before: neither 2 h after the time is up nor 2 h after the hunters won', async () => {
+    await round({ startedMinutesAgo: 60 + 120 });
+    const db = as('kim');
+    await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'enc' }));
+    await assertFails(getDocs(collection(db, 'games', GID, 'jokerAnswers')));
+    await assertFails(deleteDoc(doc(db, 'games', GID, 'pings', 'd1')));
+    await assertFails(
+      updateDoc(doc(db, 'games', GID), { status: 'lobby', startAt: null, expiresAt: inDays(180) }),
+    );
+    await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: false }));
+
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(150), finishedAt: minutesAgo(120) }),
+    );
+    await assertFails(autoEnd('kim'));
+  });
+
+  test('a finishedAt left over from an earlier round does not bring it forward', async () => {
+    await round({ startedMinutesAgo: 60, finishedMinutesAgo: 600 });
+    await assertFails(autoEnd('kim'));
+  });
+
+  test('strangers cannot end it', async () => {
+    await round({ startedMinutesAgo: 60 + 181 });
+    await assertFails(autoEnd('stranger'));
+  });
+
+  test('only the lobby reset: no other fields, no catches, no new admin', async () => {
+    await round({ startedMinutesAgo: 60 + 181 });
+    const db = as('kim');
+    const lobby = { status: 'lobby', startAt: null, expiresAt: inDays(180) };
+    await assertFails(updateDoc(doc(db, 'games', GID), { ...lobby, adminUid: 'kim' }));
+    await assertFails(updateDoc(doc(db, 'games', GID), { ...lobby, settings: 'x' }));
+    await assertFails(updateDoc(doc(db, 'games', GID), { ...lobby, expiresAt: inDays(400) }));
+    await assertFails(updateDoc(doc(db, 'games', GID), { startAt: null, expiresAt: inDays(180) }));
+    await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'sam'), { caught: true }));
+    await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'sam'), { role: 'hunter' }));
+  });
+
+  test('a second device after the first: history not overwritten or added, the lobby stays', async () => {
+    await round({ startedMinutesAgo: 60 + 181 });
+    await assertSucceeds(autoEnd('kim'));
+    const db = as('lou');
+    await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'x' }));
+    await assertFails(setDoc(doc(db, 'games', GID, 'history', 'other'), { endedAt: new Date(), data: 'x' }));
+    // The app swallows this: the round is in the lobby already.
+    await assertFails(autoEnd('lou'));
+    await assertFails(getDocs(collection(as('kim'), 'games', GID, 'jokerAnswers')));
+    await expectEnded();
   });
 });

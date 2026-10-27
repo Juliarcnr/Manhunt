@@ -1,3 +1,4 @@
+import '../core/drawing/stroke.dart';
 import '../core/round/joker.dart';
 import '../core/round/ping_schedule.dart';
 import '../core/schedule/speedhunt.dart';
@@ -80,4 +81,21 @@ abstract interface class RoundRepository {
   /// All speedhunts with target set. Hunters only – for the per-player rules
   /// of the next speedhunt (R-SET-19).
   Stream<List<Speedhunt>> watchSpeedhuntsWithTargets(GroupSession session);
+
+  /// All hunters' drawings on the map – hunters only (R-DRAW-06).
+  Stream<List<Stroke>> watchDrawings(GroupSession session);
+
+  /// Stores new strokes drawn by this hunter (R-DRAW-01).
+  Future<void> addStrokes(GroupSession session, List<Stroke> strokes);
+
+  /// Eraser (R-DRAW-04): replaces the strokes [removeIds] by the remaining
+  /// pieces [add] in one batch. Any hunter may erase any stroke.
+  Future<void> replaceStrokes(
+    GroupSession session, {
+    required Iterable<String> removeIds,
+    required List<Stroke> add,
+  });
+
+  /// Trash can (R-DRAW-04): deletes all drawings of the round.
+  Future<void> clearDrawings(GroupSession session);
 }

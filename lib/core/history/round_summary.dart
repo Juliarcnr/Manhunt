@@ -65,6 +65,7 @@ class RoundSummary {
     required this.players,
     required this.catches,
     this.abortedEarly = false,
+    this.autoEnded = false,
   });
 
   final int round;
@@ -78,6 +79,10 @@ class RoundSummary {
 
   /// The host ended the round before its time was up (R-GAME-07).
   final bool abortedEarly;
+
+  /// Nobody ended the round, so a device did 3 h after it was over
+  /// (R-GAME-10).
+  final bool autoEnded;
 
   Duration get duration => endedAt.difference(startedAt);
 
@@ -98,6 +103,7 @@ class RoundSummary {
     'players': players,
     'catches': [for (final c in catches) c.toJson()],
     'abortedEarly': abortedEarly,
+    if (autoEnded) 'autoEnded': true,
   };
 
   factory RoundSummary.fromJson(Map<String, Object?> json) => RoundSummary(
@@ -111,6 +117,7 @@ class RoundSummary {
         CatchEntry.fromJson(c! as Map<String, Object?>),
     ],
     abortedEarly: json['abortedEarly'] as bool? ?? false,
+    autoEnded: json['autoEnded'] as bool? ?? false,
   );
 
   /// Builds the summary at round end from the members and recorded catches.
@@ -129,6 +136,9 @@ class RoundSummary {
     /// When the hunters caught everyone (R-GAME-08): such a round was not
     /// aborted, even though it ended before its time.
     DateTime? finishedAt,
+
+    /// Ended by a device, not the host (R-GAME-10).
+    bool autoEnded = false,
   }) {
     final names = {for (final m in members) m.id: m.name};
     final sorted = [...catches]..sort((a, b) => a.at.compareTo(b.at));
@@ -152,6 +162,7 @@ class RoundSummary {
           finishedAt == null &&
           plannedDuration != null &&
           endedAt.isBefore(startedAt.add(plannedDuration)),
+      autoEnded: autoEnded,
     );
   }
 }

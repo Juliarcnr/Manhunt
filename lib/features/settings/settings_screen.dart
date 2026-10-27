@@ -53,11 +53,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settings = widget.readOnly
         ? ref.watch(gameProvider).value?.settings ?? widget.initial
         : _settings;
+    // The full name, which the lobby and group list may cut off (R-SET-20).
+    final name = ref.watch(gameProvider).value?.name;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (name != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                name,
+                key: const Key('settingsGroupName'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
           if (widget.readOnly)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),

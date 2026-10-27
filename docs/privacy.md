@@ -7,7 +7,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 |---|---|---|---|
 | Anonyme Firebase-UID | Firebase Auth | ja (zufällige ID, keine E-Mail/kein Name) | bei App-Deinstallation verwaist |
 | Gruppen-ID (aus Code abgeleitet) | Firestore | ja, aber ohne Rückschluss auf den Code | mit Gruppe |
-| Anzeigename | Firestore | nein (verschlüsselt) | mit Gruppe |
+| Anzeigename (in der Lobby änderbar, R-LOBBY-10) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Gruppenname (R-GROUPS-04) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Rolle, gefangen, Joker benutzt | Firestore | ja (nötig für Regeln) | Rolle mit Gruppe; gefangen/Joker bei Rundenende zurückgesetzt |
 | Spielfeld & Einstellungen | Firestore | nein (verschlüsselt) | mit Gruppe |
@@ -17,6 +17,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Zeitpunkt „Hunter haben gewonnen“ (R-GAME-08) | Firestore `games/{id}.finishedAt` | ja (nur ein Zeitpunkt, kein Name) | beim Beenden der Runde |
 | Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse (ein Catch vermerkt ggf. den Start des Speedhunts, den er beendet – R-SPEED-10) | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings). Nach Ablauf der Spielzeit oder dem Hunter-Sieg dürfen alle Spieler alle Pings und Hunter-Standorte lesen (R-GAME-06, R-GAME-08) | **beim Beenden der Runde** (ein vom Host rückgängig gemachter Catch sofort, R-CATCH-04) |
 | Live-Standort eines Spielers, der das Spielfeld verlassen hat (R-OUT-03), mit GPS-Genauigkeit – nur solange er eindeutig (30 m + doppelte Ungenauigkeit) und seit 30 s draußen ist, plus 60 s nach der Rückkehr (Einstellung R-SET-17) | Firestore `outsideLocs/{uid}` | **nein** (AES-GCM); nur Hunter dürfen lesen; lesbar ist nur, *dass* eine anonyme ID gerade draußen ist | vom eigenen Handy gelöscht, sobald die 60 s um sind, man gefangen wird oder die Zeit abläuft; spätestens beim Beenden der Runde |
+| Zeichnungen der Hunter auf der Karte (R-DRAW-01 … 07): Farbe + Linienpunkte (Koordinaten), Autor-UID, Zeitpunkt | Firestore `drawings/{id}` | **nein** für Farbe und Punkte (AES-GCM); lesbar sind nur Autor-UID, Zeitpunkt und Anzahl der Striche. Nur Hunter dürfen lesen, Spieler nie | per Radiergummi/Mülleimer sofort; spätestens beim Beenden der Runde |
 | Antworten auf den Spieler-Joker (aktueller Standort der anderen Spieler) | Firestore | **nein** (AES-GCM); nur der fragende Spieler darf sie lesen | beim Beenden der Runde |
 | Metadaten der Runde: wer wann gepingt hat (uid, Ping-Nr.), Ziel-uid eines Speedhunts, wer einen Joker wann benutzt hat | Firestore | ja (nötig für die Sicherheitsregeln; nur anonyme IDs, keine Orte) | beim Beenden der Runde (Joker-Zeitpunkte bleiben bis zur nächsten Runde) |
 | Rundenübersicht (Runde, Datum, Dauer, Teams, Catches mit Zeit und Hunter) | Firestore `history` | nein (verschlüsselt), nur Zeitpunkt des Rundenendes lesbar | mit Gruppe (keine Standorte enthalten) |
@@ -28,7 +29,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 Nur in Debug-Builds bzw. mit `--dart-define=MANHUNT_BOTS=true`. Das Handy, das sie betreibt, legt pro
 Computer-Mitglied ein zusätzliches **anonymes Firebase-Konto** an (höchstens 8 pro Handy, wiederverwendet; verwaist
 bei Deinstallation). Sie erzeugen dieselben Daten wie ein echtes Mitglied (Name „🤖 …“ verschlüsselt, Rolle, Pings,
-Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 100 m – also
+Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 200 m – also
 ebenfalls verschlüsselt, aber sinngemäß ein weiterer Standort dieser Person. Die gewünschte Anzahl steht verschlüsselt
 in den Einstellungen.
 
@@ -45,13 +46,20 @@ Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Report
 - **Runde beenden** (Host, mit Warnhinweis): löscht sofort alle Standorte und Runden-Ereignisse für alle (R-PRIV-03).
   Nach Ablauf der Spielzeit (oder wenn der letzte Spieler gefangen wurde) läuft die Runde bewusst weiter, damit alle –
   Hunter und Spieler – die Standorte noch gemeinsam ansehen können.
+- **Automatisch 3 h nach Rundenende** (R-GAME-10): Beendet der Host die Runde nicht, löscht das erste Mitgliedsgerät,
+  das sie 3 h nach Ablauf der Spielzeit bzw. nach dem letzten Catch sieht, alles wie „Runde beenden“. Dafür dürfen ab
+  diesem Zeitpunkt (bis zur Rückkehr in die Lobby) alle Mitglieder die Rundendaten lesen und löschen, die Mitglieder
+  zurücksetzen und einen Historie-Eintrag schreiben. Zu sehen gibt es dabei kaum Neues: Alle Pings und
+  Hunter-Standorte sind dann schon seit 3 h für alle sichtbar (R-GAME-06); dazu kommen nur Zeichnungen der Hunter,
+  Joker-Antworten und Außerhalb-Standorte. Es werden keine neuen Daten gespeichert.
 - **Gruppe löschen** (Host): löscht alles – Rundendaten, Mitglieder, Gruppe.
 - **180 Tage ohne Öffnen** (R-PRIV-05): Jedes Öffnen der Gruppe durch ein Mitglied (max. 1× pro Tag geschrieben) und
   jede Host-Aktion setzt `expiresAt` auf jetzt + 180 Tage. Firestore-TTL gibt es im Spark-Tarif nicht (nur mit Billing), daher räumt das **erste Gerät der
   Gruppe auf, das die App nach Ablauf öffnet**; die Sicherheitsregeln erlauben das jedem Mitglied nur nach Ablauf.
   Restrisiko: Öffnet niemand die App mehr, bleibt die Gruppe (verschlüsselte Namen/Einstellungen, ohne Standorte,
   sofern die Runde beendet wurde) liegen.
-- Wird eine Runde nie beendet, bleiben auch deren (verschlüsselte) Standorte bis zur 180-Tage-Löschung liegen.
+- Wird eine Runde nie beendet und öffnet danach auch niemand mehr die App, bleiben deren (verschlüsselte) Standorte
+  bis zur 180-Tage-Löschung liegen (R-GAME-10 braucht ein Gerät, das die Gruppe öffnet).
 
 ## Standort
 Wird nur während eines laufenden Spiels erfasst (R-PRIV-04). Android zeigt dabei eine Dauer-Benachrichtigung.

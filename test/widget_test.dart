@@ -292,6 +292,43 @@ void main() {
     expect(find.text('Kim'), findsNothing);
   });
 
+  testWidgets('members change their own name in the lobby (R-LOBBY-10)', (
+    tester,
+  ) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    final guest = await tester.runAsync(
+      () => testSession('ABCDE-FGHJK', 'guest'),
+    );
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(me!, name: 'Julia', settings: defaultSettings);
+      await deviceRepo(db).joinGame(guest!, name: 'Kim');
+    });
+    await pumpAppWithSession(tester, db: db, userId: 'guest');
+
+    // Only one pencil: next to the own name, not next to the host.
+    expect(find.byKey(const Key('renameMeButton')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('renameMeButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('renameMeButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Change your name'), findsOneWidget);
+
+    // Empty names are rejected.
+    await tester.enterText(find.byKey(const Key('nameField')), '  ');
+    await tester.tap(find.byKey(const Key('renameSave')));
+    await tester.pumpAndSettle();
+    expect(find.text('Change your name'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('nameField')), ' Kimi ');
+    await tester.tap(find.byKey(const Key('renameSave')));
+    await settleAsync(tester);
+    expect(find.text('Kimi'), findsOneWidget);
+    expect(find.text('Kim'), findsNothing);
+    expect(find.text('Julia'), findsOneWidget);
+  });
+
   testWidgets('computer members keep their role in the lobby (R-BOT-03)', (
     tester,
   ) async {
@@ -332,17 +369,16 @@ void main() {
             as String?;
 
     expect(await role('bot-x'), 'player');
-    const hint = 'Computer hunters appear as soon as a person is a hunter.';
-    Future<void> toBottom() async {
-      await tester.drag(find.byType(ListView), const Offset(0, -3000));
-      await tester.pumpAndSettle();
-    }
-
-    await toBottom();
-    expect(find.text(hint), findsOneWidget);
+    // Nobody has a role yet: this first phone adds the computer hunter at
+    // once, already assigned (R-BOT-03).
+    expect(await role('bot-1-me'), 'hunter');
 
     // Not switchable by tapping, untouched by the random assignment.
-    await tester.ensureVisible(find.text('🤖 Adelgunde'));
+    await tester.scrollUntilVisible(
+      find.text('🤖 Adelgunde'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('🤖 Adelgunde'));
     await settleAsync(tester);
     expect(await role('bot-x'), 'player');
@@ -352,8 +388,12 @@ void main() {
     await settleAsync(tester);
     expect(await role('bot-x'), 'player');
     expect({await role('me'), await role('guest')}, {'hunter', 'player'});
-    await toBottom();
-    expect(find.text(hint), findsNothing);
+    // The computer hunter moves to the first human hunter's phone: it stays
+    // here only if this phone drew the hunter role.
+    expect(
+      await role('bot-1-me'),
+      await role('me') == 'hunter' ? 'hunter' : isNull,
+    );
   });
 
   testWidgets('removed member is told and can go back home (R-LOBBY-09)', (
@@ -592,5 +632,31 @@ void main() {
       expect(find.byKey(const Key('saveSettings')), findsOneWidget);
       expect(find.byIcon(Icons.add_circle_outline), findsWidgets);
     });
+  });
+
+  testWidgets('settings show the full group name on top (R-SET-20)', (
+    tester,
+  ) async {
+    const long = 'The very long name of our Friday evening running crew';
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    await tester.runAsync(
+      () => deviceRepo(db).createGame(
+        me!,
+        name: 'Julia',
+        settings: defaultSettings,
+        groupName: long,
+      ),
+    );
+    await pumpAppWithSession(tester, db: db, userId: 'me');
+
+    await tester.tap(find.byKey(const Key('settingsButton')));
+    await tester.pumpAndSettle();
+
+    final name = tester.widget<Text>(
+      find.byKey(const Key('settingsGroupName')),
+    );
+    expect(name.data, long);
+    expect(name.overflow, isNull); // wraps instead of "…"
   });
 }

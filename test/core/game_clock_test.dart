@@ -63,6 +63,30 @@ void main() {
     });
   });
 
+  group('automatic end (R-GAME-10)', () {
+    test('3 h after the time is up', () {
+      expect(clock.autoEndAt, at(180 + 180));
+    });
+
+    test('3 h after the last catch', () {
+      final won = GameClock(
+        startAt: start,
+        settings: settings,
+        finishedAt: at(50),
+      );
+      expect(won.autoEndAt, at(50 + 180));
+    });
+
+    test('a leftover from an earlier round does not bring it forward', () {
+      final leftover = GameClock(
+        startAt: start,
+        settings: settings,
+        finishedAt: at(-60),
+      );
+      expect(leftover.autoEndAt, at(180 + 180));
+    });
+  });
+
   group('regular pings (R-PING-02)', () {
     test('first ping at minute 20, then every 20 min, none at the end', () {
       final times = clock.regularPingTimes();

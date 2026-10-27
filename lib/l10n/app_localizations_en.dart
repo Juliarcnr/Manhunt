@@ -68,6 +68,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lobbyRename => 'Rename group';
 
   @override
+  String get lobbyRenameMe => 'Change your name';
+
+  @override
   String get roleHunter => 'Hunter';
 
   @override
@@ -120,6 +123,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get overviewNoSpeedhunt => 'No speedhunt running';
+
+  @override
+  String overviewSpeedhuntOn(String name) {
+    return 'Speedhunt on $name';
+  }
 
   @override
   String overviewStillFree(int free, int total) {
@@ -317,7 +325,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer members walk randomly within 100 m of the first person with their role and ping like real phones. They run on that person\'s phone while its game screen is open.';
+      'Computer members are assigned as hunters or players right away and walk randomly within 200 m of a real phone: computer players around the first player\'s, computer hunters around the first hunter\'s – without one, around the group\'s first phone. They ping like real phones while the game screen is open there.';
 
   @override
   String get settingsBotHunters => 'Computer hunters';
@@ -453,14 +461,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lobbyWaitingForAdmin => 'Waiting for the host to start…';
 
   @override
-  String get lobbyBotsNeedHunter =>
-      'Computer hunters appear as soon as a person is a hunter.';
-
-  @override
-  String get lobbyBotsNeedPlayer =>
-      'Computer players appear as soon as a person is a player.';
-
-  @override
   String get lobbyAdminBadge => 'Host';
 
   @override
@@ -524,8 +524,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get gameTimeUpHint =>
-      'The round keeps running so you can look at the locations together. The host ends it.';
+  String gameTimeUpHint(String time) {
+    return 'The round keeps running so you can look at the locations together. The host ends it – otherwise it ends automatically at $time.';
+  }
 
   @override
   String get gameEndButton => 'End game';
@@ -559,6 +560,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyAborted => 'aborted early';
+
+  @override
+  String get historyAutoEnded => 'ended automatically';
 
   @override
   String gameNextPing(String time) {
@@ -878,4 +882,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyAllCaught => 'All players caught!';
+
+  @override
+  String get drawMode => 'Drawing mode';
+
+  @override
+  String get drawColorRed => 'Red';
+
+  @override
+  String get drawColorBlue => 'Blue';
+
+  @override
+  String get drawColorGreen => 'Green';
+
+  @override
+  String get drawColorBlack => 'Black';
+
+  @override
+  String get drawEraser => 'Eraser';
+
+  @override
+  String get drawClear => 'Delete all drawings';
+
+  @override
+  String get drawFailed => 'Drawing could not be saved.';
 }

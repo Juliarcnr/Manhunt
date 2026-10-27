@@ -49,6 +49,7 @@ Dauert 2–3 Minuten.
 - [ ] Nach dem Spiel **„Spiel beenden“** drücken: Erst dann werden alle Standorte gelöscht. Vorher könnt ihr euch die
   Pings gemeinsam auf der Karte anschauen – nach Ablauf der Zeit oder sobald der letzte Spieler gefangen ist, sehen
   **alle** (auch Spieler) alle Standorte, und Gefangene haben wieder ihre eigenen Chips. Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
+  Vergessen? Spätestens 3 h nach Spielende beendet ein Handy der Gruppe die Runde automatisch.
 
 ## 4. Datenschutz in einem Satz
 

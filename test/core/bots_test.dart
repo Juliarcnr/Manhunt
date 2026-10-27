@@ -19,7 +19,7 @@ void main() {
   group('computer members walk around their carrier (R-BOT-04)', () {
     const anchor = GeoPoint(52.52, 13.405);
 
-    test('never more than 100 m away over a long walk', () {
+    test('never more than 200 m away over a long walk', () {
       final random = Random(7);
       var walk = BotWalk.random(random);
       for (var i = 0; i < 10000; i++) {
@@ -118,7 +118,15 @@ void main() {
         botCarrier(BotKind.player, [host, bot('b', BotKind.player, 1), kim]),
         'k',
       );
-      expect(botCarrier(BotKind.player, [host]), isNull);
+    });
+
+    test('without a human of that role, the first human carries them', () {
+      // A single phone carries all bots, whatever its role.
+      expect(botCarrier(BotKind.player, [host]), 'h');
+      expect(botCarrier(BotKind.hunter, [kim]), 'k');
+      const unassigned = Member(id: 'u', name: 'Uli');
+      expect(botCarrier(BotKind.hunter, [unassigned, kim]), 'u');
+      expect(botCarrier(BotKind.hunter, [bot('b', BotKind.hunter, 1)]), isNull);
     });
 
     test('carriers create the missing bots, numbered uniquely', () {
@@ -164,12 +172,16 @@ void main() {
       ]);
     });
 
-    test('no human of a role yet → no bots of that kind', () {
+    test('no roles yet → the first phone adds all bots right away', () {
       const nobody = [
         Member(id: 'h', name: 'Alex'),
         Member(id: 'k', name: 'Kim'),
       ];
-      expect(plan(nobody, 'h').isEmpty, isTrue);
+      expect(plan(nobody, 'h').create, [
+        (kind: BotKind.hunter, name: '🤖 Stromius'),
+        (kind: BotKind.player, name: '🤖 Adelgunde'),
+        (kind: BotKind.player, name: '🤖 Pankratius'),
+      ]);
       expect(plan(nobody, 'k').isEmpty, isTrue);
     });
 

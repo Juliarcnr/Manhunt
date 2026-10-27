@@ -5,13 +5,15 @@ import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 
 /// Overview during a round (R-OVER-01 … 03): all hunters and players, caught
-/// players struck through (R-CATCH-02), and whether a speedhunt runs.
+/// players struck through (R-CATCH-02), and whether a speedhunt runs – for
+/// hunters also on whom (R-OVER-04).
 Future<void> showOverviewSheet(
   BuildContext context, {
   required List<Member> members,
   required String myId,
   String? myAlias,
   required bool speedhuntRunning,
+  String? speedhuntTarget,
   String? winner,
   Set<String> winnerIds = const {},
   void Function(Member member)? onUndoCatch,
@@ -24,6 +26,7 @@ Future<void> showOverviewSheet(
     myId: myId,
     myAlias: myAlias,
     speedhuntRunning: speedhuntRunning,
+    speedhuntTarget: speedhuntTarget,
     winner: winner,
     winnerIds: winnerIds,
     onUndoCatch: onUndoCatch,
@@ -37,6 +40,7 @@ class OverviewSheet extends StatelessWidget {
     required this.myId,
     this.myAlias,
     required this.speedhuntRunning,
+    this.speedhuntTarget,
     this.winner,
     this.winnerIds = const {},
     this.onUndoCatch,
@@ -48,6 +52,10 @@ class OverviewSheet extends StatelessWidget {
   /// The number the hunters see for this player, e.g. "Player 3" (R-ANON-04).
   final String? myAlias;
   final bool speedhuntRunning;
+
+  /// Hunters only: whom the running speedhunt is on (R-OVER-04). Never set
+  /// for players – they only learn that one runs.
+  final String? speedhuntTarget;
 
   /// Who won, once the round is over (R-GAME-09), e.g. "The hunters won".
   final String? winner;
@@ -217,13 +225,18 @@ class OverviewSheet extends StatelessWidget {
                           : AppColors.textMuted,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      speedhuntRunning
-                          ? l10n.speedhuntActive
-                          : l10n.overviewNoSpeedhunt,
-                      style: TextStyle(
-                        color: speedhuntRunning ? Colors.black : null,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        switch ((speedhuntRunning, speedhuntTarget)) {
+                          (false, _) => l10n.overviewNoSpeedhunt,
+                          (true, final String target) =>
+                            l10n.overviewSpeedhuntOn(target),
+                          (true, null) => l10n.speedhuntActive,
+                        },
+                        style: TextStyle(
+                          color: speedhuntRunning ? Colors.black : null,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],

@@ -325,6 +325,106 @@ void main() {
     });
   });
 
+  group('automatic end 3 h after the round is over (R-GAME-10)', () {
+    late DateTime start;
+
+    setUp(() async {
+      await createDefault(); // 3 h round
+      await repo.joinGame(guest, name: 'Kim');
+      final members = await repo.watchMembers(admin).first;
+      await repo.setRoles(admin, [
+        for (final m in members)
+          m.copyWith(role: m.id == 'admin' ? Role.hunter : Role.player),
+      ]);
+      start = now;
+      await repo.startGame(admin);
+      // Fake Firestore stores serverTimestamp as real time; pin it.
+      await gameDoc().update({'startAt': Timestamp.fromDate(start)});
+      await addRoundData();
+    });
+
+    Future<int> historyCount() async =>
+        (await gameDoc().collection('history').get()).docs.length;
+
+    test('nothing happens before', () async {
+      now = start.add(const Duration(hours: 5, minutes: 59));
+      expect(await repo.autoEndRound(guest), isFalse);
+      expect((await repo.watchGame(admin).first)!.status, GameStatus.running);
+      expect(await roundDocCount(), greaterThan(0));
+      expect(await historyCount(), 0);
+    });
+
+    test('any member ends it like the host: history, data deleted, '
+        'lobby, caught and joker reset', () async {
+      await repo.recordCatch(
+        guest,
+        CatchRecord(playerId: 'guest', at: start.add(const Duration(hours: 1))),
+      );
+      await gameDoc().collection('members').doc('guest').update({
+        'jokerUsed': true,
+      });
+      now = start.add(const Duration(hours: 9));
+
+      expect(await repo.autoEndRound(guest), isTrue);
+
+      expect(await roundDocCount(), 0);
+      final game = await repo.watchGame(admin).first;
+      expect(game!.status, GameStatus.lobby);
+      expect(game.startAt, isNull);
+      final kim = (await repo.watchMembers(admin).first).firstWhere(
+        (m) => m.id == 'guest',
+      );
+      expect(kim.caught, isFalse);
+      expect(kim.jokerUsed, isFalse);
+      expect(kim.role, Role.player);
+      final round = (await repo.watchHistory(admin).first).single;
+      expect(round.autoEnded, isTrue);
+      expect(round.abortedEarly, isFalse);
+      expect(round.catches.single.player, 'Kim');
+      // Ended when it was due, not whenever someone opened the app.
+      expect(round.duration, const Duration(hours: 6));
+    });
+
+    test('3 h after the hunters won', () async {
+      final won = start.add(const Duration(minutes: 30));
+      await gameDoc().update({'finishedAt': Timestamp.fromDate(won)});
+      now = won.add(const Duration(hours: 2, minutes: 59));
+      expect(await repo.autoEndRound(guest), isFalse);
+      now = won.add(const Duration(hours: 3));
+      expect(await repo.autoEndRound(guest), isTrue);
+      final round = (await repo.watchHistory(admin).first).single;
+      expect(round.duration, const Duration(hours: 3, minutes: 30));
+    });
+
+    test('a second device or a retry adds no second history entry', () async {
+      now = start.add(const Duration(hours: 6));
+      // Interrupted after the summary was saved.
+      await gameDoc()
+          .collection('history')
+          .doc('auto_${start.millisecondsSinceEpoch}')
+          .set({'endedAt': Timestamp.fromDate(now), 'data': 'saved'});
+      expect(await repo.autoEndRound(admin), isTrue);
+      expect(await historyCount(), 1);
+      expect(await repo.autoEndRound(guest), isFalse); // already in the lobby
+      expect(await historyCount(), 1);
+    });
+
+    test('opening the group ends it, the group stays', () async {
+      now = start.add(const Duration(hours: 7));
+      expect(await repo.checkIn(guest), isTrue);
+      expect((await repo.watchGame(admin).first)!.status, GameStatus.lobby);
+      expect(await roundDocCount(), 0);
+      expect(await historyCount(), 1);
+    });
+
+    test('not in the lobby', () async {
+      await repo.endRound(admin);
+      now = start.add(const Duration(days: 2));
+      expect(await repo.autoEndRound(guest), isFalse);
+      expect(await historyCount(), 1);
+    });
+  });
+
   group('history (R-HIST-01 … 03)', () {
     Future<void> playRound({required List<CatchRecord> catches}) async {
       final start = now;
@@ -536,6 +636,23 @@ void main() {
       await repo.renameGroup(admin, 'Night crew');
       expect((await repo.watchGame(guest).first)!.name, 'Night crew');
       expect(await expiresAt(), now.add(FirestoreGameRepository.groupLifetime));
+    });
+
+    test('members rename themselves, encrypted (R-LOBBY-10)', () async {
+      await createDefault();
+      await repo.joinGame(guest, name: 'Kim');
+      await repo.renameMe(guest, 'Kimi');
+      final raw =
+          (await gameDoc().collection('members').doc(guest.userId).get())
+              .data()!;
+      expect(raw['name'], isNot(contains('Kimi')));
+      final members = await repo.watchMembers(admin).first;
+      expect(members.map((m) => m.name), contains('Kimi'));
+      expect(members.map((m) => m.name), isNot(contains('Kim')));
+      expect(
+        members.singleWhere((m) => m.id == guest.userId).role,
+        Role.unassigned,
+      );
     });
 
     test('groups without a name still load', () async {

@@ -7,12 +7,13 @@ import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
 import '../core/round/player_aliases.dart';
+import '../core/schedule/game_clock.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
 /// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), sharedPings + durationSec (plain, for the rules), aliases (encrypted, per round), startAt, finishedAt (per round), createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
-/// - `games/{groupId}/{pings,hunterLocs,outsideLocs,events}/…`: per-round data, deleted when the round ends
+/// - `games/{groupId}/{pings,hunterLocs,outsideLocs,events,speedhuntTargets,jokerRequests,jokerAnswers,drawings}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
 class FirestoreGameRepository implements GameRepository {
   FirestoreGameRepository(this._db, {DateTime Function()? now, Random? random})
@@ -39,6 +40,7 @@ class FirestoreGameRepository implements GameRepository {
     'speedhuntTargets',
     'jokerRequests',
     'jokerAnswers',
+    'drawings',
   ];
 
   /// Firestore allows at most 500 writes per batch.
@@ -154,6 +156,13 @@ class FirestoreGameRepository implements GameRepository {
   }
 
   @override
+  Future<void> renameMe(GroupSession session, String name) async {
+    await _members(session)
+        .doc(session.userId)
+        .update({'name': await session.crypto.encryptJson(name)});
+  }
+
+  @override
   Stream<List<Member>> watchMembers(GroupSession session) => _members(session)
       .orderBy('joinedAt')
       .snapshots()
@@ -236,12 +245,7 @@ class FirestoreGameRepository implements GameRepository {
     // Clear leftovers of an interrupted clean-up so rounds never mix.
     await _deleteRoundData(session);
     final game = (await _game(session).get()).data()!;
-    final settingsJson = await session.crypto.decryptJson(
-      game['settings'] as String,
-    );
-    final settings = GameSettings.fromJson(
-      settingsJson! as Map<String, Object?>,
-    );
+    final settings = await _settings(session, game);
     await _game(session).update({
       'status': GameStatus.running.name,
       'startAt': FieldValue.serverTimestamp(),
@@ -337,7 +341,52 @@ class FirestoreGameRepository implements GameRepository {
     // History first: if anything below fails, the summary is not lost.
     // Then back to the lobby: only then the rules let the host read (and so
     // delete) the round data. Leftovers are also cleared on the next start.
-    await _saveSummary(session);
+    await _saveSummary(session, endedAt: _now());
+    await _backToLobby(session);
+    await _deleteRoundData(session);
+  }
+
+  @override
+  Future<bool> autoEndRound(GroupSession session) async {
+    final game = (await _game(session).get()).data();
+    if (game == null || game['status'] != GameStatus.running.name) {
+      return false;
+    }
+    final startAt = (game['startAt'] as Timestamp?)?.toDate();
+    if (startAt == null) return false;
+    final clock = GameClock(
+      startAt: startAt,
+      settings: await _settings(session, game),
+      finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
+    );
+    if (_now().isBefore(clock.autoEndAt)) return false;
+    // One history entry per round: whoever comes second (another device, or
+    // this one after an interruption) does not add it again.
+    final entry = _game(session)
+        .collection('history')
+        .doc('auto_${startAt.millisecondsSinceEpoch}');
+    if (!(await entry.get()).exists) {
+      try {
+        await _saveSummary(
+          session,
+          endedAt: clock.autoEndAt,
+          autoEnded: true,
+          entry: entry,
+        );
+      } on FirebaseException {
+        // Another device was faster; the rules do not let us overwrite it.
+        if (!(await entry.get()).exists) rethrow;
+      }
+    }
+    // Unlike the host, members may read (and so delete) the round data only
+    // while the round still runs: clean up before going back to the lobby.
+    await _deleteRoundData(session);
+    await _backToLobby(session);
+    return true;
+  }
+
+  /// Resets caught/joker and returns the group to the lobby in one batch.
+  Future<void> _backToLobby(GroupSession session) async {
     final members = await _members(session).get();
     final batch = _db.batch();
     for (final doc in members.docs) {
@@ -355,19 +404,18 @@ class FirestoreGameRepository implements GameRepository {
       'expiresAt': _newExpiry(),
     });
     await batch.commit();
-    await _deleteRoundData(session);
   }
 
-  Future<void> _saveSummary(GroupSession session) async {
+  /// Saves the current round to the history, under [entry] or a new id.
+  Future<void> _saveSummary(
+    GroupSession session, {
+    required DateTime endedAt,
+    bool autoEnded = false,
+    DocumentReference<Map<String, dynamic>>? entry,
+  }) async {
     final game = (await _game(session).get()).data()!;
-    final endedAt = _now();
     final startedAt = (game['startAt'] as Timestamp?)?.toDate() ?? endedAt;
-    final settingsJson = await session.crypto.decryptJson(
-      game['settings'] as String,
-    );
-    final settings = GameSettings.fromJson(
-      settingsJson! as Map<String, Object?>,
-    );
+    final settings = await _settings(session, game);
     final members = await Future.wait([
       for (final doc in (await _members(session).get()).docs)
         _decodeMember(session, doc),
@@ -394,11 +442,20 @@ class FirestoreGameRepository implements GameRepository {
       catches: catches,
       plannedDuration: settings.duration,
       finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
+      autoEnded: autoEnded,
     );
-    await history.add({
+    await (entry ?? history.doc()).set({
       'endedAt': Timestamp.fromDate(endedAt),
       'data': await session.crypto.encryptJson(summary.toJson()),
     });
+  }
+
+  Future<GameSettings> _settings(
+    GroupSession session,
+    Map<String, dynamic> game,
+  ) async {
+    final json = await session.crypto.decryptJson(game['settings'] as String);
+    return GameSettings.fromJson(json! as Map<String, Object?>);
   }
 
   @override
@@ -459,6 +516,13 @@ class FirestoreGameRepository implements GameRepository {
     // Extend at most once a day per group to keep writes low.
     if (expiresAt.isBefore(_now().add(groupLifetime - touchInterval))) {
       await _game(session).update({'expiresAt': _newExpiry()});
+    }
+    if (data['status'] == GameStatus.running.name) {
+      try {
+        await autoEndRound(session);
+      } on Exception {
+        // Offline, or another device was faster: the game screen tries again.
+      }
     }
     return true;
   }

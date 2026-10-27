@@ -78,11 +78,45 @@ void main() {
   });
 
   group('bots follow the settings in the lobby (R-BOT-02, R-BOT-03)', () {
-    test('no bots while no human has a role', () async {
+    test('a single phone gets all bots, assigned right away', () async {
+      await games.removeMember(kim, 'k');
       await settle();
-      expect(bots(await members()), isEmpty);
-      expect(hostBots.opened + kimBots.opened, 0);
+      final all = await members();
+      expect(bots(all), {
+        '🤖 Stromius': Role.hunter,
+        '🤖 Adelgunde': Role.player,
+        '🤖 Pankratius': Role.player,
+      });
+      expect(all.where(isBot).map((m) => m.id), everyElement(endsWith('-h')));
+      // The person still assigns themself.
+      expect(all.firstWhere((m) => m.id == 'h').role, Role.unassigned);
     });
+
+    test(
+      'without roles the first phone carries them, then they move',
+      () async {
+        await settle();
+        expect(bots(await members()), hasLength(3));
+        expect(kimBots.opened, 0);
+
+        await games.setRoles(host, [
+          const Member(id: 'h', name: 'Alex', role: Role.hunter),
+          const Member(id: 'k', name: 'Kim', role: Role.player),
+        ]);
+        await settle();
+        final all = await members();
+        expect(
+          bots(all).values,
+          unorderedEquals([Role.hunter, Role.player, Role.player]),
+        );
+        for (final m in all.where(isBot)) {
+          expect(
+            m.id,
+            endsWith(botKindOf(m.name) == BotKind.hunter ? '-h' : '-k'),
+          );
+        }
+      },
+    );
 
     test('carriers add their bots, the host assigns the roles', () async {
       await games.setRoles(host, [
