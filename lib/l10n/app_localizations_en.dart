@@ -86,6 +86,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleUnassigned => 'Not assigned yet';
 
   @override
+  String get overviewYouAreGameMaster =>
+      'You are game master – you don\'t play and see everyone live (every 15 s).';
+
+  @override
+  String lobbyHunterLiveThrottled(int percent) {
+    return 'Big round: hunters see each other only every 15 s instead of every 5 s this round, so the free Firebase quota lasts (estimated $percent % of it).';
+  }
+
+  @override
+  String get gameHunterLiveThrottled =>
+      'Hunter positions every 15 s this round (Firebase quota)';
+
+  @override
+  String get roleGameMaster => 'Game master';
+
+  @override
+  String get lobbyGameMasterHint =>
+      'Optional – doesn\'t play and sees all hunters and players live. Not included when assigning randomly.';
+
+  @override
+  String get lobbyAddGameMaster => 'Add game master';
+
+  @override
+  String get lobbyPickGameMaster => 'Who will be game master?';
+
+  @override
+  String get lobbyNobodyToPick => 'Everyone is game master already.';
+
+  @override
+  String get gameMasterInfo =>
+      'Game master – you see everyone live (every 15 s).';
+
+  @override
+  String get gameCaughtLiveInfo =>
+      'You see everyone live – don\'t pass anything on to players or hunters still in the game!';
+
+  @override
+  String get liveViewTitle => 'Careful: live locations';
+
+  @override
+  String get liveViewText =>
+      'You were caught. From now on you see the live locations of everyone still in the game – hunters and players.\n\nYou must not share them with any player or hunter who is still in the game!';
+
+  @override
+  String get liveViewOk => 'OK';
+
+  @override
   String get speedhuntActive => 'Speedhunt active';
 
   @override
@@ -223,6 +270,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDuration => 'Game duration';
+
+  @override
+  String get settingsStartTime => 'Start time';
+
+  @override
+  String get settingsStartTimeHint =>
+      'Countdown to this time after \"Start\" (1 minute if it has passed). Without a time the game starts right away.';
+
+  @override
+  String get settingsStartTimeNone => 'none';
+
+  @override
+  String get settingsStartTimeClear => 'Remove start time';
 
   @override
   String get settingsHeadStart => 'Head start for players';
@@ -498,7 +558,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lobbyBackHome => 'Back to my groups';
 
   @override
-  String get gamePhaseStarting => 'Starting…';
+  String get gamePhaseStarting => 'Starts in';
 
   @override
   String get gamePhaseHeadStart => 'Head start';
@@ -567,6 +627,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String gameNextPing(String time) {
     return 'Next ping in $time';
+  }
+
+  @override
+  String gameStartsAt(String time) {
+    return 'The game starts at $time';
   }
 
   @override
@@ -705,6 +770,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get jokerNoHunters => 'No hunter positions available right now.';
+
+  @override
+  String get noticeGameStarted => 'The game has officially started!';
+
+  @override
+  String noticeGameStartedPlayer(int minutes) {
+    return 'Your head start: $minutes min – go!';
+  }
+
+  @override
+  String noticeGameStartedHunter(int minutes) {
+    return 'The players have a $minutes min head start.';
+  }
 
   @override
   String get noticeHuntersWon => 'All players caught – the hunters won!';

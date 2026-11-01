@@ -38,6 +38,25 @@ abstract interface class RoundRepository {
   /// only (R-OUT-05).
   Stream<Map<String, LocationFix>> watchOutsideLocations(GroupSession session);
 
+  /// Player shares their live position with game masters and caught players
+  /// (R-GM-05). Overwrites the previous one.
+  Future<void> updatePlayerLocation(GroupSession session, LocationFix fix);
+
+  /// Stops sharing: deletes the own live position (R-GM-06).
+  Future<void> clearPlayerLocation(GroupSession session);
+
+  /// Live positions of the players still in the game, by player id – game
+  /// masters and caught players only (R-GM-04, R-GM-07).
+  Stream<Map<String, LocationFix>> watchPlayerLocations(GroupSession session);
+
+  /// Live hunter positions, fetched every [every] instead of listening – for
+  /// game masters and caught players, who need them less often than the
+  /// hunters themselves (Firebase quota, R-GM-05).
+  Stream<Map<String, LocationFix>> pollHunterLocations(
+    GroupSession session, {
+    Duration every = const Duration(seconds: 15),
+  });
+
   /// Player uses their single joker (R-PLAY-02) and gets the hunters'
   /// current positions once.
   Future<Map<String, LocationFix>> useJoker(GroupSession session);

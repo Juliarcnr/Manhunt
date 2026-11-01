@@ -8,6 +8,7 @@ import '../core/groups/group_list.dart';
 import '../core/history/round_summary.dart';
 import '../core/models/member.dart';
 import '../core/round/joker.dart';
+import '../core/round/observer.dart';
 import '../core/round/ping_schedule.dart';
 import '../core/schedule/speedhunt.dart';
 import '../data/firestore_game_repository.dart';
@@ -210,6 +211,29 @@ final outsideLocationsProvider = StreamProvider<Map<String, LocationFix>>(
     ref.watch(roundRepositoryProvider).watchOutsideLocations,
   ),
 );
+
+/// Live positions of the players still in the game – game masters and caught
+/// players only (R-GM-04, R-GM-07).
+final playerLocationsProvider = StreamProvider<Map<String, LocationFix>>(
+  (ref) => _sessionStream(
+    ref,
+    const {},
+    ref.watch(roundRepositoryProvider).watchPlayerLocations,
+  ),
+);
+
+/// Live hunter positions for game masters and caught players, fetched every
+/// 15 s instead of with every hunter update (Firebase quota, R-GM-05).
+final observedHunterLocationsProvider =
+    StreamProvider<Map<String, LocationFix>>(
+      (ref) => _sessionStream(
+        ref,
+        const {},
+        (session) => ref
+            .watch(roundRepositoryProvider)
+            .pollHunterLocations(session, every: playerLiveInterval),
+      ),
+    );
 
 /// The hunters' drawings on the map – hunters only (R-DRAW-06).
 final drawingsProvider = StreamProvider<List<Stroke>>(

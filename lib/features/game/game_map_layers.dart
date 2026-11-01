@@ -100,6 +100,33 @@ Widget outsidePlayersLayer({
   curve: Curves.easeInOut,
 );
 
+/// Live positions of the players still in the game, for game masters and
+/// caught players (R-GM-04); they glide like the hunters' pins.
+Widget livePlayersLayer({
+  required Map<String, LocationFix> positions,
+  required Map<String, String> names,
+  required Map<String, Color> colors,
+}) => AnimatedMarkerLayer(
+  key: const Key('livePlayers'),
+  markers: [
+    for (final MapEntry(key: id, value: fix) in positions.entries)
+      Marker(
+        key: Key('live_$id'),
+        point: fix.point.toLatLng(),
+        width: 160,
+        height: 64,
+        alignment: Alignment.topCenter,
+        child: _NamedPin(
+          name: names[id] ?? '?',
+          color: colors[id] ?? AppColors.player,
+          icon: Icons.person_pin_circle,
+        ),
+      ),
+  ],
+  duration: const Duration(seconds: 2),
+  curve: Curves.easeInOut,
+);
+
 /// Other players' current positions from the player joker (R-PLAY-03).
 MarkerLayer playersLayer({
   required Map<String, LocationFix> positions,

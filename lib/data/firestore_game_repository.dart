@@ -7,7 +7,9 @@ import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
 import '../core/round/player_aliases.dart';
+import '../core/round/read_budget.dart';
 import '../core/schedule/game_clock.dart';
+import '../core/schedule/start_time.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
@@ -36,6 +38,7 @@ class FirestoreGameRepository implements GameRepository {
     'pings',
     'hunterLocs',
     'outsideLocs',
+    'playerLocs',
     'events',
     'speedhuntTargets',
     'jokerRequests',
@@ -137,6 +140,7 @@ class FirestoreGameRepository implements GameRepository {
         for (final e in (aliasesJson ?? const {}).entries)
           e.key: e.value! as int,
       },
+      hunterLiveInterval: Duration(seconds: data['hunterLiveSec'] as int? ?? 5),
     );
   });
 
@@ -246,13 +250,25 @@ class FirestoreGameRepository implements GameRepository {
     await _deleteRoundData(session);
     final game = (await _game(session).get()).data()!;
     final settings = await _settings(session, game);
+    final members = await Future.wait([
+      for (final doc in (await _members(session).get()).docs)
+        _decodeMember(session, doc),
+    ]);
+    final startAt = plannedStartAt(_now(), startTime: settings.startTime);
     await _game(session).update({
       'status': GameStatus.running.name,
-      'startAt': FieldValue.serverTimestamp(),
+      // With a start time: countdown until then, by the host's clock
+      // (R-START-01); without: right away, by the server's clock.
+      'startAt': startAt == null
+          ? FieldValue.serverTimestamp()
+          : Timestamp.fromDate(startAt),
       // Also for groups created before the field existed (R-GAME-06).
       'durationSec': settings.duration.inSeconds,
+      // Same for every device, decided once from the estimated reads
+      // (R-QUOTA-01); stays until the next start.
+      'hunterLiveSec': hunterLiveIntervalFor(settings, members).inSeconds,
       'finishedAt': FieldValue.delete(),
-      'aliases': await _shuffledAliases(session, settings),
+      'aliases': await _shuffledAliases(session, settings, members),
       'expiresAt': _newExpiry(),
     });
   }
@@ -262,12 +278,9 @@ class FirestoreGameRepository implements GameRepository {
   Future<Object> _shuffledAliases(
     GroupSession session,
     GameSettings settings,
+    List<Member> members,
   ) async {
     if (!settings.anonymousPlayers) return FieldValue.delete();
-    final members = await Future.wait([
-      for (final doc in (await _members(session).get()).docs)
-        _decodeMember(session, doc),
-    ]);
     return session.crypto.encryptJson(
       shuffleAliases([
         for (final m in members)

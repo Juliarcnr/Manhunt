@@ -138,6 +138,21 @@ void main() {
       );
     });
 
+    test('start time: none by default, also for older groups; can be '
+        'set and removed (R-SET-21)', () {
+      const s = GameSettings();
+      expect(s.startTime, isNull);
+      final at14 = s.copyWith(startTime: const Duration(hours: 14));
+      expect(
+        GameSettings.fromJson(at14.toJson()).startTime,
+        const Duration(hours: 14),
+      );
+      expect(at14.copyWith(hunterCount: 2).startTime, isNotNull);
+      expect(at14.copyWith(startTime: null).startTime, isNull);
+      final legacy = s.toJson()..remove('startTimeMin');
+      expect(GameSettings.fromJson(legacy).startTime, isNull);
+    });
+
     test('json roundtrip', () {
       const s = GameSettings(hunterCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());

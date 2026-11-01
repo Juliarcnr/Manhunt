@@ -506,7 +506,38 @@ void main() {
       engine.update(game: game(), me: hunter, speedhuntsOnMe: []);
     });
 
-    test('first position is uploaded immediately, then throttled', () async {
+    test('throttled round: every 15 s (R-QUOTA-01)', () async {
+      engine.update(
+        game: GameInfo(
+          adminId: 'h',
+          status: GameStatus.running,
+          settings: game0,
+          startAt: start,
+          hunterLiveInterval: const Duration(seconds: 15),
+        ),
+        me: hunter,
+        speedhuntsOnMe: [],
+      );
+      location.emit(fix(52.4));
+      await flush();
+      await flush();
+      location.emit(fix(52.41));
+      await flush();
+      now = now.add(const Duration(seconds: 10));
+      await engine.tick();
+      await flush();
+      var locs = await rounds.watchHunterLocations(hunterSession).first;
+      expect(locs['h']!.point.lat, 52.4); // throttled
+
+      now = now.add(const Duration(seconds: 5));
+      await engine.tick();
+      await flush();
+      locs = await rounds.watchHunterLocations(hunterSession).first;
+      expect(locs['h']!.point.lat, 52.41);
+      expect(engine.log.value.any((l) => l.contains('read budget')), isTrue);
+    });
+
+    test('first position is uploaded immediately, then every 5 s', () async {
       location.emit(fix(52.4));
       await flush();
       await flush();
@@ -515,13 +546,13 @@ void main() {
 
       location.emit(fix(52.41));
       await flush();
-      now = now.add(const Duration(seconds: 5));
+      now = now.add(const Duration(seconds: 4));
       await engine.tick();
       await flush();
       locs = await rounds.watchHunterLocations(hunterSession).first;
       expect(locs['h']!.point.lat, 52.4); // throttled
 
-      now = now.add(const Duration(seconds: 15));
+      now = now.add(const Duration(seconds: 1));
       await engine.tick();
       await flush();
       locs = await rounds.watchHunterLocations(hunterSession).first;
@@ -741,6 +772,108 @@ void main() {
       await walk(-50, seconds: 1);
       await engine.tick();
       await pumpEventQueue();
+      expect(await online(), isEmpty);
+    });
+  });
+
+  group('live position for game masters and caught players '
+      '(R-GM-05, R-GM-06)', () {
+    const gm = Member(id: 'g', name: 'Sam', role: Role.gameMaster);
+    const other = Member(id: 'p2', name: 'Jo', role: Role.player);
+
+    Future<Map<String, LocationFix>> online() =>
+        rounds.watchPlayerLocations(hunterSession).first;
+
+    Future<void> startAs(Member me, List<Member> members) async {
+      engine = await engineFor(me.id);
+      engine.update(game: game(), me: me, speedhuntsOnMe: [], members: members);
+    }
+
+    Future<void> step(Duration d, double lat) async {
+      now = now.add(d);
+      location.emit(fix(lat));
+      await flush();
+      await engine.tick();
+      await pumpEventQueue();
+    }
+
+    test('shared every 15 s while a game master watches', () async {
+      await startAs(player, [hunter, player, gm]);
+      await step(const Duration(seconds: 1), 52.4);
+      expect((await online())['kim']!.point.lat, 52.4);
+
+      await step(const Duration(seconds: 10), 52.41);
+      expect((await online())['kim']!.point.lat, 52.4); // throttled
+
+      await step(const Duration(seconds: 5), 52.42);
+      expect((await online())['kim']!.point.lat, 52.42);
+    });
+
+    test('nothing shared without anyone watching', () async {
+      await startAs(player, [hunter, player, other]);
+      await step(const Duration(seconds: 1), 52.4);
+      await step(const Duration(seconds: 20), 52.41);
+      expect(await online(), isEmpty);
+    });
+
+    test('a caught player is an audience too', () async {
+      await startAs(player, [hunter, player, other.copyWith(caught: true)]);
+      await step(const Duration(seconds: 1), 52.4);
+      expect(await online(), contains('kim'));
+    });
+
+    test('deleted when the audience is gone', () async {
+      await startAs(player, [hunter, player, gm]);
+      await step(const Duration(seconds: 1), 52.4);
+      expect(await online(), contains('kim'));
+
+      engine.update(
+        game: game(),
+        me: player,
+        speedhuntsOnMe: [],
+        members: [hunter, player, other],
+      );
+      await step(const Duration(seconds: 5), 52.41);
+      expect(await online(), isEmpty);
+    });
+
+    test('deleted when caught', () async {
+      await startAs(player, [hunter, player, gm]);
+      await step(const Duration(seconds: 1), 52.4);
+      final caught = player.copyWith(caught: true);
+      engine.update(
+        game: game(),
+        me: caught,
+        speedhuntsOnMe: [],
+        members: [hunter, caught, gm],
+      );
+      await pumpEventQueue();
+      expect(await online(), isEmpty);
+    });
+
+    test('deleted when the time is up', () async {
+      await startAs(player, [hunter, player, gm]);
+      await step(const Duration(seconds: 1), 52.4);
+      now = at(61);
+      await engine.tick();
+      await pumpEventQueue();
+      expect(await online(), isEmpty);
+    });
+
+    test('a leftover from before an app restart is deleted', () async {
+      await rounds.updatePlayerLocation(
+        await testSession('ABCDE-FGHJK', 'kim'),
+        fix(52.4),
+      );
+      await startAs(player, [hunter, player]);
+      await step(const Duration(seconds: 1), 52.41);
+      expect(await online(), isEmpty);
+    });
+
+    test('game masters neither track nor share (R-GM-01)', () async {
+      await startAs(gm, [hunter, player, gm]);
+      await engine.tick();
+      expect(engine.isTracking, isFalse);
       expect(await online(), isEmpty);
     });
   });

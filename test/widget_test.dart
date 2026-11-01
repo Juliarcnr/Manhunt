@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/app.dart';
 import 'package:manhunt/core/groups/group_list.dart';
+import 'package:manhunt/core/models/member.dart';
+import 'package:manhunt/core/teams/team_assignment.dart';
 import 'package:manhunt/data/game_repository.dart';
 import 'package:manhunt/data/session_store.dart';
 
@@ -290,6 +292,143 @@ void main() {
     await tester.tap(find.text('Remove'));
     await settleAsync(tester);
     expect(find.text('Kim'), findsNothing);
+  });
+
+  testWidgets('host picks a game master; random assignment leaves them out; '
+      'tapping makes them a player again (R-GM-01, R-GM-02)', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    final ids = ['kim', 'sam', 'lou'];
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(me!, name: 'Julia', settings: defaultSettings);
+      for (final id in ids) {
+        await deviceRepo(db).joinGame(
+          await testSession('ABCDE-FGHJK', id),
+          name: id.toUpperCase(),
+        );
+      }
+    });
+    await pumpAppWithSession(tester, db: db, userId: 'me');
+
+    Future<String?> role(String id) async =>
+        (await tester.runAsync(
+              () => db
+                  .collection('games')
+                  .doc(me!.groupId)
+                  .collection('members')
+                  .doc(id)
+                  .get(),
+            ))!.data()?['role']
+            as String?;
+
+    // The section is the last one, right above the start button.
+    Future<void> toBottom() async {
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+    }
+
+    await toBottom();
+    await tester.tap(find.byKey(const Key('addGameMasterButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Who will be game master?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pickGameMaster_kim')));
+    await settleAsync(tester);
+    expect(await role('kim'), 'gameMaster');
+
+    // Random assignment: Kim stays game master, everyone else gets a role.
+    await tester.drag(find.byType(ListView), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('randomButton')));
+    await settleAsync(tester);
+    expect(await role('kim'), 'gameMaster');
+    for (final id in ['me', 'sam', 'lou']) {
+      expect(await role(id), isIn(['hunter', 'player']), reason: id);
+    }
+
+    // Kim's tile in the game master section: a tap makes Kim a player.
+    final kim = find.descendant(
+      of: find.byKey(const Key('gameMasterSection')),
+      matching: find.text('KIM'),
+    );
+    await toBottom();
+    await tester.tap(kim);
+    await settleAsync(tester);
+    expect(await role('kim'), 'player');
+  });
+
+  testWidgets('host is told before the start when hunters will see each '
+      'other only every 15 s (R-QUOTA-02)', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
+    // 3 h, 3 hunters, 6 players, 1 game master: ≈ 45k reads with 5 s.
+    final roles = {
+      'me': Role.hunter,
+      'h1': Role.hunter,
+      'h2': Role.hunter,
+      for (var i = 0; i < 6; i++) 'p$i': Role.player,
+      'gm': Role.gameMaster,
+    };
+    Future<void> assign(Map<String, Role> roles) => tester.runAsync(() async {
+      final members = await deviceRepo(db).watchMembers(me!).first;
+      await deviceRepo(db).setRoles(me, [
+        for (final m in members) m.copyWith(role: roles[m.id] ?? Role.player),
+      ]);
+    });
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(me!, name: 'Julia', settings: defaultSettings);
+      for (final id in roles.keys.skip(1)) {
+        await deviceRepo(db)
+            .joinGame(await testSession('ABCDE-FGHJK', id), name: id);
+      }
+    });
+    await assign(roles);
+    await pumpAppWithSession(tester, db: db, userId: 'me');
+    await tester.drag(find.byType(ListView), const Offset(0, -3000));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('hunterLiveThrottledHint')), findsOneWidget);
+    expect(find.textContaining('estimated 66 %'), findsOneWidget);
+
+    // With only the hunters assigned so far it fits.
+    await assign({
+      for (final e in roles.entries)
+        e.key: e.value == Role.hunter ? Role.hunter : Role.unassigned,
+    });
+    await settleAsync(tester);
+    expect(find.byKey(const Key('hunterLiveThrottledHint')), findsNothing);
+  });
+
+  testWidgets('guests see the game master section only when it is taken '
+      '(R-GM-01)', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final admin = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'a'));
+    final guest = await tester.runAsync(
+      () => testSession('ABCDE-FGHJK', 'guest'),
+    );
+    await tester.runAsync(() async {
+      await deviceRepo(db)
+          .createGame(admin!, name: 'Julia', settings: defaultSettings);
+      await deviceRepo(db).joinGame(guest!, name: 'Kim');
+    });
+    await pumpAppWithSession(tester, db: db, userId: 'guest');
+    Future<void> toBottom() async {
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+    }
+
+    await toBottom();
+    expect(find.byKey(const Key('gameMasterSection')), findsNothing);
+
+    await tester.runAsync(() async {
+      final members = await deviceRepo(db).watchMembers(admin!).first;
+      await deviceRepo(db)
+          .setRoles(admin, setRole(members, 'a', Role.gameMaster));
+    });
+    await settleAsync(tester);
+    await toBottom();
+    expect(find.byKey(const Key('gameMasterSection')), findsOneWidget);
+    expect(find.byKey(const Key('addGameMasterButton')), findsNothing);
   });
 
   testWidgets('members change their own name in the lobby (R-LOBBY-10)', (

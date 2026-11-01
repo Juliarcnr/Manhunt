@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' hide GeoPoint;
 
 import '../core/drawing/stroke.dart';
@@ -12,6 +14,8 @@ import 'round_repository.dart';
 /// - `hunterLocs/{uid}`: updatedAt, data (LocationFix)
 /// - `outsideLocs/{uid}`: updatedAt, data (LocationFix) – only while the
 ///   player is outside the play area (R-OUT-03)
+/// - `playerLocs/{uid}`: updatedAt, data (LocationFix) – only while a game
+///   master or caught player may watch (R-GM-05)
 /// - `events/{id}` type=speedhunt: createdAt, data (startedAt, pings, interval)
 /// - `speedhuntTargets/{eventId}`: uid (target), createdAt
 /// - `jokerRequests/{id}`: uid (requester), createdAt
@@ -135,6 +139,56 @@ class FirestoreRoundRepository implements RoundRepository {
           .collection('outsideLocs')
           .snapshots()
           .asyncMap((snap) => _decodeLocations(session, snap));
+
+  @override
+  Future<void> updatePlayerLocation(
+    GroupSession session,
+    LocationFix fix,
+  ) async {
+    await _game(session).collection('playerLocs').doc(session.userId).set({
+      'updatedAt': FieldValue.serverTimestamp(),
+      'data': await session.crypto.encryptJson(fix.toJson()),
+    });
+  }
+
+  @override
+  Future<void> clearPlayerLocation(GroupSession session) =>
+      _game(session).collection('playerLocs').doc(session.userId).delete();
+
+  @override
+  Stream<Map<String, LocationFix>> watchPlayerLocations(GroupSession session) =>
+      _game(session)
+          .collection('playerLocs')
+          .snapshots()
+          .asyncMap((snap) => _decodeLocations(session, snap));
+
+  @override
+  Stream<Map<String, LocationFix>> pollHunterLocations(
+    GroupSession session, {
+    Duration every = const Duration(seconds: 15),
+  }) {
+    final hunters = _game(session).collection('hunterLocs');
+    Timer? timer;
+    late final StreamController<Map<String, LocationFix>> controller;
+    Future<void> fetch() async {
+      try {
+        final locations = await _decodeLocations(session, await hunters.get());
+        if (!controller.isClosed) controller.add(locations);
+      } on Object catch (e, s) {
+        if (!controller.isClosed) controller.addError(e, s);
+      }
+    }
+
+    controller = StreamController(
+      onListen: () {
+        unawaited(fetch());
+        timer = Timer.periodic(every, (_) => unawaited(fetch()));
+      },
+      // No timer left behind once nobody watches.
+      onCancel: () => timer?.cancel(),
+    );
+    return controller.stream;
+  }
 
   @override
   Future<Map<String, LocationFix>> useJoker(GroupSession session) async {

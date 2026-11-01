@@ -22,6 +22,12 @@ void main() {
     });
   });
 
+  test('live players are shown until switched off (R-GM-04)', () {
+    final f = const MapFilters().toggleLivePlayer('kim');
+    expect(f.hiddenLivePlayers, {'kim'});
+    expect(f.toggleLivePlayer('kim').hiddenLivePlayers, isEmpty);
+  });
+
   test('speedhunts are shown until switched off (R-HUNT-07)', () {
     final f = const MapFilters().toggleSpeedhunt('sam_1');
     expect(f.hiddenSpeedhunts, {'sam_1'});

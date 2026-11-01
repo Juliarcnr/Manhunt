@@ -370,6 +370,44 @@ void main() {
       expect(block(s, [], 'p', 170), isNull);
     });
 
+    group('the general pause and the per-player pause are separate '
+        '(R-SET-18, R-SET-19)', () {
+      // 15 min between any two speedhunts, 30 min on the same player.
+      final s = settings.copyWith(
+        speedhuntCount: 5,
+        speedhuntCooldown: const Duration(minutes: 15),
+        speedhuntRepeatCooldown: const Duration(minutes: 30),
+      );
+      final pauses = GameClock(startAt: start, settings: s);
+      const q = Member(id: 'q', name: 'Quinn', role: Role.player);
+      SpeedhuntDenial? check(List<Speedhunt> prev, Member target, int m) =>
+          canStartSpeedhunt(
+            clock: pauses,
+            now: at(m),
+            previous: prev,
+            target: target,
+            targeted: prev,
+          );
+
+      test('the button is free after 15 min, the last target 15 min later', () {
+        final prev = [on('p', 30)]; // ends at 40
+        expect(nextSpeedhuntAt(pauses, prev), at(55));
+        expect(check(prev, q, 54), SpeedhuntDenial.coolingDown);
+        expect(check(prev, player, 54), SpeedhuntDenial.coolingDown);
+        expect(check(prev, q, 55), isNull);
+        expect(check(prev, player, 55), SpeedhuntDenial.targetCoolingDown);
+        expect(block(s, prev, 'p', 55)?.until, at(70));
+        expect(check(prev, player, 70), isNull);
+      });
+
+      test('a catch starts both pauses right then (R-SPEED-10)', () {
+        final prev = [on('p', 30).endAt(at(33))];
+        expect(nextSpeedhuntAt(pauses, prev), at(48));
+        expect(check(prev, q, 48), isNull);
+        expect(block(s, prev, 'p', 48)?.until, at(63));
+      });
+    });
+
     test('canStartSpeedhunt names the reason; without targets no check', () {
       final s = settings.copyWith(speedhuntCount: 5);
       SpeedhuntDenial? check(GameSettings s, List<Speedhunt> targeted) =>

@@ -47,6 +47,17 @@ void main() {
       expect(SavedJokers.fromJson(jokers.toJson()).speedhuntPings, isEmpty);
     });
 
+    test('the accepted live view is kept per round (R-GM-08)', () async {
+      final store = MemoryJokerStore();
+      expect(jokers.liveViewAccepted, isFalse);
+      await store.save('g1', jokers.copyWith(liveViewAccepted: true));
+      expect((await store.load('g1', round))!.liveViewAccepted, isTrue);
+      expect(
+        await store.load('g1', round.add(const Duration(hours: 4))),
+        isNull,
+      );
+    });
+
     test('another round → nothing', () async {
       final store = MemoryJokerStore();
       await store.save('g1', jokers);

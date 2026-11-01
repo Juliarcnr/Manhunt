@@ -12,6 +12,7 @@ import '../../core/history/round_summary.dart';
 import '../../core/models/member.dart';
 import '../../core/round/boundary_watch.dart';
 import '../../core/round/notices.dart';
+import '../../core/round/observer.dart';
 import '../../core/round/ping_schedule.dart';
 import '../../core/round/player_aliases.dart';
 import '../../core/round/round_result.dart';
@@ -94,6 +95,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     WidgetsBinding.instance.addObserver(this);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       // The time running out is no event, so check every second.
+      _checkStarted();
       _checkRoundOver();
       _checkAutoEnd();
       setState(() {});
@@ -138,6 +140,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // requested while another one is open (field test 2026-10-05).
     unawaited(_requestPermissions());
     unawaited(_loadJokers());
+    // Opened during the countdown: remember it for the start notice.
+    _checkStarted();
 
     _subscriptions
       ..add(
@@ -192,6 +196,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
   /// Announces the winners once when the round becomes over (R-GAME-09). The
   /// first check with loaded members is the baseline: a round already over
   /// when opening the app is not announced again.
+  /// Tells everyone when the countdown to the start time is over
+  /// (R-START-04).
+  void _checkStarted() {
+    final clock = _clock();
+    if (clock == null) return;
+    _notices
+        .onPhase(
+          clock.phaseAt(widget.now()),
+          countdown: widget.game.settings.startTime != null,
+        )
+        .forEach(_notify);
+  }
+
   void _checkRoundOver() {
     final members = ref.read(membersProvider).value;
     // Not loaded yet (the first value may be an empty list): no baseline.
@@ -311,6 +328,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     me: _me(ref.read(membersProvider).value),
     speedhuntsOnMe: ref.read(speedhuntsOnMeProvider).value ?? const [],
     speedhunts: ref.read(speedhuntsProvider).value ?? const [],
+    members: ref.read(membersProvider).value ?? const [],
   );
 
   @override
@@ -378,7 +396,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     };
   }
 
-  /// Null while the start time is still missing (server timestamp).
+  /// Null while the start time is still missing.
   GameClock? _clock() {
     final startAt = widget.game.startAt;
     if (startAt == null) return null;
@@ -437,6 +455,26 @@ class _GameScreenState extends ConsumerState<GameScreen>
     });
   }
 
+  /// New regular pings switch "last pings" back on, new speedhunt pings
+  /// their speedhunt's chip – for hunters and game masters (R-HUNT-08,
+  /// R-GM-10).
+  void _onNewPings(
+    AsyncValue<List<PingRecord>>? previous,
+    AsyncValue<List<PingRecord>> next,
+  ) {
+    final pings = next.value;
+    if (pings == null) return;
+    var f = _filters;
+    if (!f.lastPings && hasNewRegularPing(previous?.value, pings)) {
+      f = f.copyWith(lastPings: true);
+    }
+    final fresh = speedhuntsWithNewPings(previous?.value, pings);
+    if (f.hiddenSpeedhunts.any(fresh.contains)) {
+      f = f.copyWith(hiddenSpeedhunts: f.hiddenSpeedhunts.difference(fresh));
+    }
+    if (!identical(f, _filters)) setState(() => _filters = f);
+  }
+
   Member? _me(List<Member>? members) {
     for (final m in members ?? const <Member>[]) {
       if (m.id == widget.session.userId) return m;
@@ -464,7 +502,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final names = {for (final m in members ?? const <Member>[]) m.id: m.name};
     // Players also get their own ⚡ pings (R-SPEED-09); tell them that this
     // does not mean the speedhunt is on them (R-NOTIF-06).
-    final isPlayer = !(_me(members)?.isHunter ?? true);
+    final isPlayer = _me(members)?.isPlayer ?? false;
     final (title, body) = switch (notice) {
       CatchNotice(:final record) => (
         l10n.noticeCaught(names[record.playerId] ?? '?'),
@@ -495,6 +533,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
       // Only hunters get it; anonymous like everything else they see
       // (R-ANON-01).
+      GameStartedNotice() => (
+        l10n.noticeGameStarted,
+        switch (widget.game.settings.headStart.inMinutes) {
+          0 => null,
+          final minutes when isPlayer => l10n.noticeGameStartedPlayer(minutes),
+          final minutes => l10n.noticeGameStartedHunter(minutes),
+        },
+      ),
       PlayerOutsideNotice(:final playerId) => (
         l10n.noticePlayerOutside(
           _displayNames(
@@ -830,6 +876,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             hunters: _jokerReveal,
             players: _playerReveal,
             speedhuntPings: _engine?.speedhuntSnapshots.value ?? const {},
+            liveViewAccepted: _liveViewAccepted,
           ),
         );
   }
@@ -841,15 +888,63 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final saved = await ref
         .read(jokerStoreProvider)
         .load(widget.session.groupId, startAt);
-    if (saved == null || !mounted) return;
+    if (!mounted) return;
     setState(() {
+      _jokersLoaded = true;
+      if (saved == null) return;
       _jokerReveal ??= saved.hunters;
       _playerReveal ??= saved.players;
+      _liveViewAccepted |= saved.liveViewAccepted;
     });
-    _engine?.restoreSpeedhuntSnapshots(saved.speedhuntPings);
+    if (saved != null) {
+      _engine?.restoreSpeedhuntSnapshots(saved.speedhuntPings);
+    }
   }
 
   DateTime? _jokersLoadedFor;
+
+  /// Saved results are known, so asking again after a restart is avoided.
+  var _jokersLoaded = false;
+
+  /// The game master's info line shows until then: 15 s from the start of
+  /// the live view (at the round start or when opening the screen later).
+  DateTime? _gameMasterInfoUntil;
+
+  /// The caught player confirmed the warning (R-GM-08).
+  var _liveViewAccepted = false;
+  var _askingLiveView = false;
+
+  /// Before a caught player sees everyone live: warn and wait for "OK"
+  /// (R-GM-08). Not dismissible – without "OK" nothing is shown.
+  Future<void> _askLiveView() async {
+    final l10n = AppLocalizations.of(context);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          key: const Key('liveViewDialog'),
+          icon: const Icon(Icons.warning_amber_rounded),
+          title: Text(l10n.liveViewTitle),
+          content: Text(l10n.liveViewText),
+          actions: [
+            FilledButton(
+              key: const Key('liveViewOk'),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.liveViewOk),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _liveViewAccepted = true;
+      _askingLiveView = false;
+    });
+    await _saveJokers();
+  }
 
   bool _jokersLeft(Member me) {
     final s = widget.game.settings;
@@ -919,13 +1014,30 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final isHunter = me?.isHunter ?? false;
     final isPlayer = me?.isPlayer ?? false;
 
-    // startAt is a server timestamp and briefly null right after "start".
+    // Before startAt: countdown to the official start (R-START-01). Without
+    // a start time startAt is a server timestamp, briefly null after "start".
     final clock = _clock();
     final now = widget.now();
     final phase = clock?.phaseAt(now) ?? GamePhase.notStarted;
     final running = activeSpeedhunt(speedhunts, now);
     // Once the time is up, caught players are split up again (R-HUNT-11).
     final caughtNow = caughtOnMap(caught, phase);
+    final isGameMaster = me?.isGameMaster ?? false;
+    // Game masters and caught players (after the warning) see everyone live
+    // while the round runs (R-GM-03, R-GM-07, R-GM-08).
+    final observer = seesEveryoneLive(me, phase, accepted: _liveViewAccepted);
+    if (observer && isGameMaster) {
+      _gameMasterInfoUntil ??= now.add(const Duration(seconds: 15));
+    }
+    final gameMasterInfoUntil = _gameMasterInfoUntil ?? now;
+    if (_jokersLoaded &&
+        !_askingLiveView &&
+        mustAcceptLiveView(me, phase, accepted: _liveViewAccepted)) {
+      _askingLiveView = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_askLiveView());
+      });
+    }
 
     // Anonymous players (R-ANON-01): hunters see "Player 3" instead of the
     // name until the time is up (R-ANON-02); players always see names
@@ -944,10 +1056,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final playersByColor = playerColors(orderedPlayers);
 
     final (title, color, until) = switch (phase) {
+      // Countdown to the official start (R-START-01).
       GamePhase.notStarted => (
         l10n.gamePhaseStarting,
         AppColors.textMuted,
-        null,
+        clock?.startAt,
       ),
       GamePhase.headStart => (
         l10n.gamePhaseHeadStart,
@@ -994,7 +1107,140 @@ class _GameScreenState extends ConsumerState<GameScreen>
     }
     final filters = _filters;
     final filterItems = <FilterItem>[];
-    if (isHunter || (isPlayer && phase == GamePhase.ended)) {
+    void set(MapFilters f) => setState(() => _filters = f);
+    // One chip per speedhunt, e.g. "⚡ Sam 18:35" (R-HUNT-07, R-GM-10).
+    FilterItem speedhuntChip(SpeedhuntPings s) => FilterItem(
+      id: 'speedhunt_${s.id}',
+      label: l10n.filterSpeedhunt(
+        names[s.playerId] ?? '?',
+        timeFmt.format(s.startedAt.toLocal()),
+      ),
+      icon: Icons.bolt,
+      color: playersByColor[s.playerId] ?? AppColors.player,
+      selected: !filters.hiddenSpeedhunts.contains(s.id),
+      onChanged: (_) => set(filters.toggleSpeedhunt(s.id)),
+    );
+    if (observer) {
+      // Live view (R-GM-03 … R-GM-07): hunters (fetched every 15 s), the last
+      // pings, every player still in the game live, one chip per speedhunt
+      // like the hunters (R-GM-10), the caught players' pings under
+      // "caught". No drawings.
+      for (final provider in [
+        allPingsProvider,
+        playerLocationsProvider,
+        observedHunterLocationsProvider,
+      ]) {
+        ref.listen(provider, (_, next) => _retryOnError(provider, next));
+      }
+      final pings = ref.watch(allPingsProvider).value ?? const [];
+      ref.listen(allPingsProvider, _onNewPings);
+      final byPlayer = pingsByPlayer(pings);
+      final speedhuntGroups = speedhuntsFromPings(pings);
+      // Caught players stop sharing; an old position must not linger.
+      final live = {
+        for (final e
+            in (ref.watch(playerLocationsProvider).value ??
+                    const <String, LocationFix>{})
+                .entries)
+          if (membersById[e.key]?.isPlayer ?? false)
+            if (!caught.contains(e.key)) e.key: e.value,
+      };
+      if (filters.caught) {
+        for (final id in caughtNow) {
+          if (byPlayer[id] case final history?) {
+            layers.add(
+              historyLayer(
+                history,
+                color: playersByColor[id] ?? AppColors.player,
+                keyPrefix: 'history_$id',
+              ),
+            );
+          }
+        }
+      }
+      // Caught players' speedhunts go with "caught", like for the hunters.
+      layers.add(
+        speedhuntPingsLayer(
+          pings: [
+            for (final s in speedhuntGroups)
+              if (caughtNow.contains(s.playerId)
+                  ? filters.caught
+                  : !filters.hiddenSpeedhunts.contains(s.id))
+                ...s.pings,
+          ],
+          colors: playersByColor,
+          names: names,
+        ),
+      );
+      if (filters.lastPings) {
+        layers.add(
+          lastPingsLayer(
+            pings: lastRegularPings(byPlayer, skip: caughtNow),
+            names: names,
+            colors: playersByColor,
+          ),
+        );
+      }
+      if (filters.hunters) {
+        layers.add(
+          huntersLayer(
+            positions:
+                ref.watch(observedHunterLocationsProvider).value ??
+                const <String, LocationFix>{},
+            names: names,
+          ),
+        );
+      }
+      layers.add(
+        livePlayersLayer(
+          positions: {
+            for (final e in live.entries)
+              if (!filters.hiddenLivePlayers.contains(e.key)) e.key: e.value,
+          },
+          names: names,
+          colors: playersByColor,
+        ),
+      );
+      filterItems.addAll([
+        FilterItem(
+          id: 'hunters',
+          label: l10n.filterHunters,
+          icon: Icons.track_changes,
+          color: AppColors.hunter,
+          selected: filters.hunters,
+          onChanged: (v) => set(filters.copyWith(hunters: v)),
+        ),
+        FilterItem(
+          id: 'lastPings',
+          label: l10n.filterLastPings,
+          icon: Icons.location_on,
+          selected: filters.lastPings,
+          onChanged: (v) => set(filters.copyWith(lastPings: v)),
+        ),
+        // One chip per player still in the game: their live position.
+        for (final id in orderedPlayers)
+          if (!caughtNow.contains(id))
+            FilterItem(
+              id: 'live_$id',
+              label: names[id] ?? '?',
+              color: playersByColor[id] ?? AppColors.player,
+              selected: !filters.hiddenLivePlayers.contains(id),
+              onChanged: (_) => set(filters.toggleLivePlayer(id)),
+            ),
+        if (caughtNow.isNotEmpty)
+          FilterItem(
+            id: 'caught',
+            label: l10n.filterCaught,
+            icon: Icons.person_off,
+            color: AppColors.textMuted,
+            selected: filters.caught,
+            onChanged: (v) => set(filters.copyWith(caught: v)),
+          ),
+        for (final s in speedhuntGroups)
+          if (!caughtNow.contains(s.playerId)) speedhuntChip(s),
+      ]);
+    } else if (isHunter ||
+        ((isPlayer || isGameMaster) && phase == GamePhase.ended)) {
       if (!isHunter) {
         ref
           ..listen(allPingsProvider, (_, next) {
@@ -1005,23 +1251,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           });
       }
       final pings = ref.watch(allPingsProvider).value ?? const [];
-      // New regular pings switch "last pings" back on, new speedhunt pings
-      // their speedhunt's chip (R-HUNT-08).
-      ref.listen(allPingsProvider, (previous, next) {
-        final pings = next.value;
-        if (pings == null) return;
-        var f = _filters;
-        if (!f.lastPings && hasNewRegularPing(previous?.value, pings)) {
-          f = f.copyWith(lastPings: true);
-        }
-        final fresh = speedhuntsWithNewPings(previous?.value, pings);
-        if (f.hiddenSpeedhunts.any(fresh.contains)) {
-          f = f.copyWith(
-            hiddenSpeedhunts: f.hiddenSpeedhunts.difference(fresh),
-          );
-        }
-        if (!identical(f, _filters)) setState(() => _filters = f);
-      });
+      ref.listen(allPingsProvider, _onNewPings);
       final hunters =
           ref.watch(hunterLocationsProvider).value ??
           const <String, LocationFix>{};
@@ -1122,7 +1352,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         );
       }
-      void set(MapFilters f) => setState(() => _filters = f);
       filterItems.addAll([
         FilterItem(
           id: 'hunters',
@@ -1162,20 +1391,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
             selected: filters.caught,
             onChanged: (v) => set(filters.copyWith(caught: v)),
           ),
-        // One chip per speedhunt, e.g. "⚡ Sam 18:35" (R-HUNT-07).
         for (final s in speedhuntGroups)
-          if (!caughtNow.contains(s.playerId))
-            FilterItem(
-              id: 'speedhunt_${s.id}',
-              label: l10n.filterSpeedhunt(
-                names[s.playerId] ?? '?',
-                timeFmt.format(s.startedAt.toLocal()),
-              ),
-              icon: Icons.bolt,
-              color: playersByColor[s.playerId] ?? AppColors.player,
-              selected: !filters.hiddenSpeedhunts.contains(s.id),
-              onChanged: (_) => set(filters.toggleSpeedhunt(s.id)),
-            ),
+          if (!caughtNow.contains(s.playerId)) speedhuntChip(s),
       ]);
     } else if (isPlayer) {
       final mine = pingsByPlayer(
@@ -1250,7 +1467,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
           ),
         );
       }
-      void set(MapFilters f) => setState(() => _filters = f);
       filterItems.addAll([
         FilterItem(
           id: 'myPings',
@@ -1314,6 +1530,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Hunters: when the next regular pings of all players arrive (R-HUNT-10).
     final nextRegular = isHunter ? clock?.nextRegularPing(now) : null;
     final infoLines = [
+      if (clock != null && phase == GamePhase.notStarted)
+        l10n.gameStartsAt(timeFmt.format(clock.startAt.toLocal())),
       if (nextSlot != null)
         l10n.gameNextPing(formatCountdown(nextSlot.at.difference(now))),
       if (nextRegular != null)
@@ -1321,6 +1539,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
       // Once the round is over the time-up hint says enough.
       if ((me?.caught ?? false) && phase != GamePhase.ended)
         l10n.gameCaughtSelf,
+      // Game masters: only for 15 s once the live view starts (the
+      // overview says it afterwards, R-GM-03); caught players keep the
+      // reminder not to pass anything on (R-GM-08).
+      if (observer && !isGameMaster) l10n.gameCaughtLiveInfo,
+      if (observer && isGameMaster && now.isBefore(gameMasterInfoUntil))
+        l10n.gameMasterInfo,
+      // Hunters know why their colleagues move in bigger steps (R-QUOTA-02).
+      if (isHunter &&
+          widget.game.hunterLiveThrottled &&
+          phase != GamePhase.ended)
+        l10n.gameHunterLiveThrottled,
       if (phase == GamePhase.ended) _timeUpHint(l10n),
     ];
     // Below the filters the same gap as above them: the info lines if any,
@@ -1563,7 +1792,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
             ),
         ],
       ),
-      bottomNavigationBar: me == null || clock == null
+      // Nothing to catch or reveal before the official start (R-START-03);
+      // game masters only watch (R-GM-01).
+      bottomNavigationBar:
+          me == null ||
+              clock == null ||
+              phase == GamePhase.notStarted ||
+              isGameMaster
           ? null
           : SafeArea(
               child: Padding(

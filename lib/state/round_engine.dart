@@ -8,6 +8,7 @@ import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
 import '../core/round/boundary_watch.dart';
 import '../core/round/joker.dart';
+import '../core/round/observer.dart';
 import '../core/round/ping_schedule.dart';
 import '../core/schedule/game_clock.dart';
 import '../core/schedule/speedhunt.dart';
@@ -67,7 +68,9 @@ class EngineStatus {
 /// - players: sends every due ping automatically (R-PING-01, R-SPEED-03),
 /// - hunters: shares the live position with the other hunters (R-HUNT-02),
 /// - players outside the play area: warns them and, if they stay outside,
-///   shares their live position with the hunters (R-OUT-01 … R-OUT-04).
+///   shares their live position with the hunters (R-OUT-01 … R-OUT-04),
+/// - players, while a game master or caught player may watch: shares the
+///   live position with them every 15 s (R-GM-05, R-GM-06).
 ///
 /// Feed it with [update] whenever game, own member or speedhunts change.
 class RoundEngine {
@@ -78,8 +81,9 @@ class RoundEngine {
     required this.notice,
     DateTime Function()? now,
     this.tickInterval = const Duration(seconds: 5),
-    this.hunterUploadInterval = const Duration(seconds: 15),
+    this.hunterUploadInterval,
     this.outsideUploadInterval = const Duration(seconds: 5),
+    this.playerLiveUploadInterval = playerLiveInterval,
     this.onLog,
   }) : _now = now ?? DateTime.now;
 
@@ -92,8 +96,17 @@ class RoundEngine {
   final LocationService location;
   final TrackingNotice notice;
   final Duration tickInterval;
-  final Duration hunterUploadInterval;
+
+  /// Overrides the round's [GameInfo.hunterLiveInterval] (5 s, or 15 s to
+  /// save reads, R-QUOTA-01).
+  final Duration? hunterUploadInterval;
+
+  Duration get _hunterInterval =>
+      hunterUploadInterval ??
+      _game?.hunterLiveInterval ??
+      const Duration(seconds: 5);
   final Duration outsideUploadInterval;
+  final Duration playerLiveUploadInterval;
   final DateTime Function() _now;
 
   /// Gets every [log] message too – computer members report into their
@@ -102,6 +115,7 @@ class RoundEngine {
 
   GameInfo? _game;
   Member? _me;
+  List<Member> _members = const [];
   List<Speedhunt> _speedhuntsOnMe = const [];
   List<Speedhunt> _speedhunts = const [];
 
@@ -149,6 +163,12 @@ class RoundEngine {
   var _outsideMaybeShared = true;
   DateTime? _lastOutsideUpload;
   var _outsideBusy = false;
+
+  /// Same for the live position for game masters and caught players
+  /// (R-GM-05): true at start, so a leftover gets deleted.
+  var _liveMaybeShared = true;
+  DateTime? _lastLiveUpload;
+  var _liveBusy = false;
 
   bool get isTracking => _tracking != null;
 
@@ -214,15 +234,26 @@ class RoundEngine {
   }
 
   /// [speedhunts] are all public speedhunts (without target), for the own
-  /// ⚡ pings of every player (R-SPEED-09).
+  /// ⚡ pings of every player (R-SPEED-09). [members] tell whether anyone
+  /// watches the players live (R-GM-05).
   void update({
     required GameInfo? game,
     required Member? me,
     required List<Speedhunt> speedhuntsOnMe,
     List<Speedhunt> speedhunts = const [],
+    List<Member> members = const [],
   }) {
+    if ((me?.isHunter ?? false) &&
+        (game?.hunterLiveThrottled ?? false) &&
+        !(_game?.hunterLiveThrottled ?? false)) {
+      _log(
+        'hunter live every ${game!.hunterLiveInterval.inSeconds} s '
+        '(read budget)',
+      );
+    }
     _game = game;
     _me = me;
+    _members = members;
     _speedhuntsOnMe = speedhuntsOnMe;
     _speedhunts = speedhunts;
     _sync();
@@ -429,6 +460,41 @@ class RoundEngine {
     }
   }
 
+  /// An active player shares the live position only while a game master or
+  /// caught player may watch (R-GM-05).
+  bool get _sharesLive =>
+      _shouldTrack && (_me?.isPlayer ?? false) && hasLiveAudience(_members);
+
+  /// Uploads the own live position every [playerLiveUploadInterval] while
+  /// someone may watch, deletes it as soon as nobody may (R-GM-05, R-GM-06).
+  Future<void> _syncLiveLocation() async {
+    if (_liveBusy) return;
+    _liveBusy = true;
+    try {
+      if (_sharesLive) {
+        final fix = _lastFix;
+        if (!_isFresh(fix)) return;
+        final last = _lastLiveUpload;
+        if (last != null &&
+            _now().difference(last) < playerLiveUploadInterval) {
+          return;
+        }
+        _liveMaybeShared = true;
+        await rounds.updatePlayerLocation(session, fix!);
+        _lastLiveUpload = _now();
+      } else if (_liveMaybeShared) {
+        await rounds.clearPlayerLocation(session);
+        _liveMaybeShared = false;
+        _lastLiveUpload = null;
+      }
+    } on Exception catch (e) {
+      // Retried on the next tick.
+      _setStatus((s) => s.copyWith(lastError: 'Live: $e'));
+    } finally {
+      _liveBusy = false;
+    }
+  }
+
   void _stop() {
     if (_tracking != null) {
       _log('tracking: stop (${_notTrackingReason ?? 'disposed'})');
@@ -442,6 +508,10 @@ class RoundEngine {
     _setBoundary(const BoundaryState(), why: 'tracking stopped');
     if (_outsideMaybeShared && (_me?.isPlayer ?? false)) {
       unawaited(_syncOutsideLocation());
+    }
+    // Caught, round over …: nobody may watch any more (R-GM-06).
+    if (_liveMaybeShared && (_me?.isPlayer ?? false)) {
+      unawaited(_syncLiveLocation());
     }
     if (status.value.state != TrackingState.off) {
       _setStatus((s) => s.copyWith(state: TrackingState.off));
@@ -465,6 +535,7 @@ class RoundEngine {
         _stepBoundary();
         await _confirmOutside();
         await _syncOutsideLocation();
+        await _syncLiveLocation();
         await _sendDuePings();
         await _recordSpeedhuntSnapshots();
         await _answerJokerRequests();
@@ -601,7 +672,7 @@ class RoundEngine {
 
   Future<void> _uploadHunterLocation(LocationFix fix) async {
     final last = _lastUpload;
-    if (last != null && _now().difference(last) < hunterUploadInterval) return;
+    if (last != null && _now().difference(last) < _hunterInterval) return;
     try {
       await rounds.updateHunterLocation(session, fix);
       _lastUpload = _now();

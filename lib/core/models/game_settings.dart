@@ -2,7 +2,7 @@ import 'geo_point.dart';
 
 /// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
 /// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19,
-/// R-BOT-02).
+/// R-SET-21, R-BOT-02).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -25,7 +25,10 @@ class GameSettings {
     this.botHunters = 0,
     this.botPlayers = 0,
     this.area = const [],
+    this.startTime,
   });
+
+  static const _keep = Object();
 
   final Duration duration;
   final Duration headStart;
@@ -76,6 +79,10 @@ class GameSettings {
   /// only offered in debug builds.
   final int botHunters;
   final int botPlayers;
+
+  /// Time of day (since midnight, local) of the official start; null = a
+  /// short countdown from pressing "start" (R-SET-21, R-START-01).
+  final Duration? startTime;
 
   /// The joker "player positions" is only offered without [sharedPings].
   bool get playerJokerAvailable => playerJokerEnabled && !sharedPings;
@@ -137,6 +144,7 @@ class GameSettings {
     int? botHunters,
     int? botPlayers,
     List<GeoPoint>? area,
+    Object? startTime = _keep,
   }) => GameSettings(
     duration: duration ?? this.duration,
     headStart: headStart ?? this.headStart,
@@ -159,6 +167,10 @@ class GameSettings {
     botHunters: botHunters ?? this.botHunters,
     botPlayers: botPlayers ?? this.botPlayers,
     area: area ?? this.area,
+    // Pass null to clear it.
+    startTime: identical(startTime, _keep)
+        ? this.startTime
+        : startTime as Duration?,
   );
 
   Map<String, Object?> toJson() => {
@@ -182,6 +194,7 @@ class GameSettings {
     'botHunters': botHunters,
     'botPlayers': botPlayers,
     'area': [for (final p in area) p.toJson()],
+    'startTimeMin': startTime?.inMinutes,
   };
 
   factory GameSettings.fromJson(Map<String, Object?> json) => GameSettings(
@@ -216,6 +229,10 @@ class GameSettings {
       for (final p in json['area']! as List<Object?>)
         GeoPoint.fromJson(p! as Map<String, Object?>),
     ],
+    startTime: switch (json['startTimeMin'] as int?) {
+      final min? => Duration(minutes: min),
+      null => null,
+    },
   );
 }
 

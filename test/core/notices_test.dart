@@ -3,6 +3,7 @@ import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/round/notices.dart';
 import 'package:manhunt/core/round/round_result.dart';
+import 'package:manhunt/core/schedule/game_clock.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
 
 void main() {
@@ -118,6 +119,37 @@ void main() {
       final tracker = NoticeTracker();
       expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
       expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
+    });
+  });
+
+  group('official start after the countdown (R-START-04)', () {
+    test('announced once when the countdown runs out', () {
+      final tracker = NoticeTracker();
+      expect(tracker.onPhase(GamePhase.notStarted, countdown: true), isEmpty);
+      expect(
+        tracker.onPhase(GamePhase.headStart, countdown: true).single,
+        isA<GameStartedNotice>(),
+      );
+      expect(tracker.onPhase(GamePhase.headStart, countdown: true), isEmpty);
+      expect(tracker.onPhase(GamePhase.hunting, countdown: true), isEmpty);
+    });
+
+    test('without head start the hunt starts right away: announced, too', () {
+      final tracker = NoticeTracker()
+        ..onPhase(GamePhase.notStarted, countdown: true);
+      expect(tracker.onPhase(GamePhase.hunting, countdown: true), hasLength(1));
+    });
+
+    test('opened after the start: nothing to tell', () {
+      final tracker = NoticeTracker();
+      expect(tracker.onPhase(GamePhase.headStart, countdown: true), isEmpty);
+    });
+
+    test('without a start time there is no countdown to end', () {
+      // The server's start may lie a moment ahead of the phone's clock.
+      final tracker = NoticeTracker()
+        ..onPhase(GamePhase.notStarted, countdown: false);
+      expect(tracker.onPhase(GamePhase.headStart, countdown: false), isEmpty);
     });
   });
 }

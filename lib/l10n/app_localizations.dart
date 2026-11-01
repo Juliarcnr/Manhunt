@@ -236,6 +236,84 @@ abstract class AppLocalizations {
   /// **'Not assigned yet'**
   String get roleUnassigned;
 
+  /// No description provided for @overviewYouAreGameMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'You are game master – you don\'t play and see everyone live (every 15 s).'**
+  String get overviewYouAreGameMaster;
+
+  /// No description provided for @lobbyHunterLiveThrottled.
+  ///
+  /// In en, this message translates to:
+  /// **'Big round: hunters see each other only every 15 s instead of every 5 s this round, so the free Firebase quota lasts (estimated {percent} % of it).'**
+  String lobbyHunterLiveThrottled(int percent);
+
+  /// No description provided for @gameHunterLiveThrottled.
+  ///
+  /// In en, this message translates to:
+  /// **'Hunter positions every 15 s this round (Firebase quota)'**
+  String get gameHunterLiveThrottled;
+
+  /// No description provided for @roleGameMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Game master'**
+  String get roleGameMaster;
+
+  /// No description provided for @lobbyGameMasterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional – doesn\'t play and sees all hunters and players live. Not included when assigning randomly.'**
+  String get lobbyGameMasterHint;
+
+  /// No description provided for @lobbyAddGameMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Add game master'**
+  String get lobbyAddGameMaster;
+
+  /// No description provided for @lobbyPickGameMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Who will be game master?'**
+  String get lobbyPickGameMaster;
+
+  /// No description provided for @lobbyNobodyToPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone is game master already.'**
+  String get lobbyNobodyToPick;
+
+  /// No description provided for @gameMasterInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Game master – you see everyone live (every 15 s).'**
+  String get gameMasterInfo;
+
+  /// No description provided for @gameCaughtLiveInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'You see everyone live – don\'t pass anything on to players or hunters still in the game!'**
+  String get gameCaughtLiveInfo;
+
+  /// No description provided for @liveViewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Careful: live locations'**
+  String get liveViewTitle;
+
+  /// No description provided for @liveViewText.
+  ///
+  /// In en, this message translates to:
+  /// **'You were caught. From now on you see the live locations of everyone still in the game – hunters and players.\n\nYou must not share them with any player or hunter who is still in the game!'**
+  String get liveViewText;
+
+  /// No description provided for @liveViewOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get liveViewOk;
+
   /// No description provided for @speedhuntActive.
   ///
   /// In en, this message translates to:
@@ -481,6 +559,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Game duration'**
   String get settingsDuration;
+
+  /// No description provided for @settingsStartTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Start time'**
+  String get settingsStartTime;
+
+  /// No description provided for @settingsStartTimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Countdown to this time after \"Start\" (1 minute if it has passed). Without a time the game starts right away.'**
+  String get settingsStartTimeHint;
+
+  /// No description provided for @settingsStartTimeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'none'**
+  String get settingsStartTimeNone;
+
+  /// No description provided for @settingsStartTimeClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove start time'**
+  String get settingsStartTimeClear;
 
   /// No description provided for @settingsHeadStart.
   ///
@@ -959,7 +1061,7 @@ abstract class AppLocalizations {
   /// No description provided for @gamePhaseStarting.
   ///
   /// In en, this message translates to:
-  /// **'Starting…'**
+  /// **'Starts in'**
   String get gamePhaseStarting;
 
   /// No description provided for @gamePhaseHeadStart.
@@ -1069,6 +1171,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next ping in {time}'**
   String gameNextPing(String time);
+
+  /// No description provided for @gameStartsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'The game starts at {time}'**
+  String gameStartsAt(String time);
 
   /// No description provided for @gameNextPings.
   ///
@@ -1291,6 +1399,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No hunter positions available right now.'**
   String get jokerNoHunters;
+
+  /// No description provided for @noticeGameStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'The game has officially started!'**
+  String get noticeGameStarted;
+
+  /// No description provided for @noticeGameStartedPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Your head start: {minutes} min – go!'**
+  String noticeGameStartedPlayer(int minutes);
+
+  /// No description provided for @noticeGameStartedHunter.
+  ///
+  /// In en, this message translates to:
+  /// **'The players have a {minutes} min head start.'**
+  String noticeGameStartedHunter(int minutes);
 
   /// No description provided for @noticeHuntersWon.
   ///

@@ -310,4 +310,84 @@ void main() {
       expect((settings().botHunters, settings().botPlayers), (1, 2));
     });
   });
+
+  group('start time (R-SET-21)', () {
+    Future<GameSettings Function()> pumpEditable(WidgetTester tester) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (context, setState) => SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return () => settings;
+    }
+
+    testWidgets('none by default, explained', (tester) async {
+      await pumpEditable(tester);
+      expect(find.text('Startzeit'), findsOneWidget);
+      expect(find.textContaining('Ohne Uhrzeit'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('startTimeValue'))).data,
+        'keine',
+      );
+      expect(find.byKey(const Key('startTimeClear')), findsNothing);
+    });
+
+    testWidgets('picked with the time picker and removed again', (
+      tester,
+    ) async {
+      final current = await pumpEditable(tester);
+      await tester.tap(find.byKey(const Key('startTimeTile')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(current().startTime, const Duration(hours: 14));
+      expect(
+        tester.widget<Text>(find.byKey(const Key('startTimeValue'))).data,
+        '14:00',
+      );
+
+      await tester.tap(find.byKey(const Key('startTimeClear')));
+      await tester.pump();
+      expect(current().startTime, isNull);
+    });
+
+    testWidgets('read-only: only the value', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: SettingsForm(
+                settings: GameSettings(startTime: Duration(hours: 9)),
+                onChanged: null,
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('startTimeValue'))).data,
+        '09:00',
+      );
+      expect(find.byKey(const Key('startTimeClear')), findsNothing);
+      await tester.tap(find.byKey(const Key('startTimeTile')));
+      await tester.pumpAndSettle();
+      expect(find.text('OK'), findsNothing);
+    });
+  });
 }

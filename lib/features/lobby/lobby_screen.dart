@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/bots/bot_plan.dart';
 import '../../core/models/member.dart';
+import '../../core/round/read_budget.dart';
 import '../../core/teams/start_check.dart';
 import '../../core/teams/team_assignment.dart';
 import '../../data/game_repository.dart';
@@ -49,7 +50,9 @@ class LobbyScreen extends ConsumerWidget {
     final humans = members.where((m) => !isBot(m)).toList();
 
     void assignRandom() {
-      if (humans.length <= game.settings.hunterCount) {
+      // Game masters keep their role (R-GM-02).
+      final playing = humans.where((m) => !m.isGameMaster).length;
+      if (playing <= game.settings.hunterCount) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l10n.errorNotEnoughPlayers)));
         return;
@@ -65,6 +68,24 @@ class LobbyScreen extends ConsumerWidget {
     final hunters = members.where((m) => m.isHunter).toList();
     final players = members.where((m) => m.isPlayer).toList();
     final unassigned = members.where((m) => m.role == Role.unassigned).toList();
+    final gameMasters = members.where((m) => m.isGameMaster).toList();
+
+    // Host picks who becomes game master (R-GM-02); computer members keep
+    // their kind's role.
+    Future<void> addGameMaster() async {
+      final picked = await _pickGameMaster(context, [
+        for (final m in humans)
+          if (!m.isGameMaster) m,
+      ]);
+      if (picked != null) {
+        await run(
+          () => repo.setRoles(
+            session,
+            setRole(members, picked.id, Role.gameMaster),
+          ),
+        );
+      }
+    }
 
     Widget memberTile(Member m) => _MemberTile(
       member: m,
@@ -236,6 +257,38 @@ class LobbyScreen extends ConsumerWidget {
                 icon: Icons.directions_run,
                 children: players.map(memberTile).toList(),
               ),
+              // Optional (R-GM-01): others only see it when someone has it.
+              if (_isAdmin || gameMasters.isNotEmpty)
+                _RoleSection(
+                  key: const Key('gameMasterSection'),
+                  title: l10n.roleGameMaster,
+                  color: AppColors.gameMaster,
+                  icon: Icons.visibility_outlined,
+                  footer: [
+                    if (_isAdmin) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: Text(
+                          l10n.lobbyGameMasterHint,
+                          style: const TextStyle(color: AppColors.textMuted),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: TextButton.icon(
+                            key: const Key('addGameMasterButton'),
+                            onPressed: addGameMaster,
+                            icon: const Icon(Icons.add),
+                            label: Text(l10n.lobbyAddGameMaster),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  children: gameMasters.map(memberTile).toList(),
+                ),
               if (_isAdmin && problems.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 for (final p in problems)
@@ -254,6 +307,35 @@ class LobbyScreen extends ConsumerWidget {
                     ),
                   ),
               ],
+              // Before the start the host learns that hunters will see each
+              // other less often (R-QUOTA-02).
+              if (_isAdmin &&
+                  hunterLiveIntervalFor(game.settings, members) !=
+                      hunterLiveNormal)
+                Padding(
+                  key: const Key('hunterLiveThrottledHint'),
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.speed,
+                        size: 16,
+                        color: AppColors.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.lobbyHunterLiveThrottled(
+                            (estimatedQuotaShare(game.settings, members) * 100)
+                                .round(),
+                          ),
+                          style: const TextStyle(color: AppColors.textMuted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -450,18 +532,68 @@ class _CodeCard extends StatelessWidget {
   }
 }
 
+/// Host chooses a member to become game master (R-GM-02). Returns null if
+/// cancelled.
+Future<Member?> _pickGameMaster(
+  BuildContext context,
+  List<Member> candidates,
+) => showModalBottomSheet<Member>(
+  context: context,
+  showDragHandle: true,
+  builder: (ctx) {
+    final l10n = AppLocalizations.of(ctx);
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              l10n.lobbyPickGameMaster,
+              style: Theme.of(ctx).textTheme.titleMedium,
+            ),
+          ),
+          if (candidates.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                l10n.lobbyNobodyToPick,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+          for (final m in candidates)
+            ListTile(
+              key: Key('pickGameMaster_${m.id}'),
+              leading: const Icon(
+                Icons.visibility_outlined,
+                color: AppColors.gameMaster,
+              ),
+              title: Text(m.name),
+              onTap: () => Navigator.pop(ctx, m),
+            ),
+        ],
+      ),
+    );
+  },
+);
+
 class _RoleSection extends StatelessWidget {
   const _RoleSection({
+    super.key,
     required this.title,
     required this.color,
     required this.icon,
     required this.children,
+    this.footer = const [],
   });
 
   final String title;
   final Color color;
   final IconData icon;
   final List<Widget> children;
+
+  /// Below the members, not counted (e.g. hint and add button).
+  final List<Widget> footer;
 
   @override
   Widget build(BuildContext context) {
@@ -491,6 +623,7 @@ class _RoleSection extends StatelessWidget {
                 ),
               ),
               ...children,
+              ...footer,
             ],
           ),
         ),
@@ -527,6 +660,7 @@ class _MemberTile extends StatelessWidget {
       Role.hunter => AppColors.hunter,
       Role.player => AppColors.player,
       Role.unassigned => AppColors.textMuted,
+      Role.gameMaster => AppColors.gameMaster,
     };
     return ListTile(
       onTap: onTap,

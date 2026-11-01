@@ -1,4 +1,5 @@
 import '../history/round_summary.dart';
+import '../schedule/game_clock.dart';
 import '../schedule/speedhunt.dart';
 import 'boundary_watch.dart';
 import 'ping_schedule.dart';
@@ -31,6 +32,11 @@ class SpeedhuntNotice extends GameNotice {
 class PingSentNotice extends GameNotice {
   const PingSentNotice(this.kind);
   final PingKind kind;
+}
+
+/// The countdown is over: the game officially starts now (R-START-04).
+class GameStartedNotice extends GameNotice {
+  const GameStartedNotice();
 }
 
 /// The round is over – time up or last player caught – and [result] tells
@@ -74,6 +80,7 @@ class NoticeTracker {
   Set<String>? _outside;
   var _resultKnown = false;
   RoundResult? _result;
+  var _countingDown = false;
 
   static String _catchKey(CatchRecord c) =>
       '${c.playerId}@${c.at.toUtc().toIso8601String()}';
@@ -120,6 +127,22 @@ class NoticeTracker {
     _result = result;
     return known && before == null && result != null
         ? [RoundOverNotice(result)]
+        : const [];
+  }
+
+  /// The current [phase]; [countdown]: the round has a start time, so there
+  /// is a countdown worth ending with a notice (R-START-04). Announced once
+  /// when the countdown seen by this tracker runs out; opened after the
+  /// start (or without a start time: right away) there is nothing to tell.
+  List<GameNotice> onPhase(GamePhase phase, {required bool countdown}) {
+    if (phase == GamePhase.notStarted) {
+      _countingDown = countdown;
+      return const [];
+    }
+    final ended = _countingDown;
+    _countingDown = false;
+    return ended && phase != GamePhase.ended
+        ? const [GameStartedNotice()]
         : const [];
   }
 

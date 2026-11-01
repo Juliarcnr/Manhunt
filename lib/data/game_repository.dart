@@ -17,6 +17,7 @@ class GameInfo {
     this.finishedAt,
     this.name,
     this.aliases = const {},
+    this.hunterLiveInterval = const Duration(seconds: 5),
   });
 
   final String adminId;
@@ -36,6 +37,14 @@ class GameInfo {
   /// Anonymous player numbers of the current round by player id (R-ANON-01);
   /// empty in the lobby and without [GameSettings.anonymousPlayers].
   final Map<String, int> aliases;
+
+  /// How often hunters share their live position this round: 5 s, or 15 s
+  /// if the host's estimate said the round would use too many reads
+  /// (R-QUOTA-01). Set at the start; 5 s for older rounds.
+  final Duration hunterLiveInterval;
+
+  /// Hunters see each other less often this round (R-QUOTA-01).
+  bool get hunterLiveThrottled => hunterLiveInterval.inSeconds > 5;
 }
 
 /// What a device needs to talk to its group: the derived crypto and its own id.

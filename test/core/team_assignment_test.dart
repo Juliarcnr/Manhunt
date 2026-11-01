@@ -53,4 +53,35 @@ void main() {
       expect(toggleRole(assigned, 'a')[0].role, Role.player);
     });
   });
+
+  group('game master (R-GM-02)', () {
+    final withMaster = [
+      ...members,
+      const Member(id: 'gm', name: 'GM', role: Role.gameMaster),
+    ];
+
+    test('random assignment keeps game masters and skips them', () {
+      for (var seed = 0; seed < 20; seed++) {
+        final r = assignRandomRoles(withMaster, 3, random: Random(seed));
+        expect(r.last.role, Role.gameMaster);
+        expect(r.where((m) => m.isHunter), hasLength(3));
+        expect(r.where((m) => m.isPlayer), hasLength(4));
+        expect(r.map((m) => m.id), withMaster.map((m) => m.id));
+      }
+    });
+
+    test('game masters do not count as available', () {
+      expect(() => assignRandomRoles(withMaster, 8), throwsArgumentError);
+    });
+
+    test('setRole makes a member game master', () {
+      final r = setRole(members, 'm2', Role.gameMaster);
+      expect(r[2].isGameMaster, isTrue);
+      expect(r.where((m) => m.isGameMaster), hasLength(1));
+    });
+
+    test('toggleRole turns a game master into a player', () {
+      expect(toggleRole(withMaster, 'gm').last.role, Role.player);
+    });
+  });
 }

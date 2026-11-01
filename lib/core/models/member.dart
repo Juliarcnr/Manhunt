@@ -1,4 +1,6 @@
-enum Role { unassigned, hunter, player }
+/// [gameMaster] (R-GM-01): plays no part, watches everyone live; never
+/// shuffled (R-GM-02).
+enum Role { unassigned, hunter, player, gameMaster }
 
 /// A participant of a group. [id] is the anonymous device/auth id.
 class Member {
@@ -24,6 +26,7 @@ class Member {
 
   bool get isHunter => role == Role.hunter;
   bool get isPlayer => role == Role.player;
+  bool get isGameMaster => role == Role.gameMaster;
 
   Member copyWith({
     String? name,

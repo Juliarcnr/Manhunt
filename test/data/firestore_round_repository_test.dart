@@ -177,6 +177,45 @@ void main() {
     });
   });
 
+  group('live positions for game masters and caught players '
+      '(R-GM-04, R-GM-05)', () {
+    test('overwritten, encrypted, deleted when no longer shared', () async {
+      await rounds.updatePlayerLocation(kim, fix(52.654321));
+      await rounds.updatePlayerLocation(kim, fix(52.66, 1));
+      await rounds.updatePlayerLocation(sam, fix(52.7));
+      var locs = await rounds.watchPlayerLocations(hunter).first;
+      expect(locs.keys, unorderedEquals(['kim', 'sam']));
+      expect(locs['kim']!.point.lat, 52.66);
+      expect(db.dump(), isNot(contains('52.66')));
+      await rounds.clearPlayerLocation(kim);
+      locs = await rounds.watchPlayerLocations(hunter).first;
+      expect(locs.keys, ['sam']);
+    });
+
+    test(
+      'player positions are deleted when the round ends (R-GM-09)',
+      () async {
+        await games.startGame(hunter);
+        await rounds.updatePlayerLocation(kim, fix(52.4));
+        await games.endRound(hunter);
+        expect(await rounds.watchPlayerLocations(hunter).first, isEmpty);
+      },
+    );
+
+    test('hunter positions are fetched again and again', () async {
+      await rounds.updateHunterLocation(hunter, fix(52.4));
+      final polled = rounds
+          .pollHunterLocations(kim, every: const Duration(milliseconds: 20))
+          .asBroadcastStream();
+      expect((await polled.first)['hunter']!.point.lat, 52.4);
+      await rounds.updateHunterLocation(hunter, fix(52.5));
+      expect(
+        await polled.firstWhere((l) => l['hunter']!.point.lat == 52.5),
+        isNotEmpty,
+      );
+    });
+  });
+
   group('hunter positions & joker (R-HUNT-02, R-PLAY-02)', () {
     test('live position is overwritten, not accumulated', () async {
       await rounds.updateHunterLocation(hunter, fix(52.4));

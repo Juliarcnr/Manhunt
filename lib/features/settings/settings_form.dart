@@ -85,6 +85,12 @@ class SettingsForm extends StatelessWidget {
         SectionCard(
           title: l10n.settingsSectionGame,
           children: [
+            StartTimeTile(
+              startTime: s.startTime,
+              onChanged: readOnly
+                  ? null
+                  : (v) => change(s.copyWith(startTime: v)),
+            ),
             minutes(
               label: l10n.settingsDuration,
               value: s.duration,
@@ -371,6 +377,94 @@ class SectionCard extends StatelessWidget {
               ...children,
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Optional time of day of the official start (R-SET-21): tap to pick it,
+/// × to remove it. Without [onChanged] only the value is shown (R-SET-14).
+class StartTimeTile extends StatelessWidget {
+  const StartTimeTile({
+    super.key,
+    required this.startTime,
+    required this.onChanged,
+  });
+
+  final Duration? startTime;
+  final ValueChanged<Duration?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final time = startTime;
+    final onChanged = this.onChanged;
+    final valueText = time == null
+        ? l10n.settingsStartTimeNone
+        : MaterialLocalizations.of(context).formatTimeOfDay(
+            TimeOfDay(hour: time.inHours, minute: time.inMinutes % 60),
+            alwaysUse24HourFormat: true,
+          );
+
+    Future<void> pick() async {
+      final picked = await showTimePicker(
+        context: context,
+        initialTime: time == null
+            ? const TimeOfDay(hour: 14, minute: 0)
+            : TimeOfDay(hour: time.inHours, minute: time.inMinutes % 60),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        ),
+      );
+      if (picked != null) {
+        onChanged?.call(Duration(hours: picked.hour, minutes: picked.minute));
+      }
+    }
+
+    return InkWell(
+      key: const Key('startTimeTile'),
+      onTap: onChanged == null ? null : pick,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsStartTime),
+                  Text(
+                    l10n.settingsStartTimeHint,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, right: 12),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    valueText,
+                    key: const Key('startTimeValue'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+            if (onChanged != null && time != null)
+              IconButton(
+                key: const Key('startTimeClear'),
+                tooltip: l10n.settingsStartTimeClear,
+                onPressed: () => onChanged(null),
+                icon: const Icon(Icons.close),
+              ),
+          ],
         ),
       ),
     );

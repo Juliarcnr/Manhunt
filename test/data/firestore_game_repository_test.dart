@@ -186,6 +186,47 @@ void main() {
     });
   });
 
+  group('countdown to the official start (R-START-01, R-SET-21)', () {
+    test('without a start time: right away, by the server clock', () async {
+      await createDefault();
+      await repo.startGame(admin);
+      final game = await repo.watchGame(admin).first;
+      // The fake server timestamp is the real current time.
+      final lag = DateTime.now().difference(game!.startAt!);
+      expect(lag.inSeconds.abs(), lessThan(5));
+    });
+
+    test('with a start time that has passed: one minute', () async {
+      now = DateTime(2026, 10, 4, 14, 5);
+      await repo.createGame(
+        admin,
+        name: 'Julia',
+        settings: const GameSettings(startTime: Duration(hours: 14)),
+      );
+      await repo.startGame(admin);
+      final game = await repo.watchGame(admin).first;
+      expect(
+        game!.startAt!.isAtSameMomentAs(DateTime(2026, 10, 4, 14, 6)),
+        isTrue,
+      );
+    });
+
+    test('with a start time: at that time', () async {
+      now = DateTime(2026, 10, 4, 13, 57, 30);
+      await repo.createGame(
+        admin,
+        name: 'Julia',
+        settings: const GameSettings(startTime: Duration(hours: 14)),
+      );
+      await repo.startGame(admin);
+      final game = await repo.watchGame(admin).first;
+      expect(
+        game!.startAt!.isAtSameMomentAs(DateTime(2026, 10, 4, 14)),
+        isTrue,
+      );
+    });
+  });
+
   group('anonymous players (R-ANON-01, R-SET-16)', () {
     Future<void> startWith(GameSettings settings) async {
       await repo.createGame(admin, name: 'Julia', settings: settings);
@@ -236,6 +277,54 @@ void main() {
         await repo.startGame(admin);
       }
       expect(orders.length, greaterThan(1));
+    });
+  });
+
+  group('hunter live interval from the estimated reads (R-QUOTA-01)', () {
+    Future<void> start({required int players, int hours = 3}) async {
+      await repo.createGame(
+        admin,
+        name: 'Alex',
+        settings: GameSettings(duration: Duration(hours: hours)),
+      );
+      final ids = [for (var i = 0; i < players; i++) 'p$i'];
+      for (final id in ids) {
+        await repo.joinGame(await testSession(code, id), name: id);
+      }
+      final members = await repo.watchMembers(admin).first;
+      await repo.setRoles(admin, [
+        for (final m in members)
+          m.copyWith(role: ids.contains(m.id) ? Role.player : Role.hunter),
+      ]);
+      await repo.startGame(admin);
+    }
+
+    Future<int?> stored() async =>
+        (await gameDoc().get()).data()!['hunterLiveSec'] as int?;
+
+    test('a small round keeps 5 s', () async {
+      await start(players: 2);
+      expect(await stored(), 5);
+      expect(
+        (await repo.watchGame(admin).first)!.hunterLiveInterval,
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('a round over the budget gets 15 s for everyone', () async {
+      await start(players: 20, hours: 5);
+      expect(await stored(), 15);
+      final game = (await repo.watchGame(guest).first)!;
+      expect(game.hunterLiveInterval, const Duration(seconds: 15));
+      expect(game.hunterLiveThrottled, isTrue);
+    });
+
+    test('older rounds without the field: 5 s', () async {
+      await createDefault();
+      expect(
+        (await repo.watchGame(admin).first)!.hunterLiveInterval,
+        const Duration(seconds: 5),
+      );
     });
   });
 

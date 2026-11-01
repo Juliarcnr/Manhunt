@@ -25,6 +25,14 @@ void main() {
       expect(c.canStart, isFalse);
     });
 
+    test('a game master counts as assigned, not as hunter or player '
+        '(R-GM-01)', () {
+      const gm = Member(id: 'g', name: 'G', role: Role.gameMaster);
+      expect(StartCheck(ready, [hunter, player, gm]).canStart, isTrue);
+      expect(StartCheck(ready, [hunter, gm]).noPlayer, isTrue);
+      expect(StartCheck(ready, [player, gm]).noHunter, isTrue);
+    });
+
     test('needs at least one hunter and one player', () {
       expect(StartCheck(ready, [hunter]).noPlayer, isTrue);
       expect(StartCheck(ready, [player]).noHunter, isTrue);

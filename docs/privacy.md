@@ -10,13 +10,16 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Anzeigename (in der Lobby änderbar, R-LOBBY-10) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Gruppenname (R-GROUPS-04) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Rolle, gefangen, Joker benutzt | Firestore | ja (nötig für Regeln) | Rolle mit Gruppe; gefangen/Joker bei Rundenende zurückgesetzt |
-| Spielfeld & Einstellungen | Firestore | nein (verschlüsselt) | mit Gruppe |
+| Spielfeld & Einstellungen (inkl. optionaler Startzeit, R-SET-21) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Anonyme Spielernummern der Runde (R-ANON-01): Zuordnung UID → „Spieler n“ | Firestore `games/{id}.aliases` | nein (verschlüsselt) | beim Beenden der Runde |
 | Schalter „Reguläre Pings an alle Spieler“ (R-SET-15) | Firestore `games/{id}.sharedPings` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; verrät nur die Spielvariante) | mit Gruppe |
+| Takt der Hunter-Live-Standorte der Runde, 5 oder 15 s (R-QUOTA-01) | Firestore `games/{id}.hunterLiveSec` | ja (nur eine Zahl, verrät nur, dass die Runde groß ist) | bleibt bis zum nächsten Start, mit Gruppe |
 | Spieldauer (R-GAME-06) | Firestore `games/{id}.durationSec` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig, damit die Sicherheitsregeln das Spielende kennen; verrät nur die Spieldauer) | mit Gruppe |
 | Zeitpunkt „Hunter haben gewonnen“ (R-GAME-08) | Firestore `games/{id}.finishedAt` | ja (nur ein Zeitpunkt, kein Name) | beim Beenden der Runde |
 | Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse (ein Catch vermerkt ggf. den Start des Speedhunts, den er beendet – R-SPEED-10) | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings). Nach Ablauf der Spielzeit oder dem Hunter-Sieg dürfen alle Spieler alle Pings und Hunter-Standorte lesen (R-GAME-06, R-GAME-08) | **beim Beenden der Runde** (ein vom Host rückgängig gemachter Catch sofort, R-CATCH-04) |
 | Live-Standort eines Spielers, der das Spielfeld verlassen hat (R-OUT-03), mit GPS-Genauigkeit – nur solange er eindeutig (30 m + doppelte Ungenauigkeit) und seit 30 s draußen ist, plus 60 s nach der Rückkehr (Einstellung R-SET-17) | Firestore `outsideLocs/{uid}` | **nein** (AES-GCM); nur Hunter dürfen lesen; lesbar ist nur, *dass* eine anonyme ID gerade draußen ist | vom eigenen Handy gelöscht, sobald die 60 s um sind, man gefangen wird oder die Zeit abläuft; spätestens beim Beenden der Runde |
+| Live-Standort jedes nicht gefangenen Spielers für Spielleitung und gefangene Spieler (R-GM-05), alle 15 s überschrieben – nur solange es eine Spielleitung oder einen gefangenen Spieler gibt | Firestore `playerLocs/{uid}` | **nein** (AES-GCM); lesen dürfen nur Spielleitung und gefangene Spieler, solange die Runde läuft und noch niemand gewonnen hat – nie Hunter oder Spieler im Spiel. Gefangene werden in der App gewarnt, nichts weiterzugeben (R-GM-08) | vom eigenen Handy gelöscht, sobald man gefangen wird, niemand mehr zusehen darf oder die Zeit abläuft bzw. die Hunter gewonnen haben; spätestens beim Beenden der Runde |
+| Rolle „Spielleitung“ (R-GM-01) | Firestore `members/{uid}.role` | ja (wie die anderen Rollen, nötig für die Regeln) | mit Gruppe |
 | Zeichnungen der Hunter auf der Karte (R-DRAW-01 … 07): Farbe + Linienpunkte (Koordinaten), Autor-UID, Zeitpunkt | Firestore `drawings/{id}` | **nein** für Farbe und Punkte (AES-GCM); lesbar sind nur Autor-UID, Zeitpunkt und Anzahl der Striche. Nur Hunter dürfen lesen, Spieler nie | per Radiergummi/Mülleimer sofort; spätestens beim Beenden der Runde |
 | Antworten auf den Spieler-Joker (aktueller Standort der anderen Spieler) | Firestore | **nein** (AES-GCM); nur der fragende Spieler darf sie lesen | beim Beenden der Runde |
 | Metadaten der Runde: wer wann gepingt hat (uid, Ping-Nr.), Ziel-uid eines Speedhunts, wer einen Joker wann benutzt hat | Firestore | ja (nötig für die Sicherheitsregeln; nur anonyme IDs, keine Orte) | beim Beenden der Runde (Joker-Zeitpunkte bleiben bis zur nächsten Runde) |
@@ -71,6 +74,9 @@ Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt des Jokers bzw. die Kennung der
 **auf dem eigenen Gerät** im Schlüsselspeicher des Betriebssystems abgelegt, damit man sie in der laufenden Runde
 wieder einblenden kann (R-PLAY-04). Sie gehören zu genau einer Runde, werden in der nächsten Runde nicht mehr
 angezeigt und beim nächsten Joker überschrieben; sie verlassen das Gerät nicht.
+
+Dass ein gefangener Spieler die Warnung zur Live-Ansicht bestätigt hat (R-GM-08), merkt sich nur das eigene Gerät
+(Schlüsselspeicher, pro Runde, zusammen mit den Joker-Ergebnissen).
 
 Ebenso bleiben die eigenen ⚡-Pings (R-SPEED-09) **nur auf dem Gerät** (Schlüsselspeicher, pro Runde): Zu jedem
 Speedhunt-Ping-Zeitpunkt merkt sich jedes Spielerhandy seinen Standort, um ihn anzuzeigen. Gesendet wird nur der

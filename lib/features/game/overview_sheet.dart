@@ -4,7 +4,8 @@ import '../../core/models/member.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 
-/// Overview during a round (R-OVER-01 … 03): all hunters and players, caught
+/// Overview during a round (R-OVER-01 … 03): all hunters, players and game
+/// masters (R-GM-11), caught
 /// players struck through (R-CATCH-02), and whether a speedhunt runs – for
 /// hunters also on whom (R-OVER-04).
 Future<void> showOverviewSheet(
@@ -78,6 +79,11 @@ class OverviewSheet extends StatelessWidget {
         if (m.isPlayer) m,
     ]..sort((a, b) => (a.caught ? 1 : 0) - (b.caught ? 1 : 0));
     final free = players.where((p) => !p.caught).length;
+    final gameMasters = [
+      for (final m in members)
+        if (m.isGameMaster) m,
+    ];
+    final iAmGameMaster = gameMasters.any((m) => m.id == myId);
 
     Widget section(String title, Color color, IconData icon) => Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -177,6 +183,28 @@ class OverviewSheet extends StatelessWidget {
                   ],
                 ),
               ),
+            // The own role, as the info line is gone after 15 s (R-GM-03).
+            if (iAmGameMaster)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: AppColors.gameMaster,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.overviewYouAreGameMaster,
+                        key: const Key('overviewGameMaster'),
+                        style: const TextStyle(color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (winner case final winner?)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -255,6 +283,14 @@ class OverviewSheet extends StatelessWidget {
               Icons.directions_run,
             ),
             for (final p in players) tile(p, AppColors.player),
+            if (gameMasters.isNotEmpty) ...[
+              section(
+                '${l10n.roleGameMaster} · ${gameMasters.length}',
+                AppColors.gameMaster,
+                Icons.visibility_outlined,
+              ),
+              for (final g in gameMasters) tile(g, AppColors.gameMaster),
+            ],
             const SizedBox(height: 16),
           ],
         ),

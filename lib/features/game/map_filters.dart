@@ -20,6 +20,7 @@ class MapFilters {
     this.playerHistories = const {},
     this.hiddenSpeedhunts = const {},
     this.caught = false,
+    this.hiddenLivePlayers = const {},
     this.myPings = true,
     this.sharedPings = true,
     this.hunterJoker = true,
@@ -42,6 +43,10 @@ class MapFilters {
   /// caught players lose their own chips (R-HUNT-09).
   final bool caught;
 
+  /// Game masters and caught players: players whose live position is
+  /// switched off; everyone else is shown (R-GM-04).
+  final Set<String> hiddenLivePlayers;
+
   // Players (R-PLAY-01, R-PLAY-04). Joker filters only appear once used and
   // are on right after using a joker.
   final bool myPings;
@@ -60,6 +65,7 @@ class MapFilters {
     Map<String, HistoryMode>? playerHistories,
     Set<String>? hiddenSpeedhunts,
     bool? caught,
+    Set<String>? hiddenLivePlayers,
     bool? myPings,
     bool? sharedPings,
     bool? hunterJoker,
@@ -70,6 +76,7 @@ class MapFilters {
     playerHistories: playerHistories ?? this.playerHistories,
     hiddenSpeedhunts: hiddenSpeedhunts ?? this.hiddenSpeedhunts,
     caught: caught ?? this.caught,
+    hiddenLivePlayers: hiddenLivePlayers ?? this.hiddenLivePlayers,
     myPings: myPings ?? this.myPings,
     sharedPings: sharedPings ?? this.sharedPings,
     hunterJoker: hunterJoker ?? this.hunterJoker,
@@ -90,5 +97,11 @@ class MapFilters {
     hiddenSpeedhunts: hiddenSpeedhunts.contains(id)
         ? ({...hiddenSpeedhunts}..remove(id))
         : {...hiddenSpeedhunts, id},
+  );
+
+  MapFilters toggleLivePlayer(String id) => copyWith(
+    hiddenLivePlayers: hiddenLivePlayers.contains(id)
+        ? ({...hiddenLivePlayers}..remove(id))
+        : {...hiddenLivePlayers, id},
   );
 }

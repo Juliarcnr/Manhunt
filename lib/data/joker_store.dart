@@ -6,13 +6,15 @@ import '../core/round/ping_schedule.dart';
 
 /// Joker results and own ⚡ pings of the current round, kept on this device so
 /// they can be shown again any time – also after an app restart (R-PLAY-04,
-/// R-SPEED-09).
+/// R-SPEED-09). Also whether the caught player accepted the live view
+/// (R-GM-08).
 class SavedJokers {
   const SavedJokers({
     required this.roundStart,
     this.hunters,
     this.players,
     this.speedhuntPings = const {},
+    this.liveViewAccepted = false,
   });
 
   /// Results belong to one round; another round start means "nothing saved".
@@ -29,15 +31,21 @@ class SavedJokers {
   /// Own position at each speedhunt ping time, by slot id (R-SPEED-09).
   final Map<String, LocationFix> speedhuntPings;
 
+  /// The caught player confirmed not to pass on what they see live
+  /// (R-GM-08); asked once per round.
+  final bool liveViewAccepted;
+
   SavedJokers copyWith({
     ({DateTime at, Map<String, LocationFix> positions})? hunters,
     ({DateTime at, String requestId})? players,
     Map<String, LocationFix>? speedhuntPings,
+    bool? liveViewAccepted,
   }) => SavedJokers(
     roundStart: roundStart,
     hunters: hunters ?? this.hunters,
     players: players ?? this.players,
     speedhuntPings: speedhuntPings ?? this.speedhuntPings,
+    liveViewAccepted: liveViewAccepted ?? this.liveViewAccepted,
   );
 
   Map<String, Object?> toJson() => {
@@ -58,6 +66,7 @@ class SavedJokers {
       'speedhuntPings': {
         for (final e in speedhuntPings.entries) e.key: e.value.toJson(),
       },
+    if (liveViewAccepted) 'liveViewAccepted': true,
   };
 
   factory SavedJokers.fromJson(Map<String, Object?> json) {
@@ -70,6 +79,7 @@ class SavedJokers {
           e.key: LocationFix.fromJson(e.value! as Map<String, Object?>),
       },
       roundStart: DateTime.parse(json['roundStart']! as String),
+      liveViewAccepted: json['liveViewAccepted'] as bool? ?? false,
       hunters: h == null
           ? null
           : (

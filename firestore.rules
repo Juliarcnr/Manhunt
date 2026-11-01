@@ -39,6 +39,21 @@ service cloud.firestore {
       return isMember(gid) && myMember(gid).role == 'player';
     }
 
+    // Plays no part, watches everyone live (R-GM-01, R-GM-03).
+    function isGameMaster(gid) {
+      return isMember(gid) && myMember(gid).role == 'gameMaster';
+    }
+
+    // A caught player may watch like a game master (R-GM-07).
+    function isCaughtPlayer(gid) {
+      return isPlayer(gid) && myMember(gid).get('caught', false) == true;
+    }
+
+    // Only while a round runs: back in the lobby nobody watches anything.
+    function watchesLive(gid) {
+      return isRunning(gid) && (isGameMaster(gid) || isCaughtPlayer(gid));
+    }
+
     function isRunning(gid) {
       return game(gid).status == 'running';
     }
@@ -96,7 +111,7 @@ service cloud.firestore {
 
     function isRoundCollection(name) {
       return name in [
-        'pings', 'hunterLocs', 'outsideLocs', 'events', 'speedhuntTargets', 'jokerRequests',
+        'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests',
         'jokerAnswers', 'drawings'
       ];
     }
@@ -176,7 +191,7 @@ service cloud.firestore {
         // Host: roles + reset of caught/joker at round end. Self: own name.
         allow update: if
           (isAdmin(gid) && onlyChanges(['role', 'caught', 'jokerUsed', 'playerJokerUsed'])
-            && request.resource.data.role in ['unassigned', 'hunter', 'player'])
+            && request.resource.data.role in ['unassigned', 'hunter', 'player', 'gameMaster'])
           || (signedIn() && request.auth.uid == uid && onlyChanges(['name']))
           // Automatic end (R-GAME-10): any member resets like the host.
           || (canAutoEnd(gid) && onlyChanges(['caught', 'jokerUsed', 'playerJokerUsed'])
@@ -226,9 +241,10 @@ service cloud.firestore {
       // only their own (R-HUNT-03, R-PLAY-01) – or, if the host lets the
       // regular pings go to everyone, all regular ones; never speedhunt pings
       // (R-SET-15, R-SPEED-04). Once the round is over, players read all
-      // (R-GAME-06). One doc per slot, never edited.
+      // (R-GAME-06). Game masters and caught players read all (R-GM-03,
+      // R-GM-07). One doc per slot, never edited.
       match /pings/{pingId} {
-        allow read: if isHunter(gid)
+        allow read: if isHunter(gid) || watchesLive(gid)
           || (isPlayer(gid) && roundOver(gid))
           || (isMember(gid) && resource.data.uid == request.auth.uid)
           || (isPlayer(gid) && game(gid).get('sharedPings', false) == true
@@ -243,9 +259,10 @@ service cloud.firestore {
 
       // Live hunter positions (R-HUNT-02): hunters only; a player right after
       // using their joker may read them once (R-PLAY-02), all players once the
-      // round is over (R-GAME-06).
+      // round is over (R-GAME-06), game masters and caught players always
+      // (R-GM-03, R-GM-07).
       match /hunterLocs/{hunterId} {
-        allow read: if isHunter(gid) || jokerWindowOpen(gid)
+        allow read: if isHunter(gid) || jokerWindowOpen(gid) || watchesLive(gid)
           || (isPlayer(gid) && roundOver(gid));
         allow create, update: if isRunning(gid) && isHunter(gid)
           && request.auth.uid == hunterId
@@ -260,6 +277,21 @@ service cloud.firestore {
       match /outsideLocs/{playerId} {
         allow read: if isHunter(gid);
         allow create, update: if isRunning(gid) && isPlayer(gid)
+          && request.auth.uid == playerId
+          && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
+          && request.resource.data.data is string;
+        allow delete: if signedIn() && request.auth.uid == playerId;
+      }
+
+      // Live position of a player still in the game, every 15 s, for game
+      // masters and caught players only – never hunters or active players
+      // (R-GM-04 … R-GM-07). Nothing is shared live once the round is over
+      // (R-GM-09). Written and deleted by the player's own device.
+      match /playerLocs/{playerId} {
+        allow read: if watchesLive(gid) && !roundOver(gid);
+        allow create, update: if isRunning(gid) && isPlayer(gid)
+          && myMember(gid).get('caught', false) == false
+          && !roundOver(gid)
           && request.auth.uid == playerId
           && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
           && request.resource.data.data is string;

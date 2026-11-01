@@ -234,6 +234,7 @@ class BotRunner {
 
   GameInfo? _game;
   Member? _me;
+  List<Member> _members = const [];
   List<Speedhunt> _speedhunts = const [];
   List<Speedhunt> _speedhuntsOnMe = const [];
   List<CatchRecord> _catches = const [];
@@ -251,6 +252,7 @@ class BotRunner {
       )
       ..add(
         device.games.watchMembers(session).listen((members) {
+          _members = members;
           _me = members.where((m) => m.id == session.userId).firstOrNull;
           _playerStreams();
           _feed();
@@ -296,6 +298,7 @@ class BotRunner {
     me: _me,
     speedhuntsOnMe: applyCatches(_speedhuntsOnMe, _catches),
     speedhunts: applyCatches(_speedhunts, _catches),
+    members: _members,
   );
 
   void _error(Object e) => engine.note('stream error: $e');

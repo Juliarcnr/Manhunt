@@ -86,6 +86,53 @@ class AppLocalizationsDe extends AppLocalizations {
   String get roleUnassigned => 'Noch nicht eingeteilt';
 
   @override
+  String get overviewYouAreGameMaster =>
+      'Du bist Spielleitung – du spielst nicht mit und siehst alle live (alle 15 s).';
+
+  @override
+  String lobbyHunterLiveThrottled(int percent) {
+    return 'Große Runde: Hunter sehen einander diese Runde nur alle 15 s statt alle 5 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt $percent % davon).';
+  }
+
+  @override
+  String get gameHunterLiveThrottled =>
+      'Hunter-Standorte diese Runde alle 15 s (Firebase-Kontingent)';
+
+  @override
+  String get roleGameMaster => 'Spielleitung';
+
+  @override
+  String get lobbyGameMasterHint =>
+      'Optional – spielt nicht mit und sieht alle Hunter und Spieler live. Wird nicht mit ausgewürfelt.';
+
+  @override
+  String get lobbyAddGameMaster => 'Spielleitung hinzufügen';
+
+  @override
+  String get lobbyPickGameMaster => 'Wer übernimmt die Spielleitung?';
+
+  @override
+  String get lobbyNobodyToPick => 'Alle sind schon Spielleitung.';
+
+  @override
+  String get gameMasterInfo =>
+      'Spielleitung – du siehst alle live (alle 15 s).';
+
+  @override
+  String get gameCaughtLiveInfo =>
+      'Du siehst alle live – nichts an Spieler oder Hunter im Spiel weitergeben!';
+
+  @override
+  String get liveViewTitle => 'Achtung: Live-Standorte';
+
+  @override
+  String get liveViewText =>
+      'Du bist gefangen. Ab jetzt siehst du die Live-Standorte aller, die noch im Spiel sind – Hunter und Spieler.\n\nDiese darfst du mit keinem Spieler und keinem Hunter teilen, der noch im Spiel ist!';
+
+  @override
+  String get liveViewOk => 'OK';
+
+  @override
   String get speedhuntActive => 'Speedhunt aktiv';
 
   @override
@@ -224,6 +271,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsDuration => 'Spieldauer';
+
+  @override
+  String get settingsStartTime => 'Startzeit';
+
+  @override
+  String get settingsStartTimeHint =>
+      'Nach „Start“ läuft ein Countdown bis zu dieser Uhrzeit (1 Minute, wenn sie schon vorbei ist). Ohne Uhrzeit startet das Spiel sofort.';
+
+  @override
+  String get settingsStartTimeNone => 'keine';
+
+  @override
+  String get settingsStartTimeClear => 'Startzeit entfernen';
 
   @override
   String get settingsHeadStart => 'Vorlauf für Spieler';
@@ -504,7 +564,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyBackHome => 'Zurück zu meinen Gruppen';
 
   @override
-  String get gamePhaseStarting => 'Startet…';
+  String get gamePhaseStarting => 'Start in';
 
   @override
   String get gamePhaseHeadStart => 'Vorlauf';
@@ -573,6 +633,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String gameNextPing(String time) {
     return 'Nächster Ping in $time';
+  }
+
+  @override
+  String gameStartsAt(String time) {
+    return 'Das Spiel startet um $time';
   }
 
   @override
@@ -712,6 +777,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get jokerNoHunters => 'Gerade keine Hunter-Standorte verfügbar.';
+
+  @override
+  String get noticeGameStarted => 'Das Spiel hat offiziell begonnen!';
+
+  @override
+  String noticeGameStartedPlayer(int minutes) {
+    return 'Euer Vorlauf: $minutes min – los gehts!';
+  }
+
+  @override
+  String noticeGameStartedHunter(int minutes) {
+    return 'Die Spieler haben $minutes min Vorlauf.';
+  }
 
   @override
   String get noticeHuntersWon =>

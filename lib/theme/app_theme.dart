@@ -14,6 +14,9 @@ abstract final class AppColors {
   /// Players: electric teal.
   static const player = Color(0xFF1DE9B6);
 
+  /// Game master (R-GM-01): neutral blue-grey, belongs to neither side.
+  static const gameMaster = Color(0xFFB0BEC5);
+
   /// One distinct colour per player on the map (field test feedback).
   /// Avoids the hunter orange-red and the speedhunt yellow.
   static const playerPalette = [

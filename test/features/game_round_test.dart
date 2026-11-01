@@ -77,6 +77,7 @@ void main() {
     String userId, {
     GameSettings gameSettings = settings,
     DateTime? finishedAt,
+    Duration hunterLive = const Duration(seconds: 5),
   }) async {
     final session = (await tester.runAsync(() => testSession(code, userId)))!;
     // Anonymous numbers as shuffled by the host at the start (R-ANON-01).
@@ -107,6 +108,7 @@ void main() {
               startAt: start,
               finishedAt: finishedAt,
               aliases: aliases ?? const {},
+              hunterLiveInterval: hunterLive,
             ),
             now: () => now,
           ),
@@ -122,6 +124,74 @@ void main() {
     notifications = SilentNotificationService();
     jokers = MemoryJokerStore();
     now = start.add(const Duration(minutes: 30));
+  });
+
+  group('countdown before the official start (R-START-01, R-START-03, '
+      'R-START-04)', () {
+    final timed = settings.copyWith(startTime: const Duration(hours: 14));
+
+    testWidgets('hunter: countdown and start time, no buttons, no tracking', (
+      tester,
+    ) async {
+      now = start.subtract(const Duration(seconds: 90));
+      await seed(tester, gameSettings: timed);
+      await pumpAs(tester, 'alex', gameSettings: timed);
+      expect(find.text('STARTS IN'), findsOneWidget);
+      expect(find.text('01:30'), findsOneWidget);
+      expect(
+        find.text(
+          'The game starts at ${DateFormat.Hm('en').format(start.toLocal())}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('catchButton')), findsNothing);
+      expect(find.byKey(const Key('speedhuntButton')), findsNothing);
+      expect(location.isTracking, isFalse);
+
+      // At the official start the head start begins (R-GAME-04).
+      now = start;
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      expect(find.text('HEAD START'), findsOneWidget);
+      expect(find.byKey(const Key('catchButton')), findsOneWidget);
+      // Everyone is told that it starts now (R-START-04).
+      expect(find.text('The game has officially started!'), findsOneWidget);
+      expect(
+        find.text('The players have a 15 min head start.'),
+        findsOneWidget,
+      );
+      expect(
+        notifications.shown.map((n) => n.title),
+        contains('The game has officially started!'),
+      );
+    });
+
+    testWidgets('player: no joker or self-catch before the start', (
+      tester,
+    ) async {
+      now = start.subtract(const Duration(seconds: 30));
+      await seed(tester, gameSettings: timed);
+      await pumpAs(tester, 'kim', gameSettings: timed);
+      expect(find.text('STARTS IN'), findsOneWidget);
+      expect(find.byKey(const Key('jokerButton')), findsNothing);
+      expect(find.byKey(const Key('selfCatchButton')), findsNothing);
+
+      now = start;
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      expect(find.text('Your head start: 15 min – go!'), findsOneWidget);
+      expect(find.byKey(const Key('selfCatchButton')), findsOneWidget);
+    });
+
+    testWidgets('no start notice without a start time', (tester) async {
+      now = start.subtract(const Duration(seconds: 2));
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      now = start;
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      expect(notifications.shown, isEmpty);
+    });
   });
 
   group('hunter (R-HUNT-*, R-SPEED-*)', () {
@@ -385,6 +455,27 @@ void main() {
         expect(find.byKey(const Key('speedhuntPlayer')), findsNothing);
       });
 
+      testWidgets('catching the target starts the pause right then '
+          '(R-SPEED-10)', (tester) async {
+        now = start.add(const Duration(minutes: 63));
+        await seed(tester);
+        await speedhuntOnSam(tester);
+        await pumpAs(tester, 'alex');
+        // Running until minute 70, then 30 min pause.
+        expect(find.text('Speedhunt (1) · 37:00'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('catchButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('catchPlayer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Sam').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('confirmCatch')));
+        await settle(tester);
+
+        expect(find.text('Speedhunt (1) · 30:00'), findsOneWidget);
+      });
+
       testWidgets('same player again only after their own pause', (
         tester,
       ) async {
@@ -644,6 +735,20 @@ void main() {
       expect(find.byKey(const Key('lastPing_kim')), findsOneWidget);
       expect(find.text('Kim'), findsWidgets);
     });
+  });
+
+  testWidgets('hunters are told when they see each other only every 15 s '
+      '(R-QUOTA-02)', (tester) async {
+    await seed(tester);
+    await pumpAs(tester, 'alex', hunterLive: const Duration(seconds: 15));
+    expect(
+      find.text('Hunter positions every 15 s this round (Firebase quota)'),
+      findsOneWidget,
+    );
+    await pumpAs(tester, 'alex');
+    expect(find.textContaining('every 15 s this round'), findsNothing);
+    await pumpAs(tester, 'kim', hunterLive: const Duration(seconds: 15));
+    expect(find.textContaining('every 15 s this round'), findsNothing);
   });
 
   group('player (R-PLAY-*, R-PING-*)', () {
@@ -1024,6 +1129,10 @@ void main() {
       await tester.tap(find.byKey(const Key('confirmSelfCatch')));
       await settle(tester);
 
+      // First the warning about the live view (R-GM-08).
+      expect(find.byKey(const Key('liveViewDialog')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('liveViewOk')));
+      await settle(tester);
       expect(find.textContaining('You were caught'), findsOneWidget);
       expect(find.text('Kim was caught'), findsOneWidget);
       expect(find.byKey(const Key('selfCatchButton')), findsNothing);
@@ -2354,6 +2463,9 @@ void main() {
       await catchByRepo(tester, 'kim');
       await catchByRepo(tester, 'sam');
       await pumpAs(tester, 'sam');
+      // Caught while the round ran: the live view warning first (R-GM-08).
+      await tester.tap(find.byKey(const Key('liveViewOk')));
+      await tester.pumpAndSettle();
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
       expect(
@@ -2407,6 +2519,237 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('overviewUndoCatch_sam')), findsNothing);
       expect(find.byKey(const Key('overviewUndoCatch_kim')), findsNothing);
+    });
+  });
+
+  group('game master and caught players watch live (R-GM-01 … R-GM-09)', () {
+    LocationFix live(double lat) =>
+        LocationFix(point: GeoPoint(lat, 13.405), at: now);
+
+    /// Like [seed], plus Gil as game master; anonymous players on, so the
+    /// real names show that only hunters get numbers (R-GM-03).
+    Future<void> seedWithGameMaster(WidgetTester tester) async {
+      await seed(
+        tester,
+        gameSettings: settings.copyWith(anonymousPlayers: true),
+      );
+      await tester.runAsync(() async {
+        final games = FirestoreGameRepository(db);
+        final alex = await testSession(code, 'alex');
+        await games.joinGame(await testSession(code, 'gil'), name: 'Gil');
+        final members = await games.watchMembers(alex).first;
+        await games.setRoles(alex, [
+          for (final m in members)
+            m.id == 'gil' ? m.copyWith(role: Role.gameMaster) : m,
+        ]);
+        final rounds = FirestoreRoundRepository(db);
+        await rounds.updateHunterLocation(alex, live(52.501));
+        await rounds.updatePlayerLocation(
+          await testSession(code, 'kim'),
+          live(52.502),
+        );
+        await rounds.updatePlayerLocation(
+          await testSession(code, 'sam'),
+          live(52.503),
+        );
+      });
+    }
+
+    Future<void> pumpGameMaster(WidgetTester tester, String userId) => pumpAs(
+      tester,
+      userId,
+      gameSettings: settings.copyWith(anonymousPlayers: true),
+    );
+
+    Future<void> catchPlayer(WidgetTester tester, String id) async {
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(playerId: id, at: now),
+        ),
+      );
+      await settle(tester);
+    }
+
+    testWidgets('game master sees hunters and players live with real names, '
+        'no drawing or game buttons', (tester) async {
+      await seedWithGameMaster(tester);
+      await pumpGameMaster(tester, 'gil');
+      for (final id in ['hunters', 'lastPings', 'live_kim', 'live_sam']) {
+        expect(find.byKey(Key('filter_$id')), findsOneWidget, reason: id);
+      }
+      expect(find.byKey(const Key('filter_player_kim')), findsNothing);
+      expect(find.byKey(const Key('live_kim')), findsOneWidget);
+      expect(find.byKey(const Key('live_sam')), findsOneWidget);
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+      expect(find.text('Kim'), findsWidgets);
+      expect(find.textContaining('Player 1'), findsNothing);
+      expect(
+        find.text('Game master – you see everyone live (every 15 s).'),
+        findsOneWidget,
+      );
+      for (final key in [
+        'drawModeButton',
+        'catchButton',
+        'speedhuntButton',
+        'jokerButton',
+        'selfCatchButton',
+      ]) {
+        expect(find.byKey(Key(key)), findsNothing, reason: key);
+      }
+      // Game masters do not take part: no tracking (R-GM-01).
+      expect(location.isTracking, isFalse);
+
+      // A live chip switches that player off.
+      await tester.tap(find.byKey(const Key('filter_live_kim')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('live_kim')), findsNothing);
+      expect(find.byKey(const Key('live_sam')), findsOneWidget);
+    });
+
+    testWidgets('a caught player loses their live pin and chip; their pings '
+        'go under "caught"', (tester) async {
+      await seedWithGameMaster(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).sendPing(
+          await testSession(code, 'sam'),
+          PingSlot(
+            id: 'regular_1',
+            kind: PingKind.regular,
+            at: start.add(const Duration(minutes: 20)),
+          ),
+          live(52.509),
+        ),
+      );
+      await pumpGameMaster(tester, 'gil');
+      expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
+
+      await catchPlayer(tester, 'sam');
+      expect(find.byKey(const Key('filter_live_sam')), findsNothing);
+      // Sam's device deletes it; an old one must not show meanwhile.
+      expect(find.byKey(const Key('live_sam')), findsNothing);
+      expect(find.byKey(const Key('lastPing_sam')), findsNothing);
+      await tester.tap(find.byKey(const Key('filter_caught')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('history_sam_1')), findsOneWidget);
+    });
+
+    testWidgets('caught player: warning first, live view only after "OK", '
+        'asked once per round (R-GM-07, R-GM-08)', (tester) async {
+      await seedWithGameMaster(tester);
+      await catchPlayer(tester, 'kim');
+      await pumpAs(tester, 'kim');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('liveViewDialog')), findsOneWidget);
+      expect(find.byKey(const Key('live_sam')), findsNothing);
+      // Not dismissible by tapping outside.
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('liveViewDialog')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('liveViewOk')));
+      await settle(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('liveViewDialog')), findsNothing);
+      expect(find.byKey(const Key('live_sam')), findsOneWidget);
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+      expect(find.byKey(const Key('filter_live_sam')), findsOneWidget);
+      expect(find.byKey(const Key('filter_live_kim')), findsNothing);
+      expect(find.byKey(const Key('drawModeButton')), findsNothing);
+      final saved = await tester.runAsync(
+        () async =>
+            jokers.load((await testSession(code, 'kim')).groupId, start),
+      );
+      expect(saved?.liveViewAccepted, isTrue);
+
+      // After an app restart: not asked again.
+      await tester.pumpWidget(const SizedBox());
+      await pumpAs(tester, 'kim');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('liveViewDialog')), findsNothing);
+      expect(find.byKey(const Key('live_sam')), findsOneWidget);
+    });
+
+    testWidgets('game master: info line only for 15 s, the overview tells the '
+        'role (R-GM-03, R-GM-11)', (tester) async {
+      await seedWithGameMaster(tester);
+      await pumpGameMaster(tester, 'gil');
+      const info = 'Game master – you see everyone live (every 15 s).';
+      expect(find.text(info), findsOneWidget);
+      now = now.add(const Duration(seconds: 16));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text(info), findsNothing);
+
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overviewGameMaster')), findsOneWidget);
+      expect(find.text('GAME MASTER · 1'), findsOneWidget);
+      expect(find.text('Gil (You)'), findsOneWidget);
+    });
+
+    testWidgets('others see the game master in the overview, without the '
+        'own-role line (R-GM-11)', (tester) async {
+      await seedWithGameMaster(tester);
+      await pumpGameMaster(tester, 'kim');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('overview_gil')), findsOneWidget);
+      expect(find.byKey(const Key('overviewGameMaster')), findsNothing);
+    });
+
+    testWidgets('game master has the speedhunt chips like the hunters '
+        '(R-GM-10)', (tester) async {
+      await seedWithGameMaster(tester);
+      final sh = start.add(const Duration(minutes: 25)).millisecondsSinceEpoch;
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).sendPing(
+          await testSession(code, 'sam'),
+          PingSlot(
+            id: 'speedhunt_${sh}_1',
+            kind: PingKind.speedhunt,
+            at: start.add(const Duration(minutes: 25)),
+          ),
+          live(52.508),
+        ),
+      );
+      await pumpGameMaster(tester, 'gil');
+      final chip = find.byKey(Key('filter_speedhunt_sam_$sh'));
+      expect(chip, findsOneWidget);
+      expect(find.text('⚡1 Sam'), findsOneWidget);
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(find.text('⚡1 Sam'), findsNothing);
+
+      // Caught: the speedhunt goes under "caught", like for the hunters.
+      await catchPlayer(tester, 'sam');
+      expect(chip, findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('filter_caught')));
+      await tester.tap(find.byKey(const Key('filter_caught')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('⚡1'), findsOneWidget);
+    });
+
+    testWidgets('players still in the game and hunters get no live view', (
+      tester,
+    ) async {
+      await seedWithGameMaster(tester);
+      for (final id in ['sam', 'alex']) {
+        await pumpGameMaster(tester, id);
+        expect(find.byKey(const Key('liveViewDialog')), findsNothing);
+        expect(find.byKey(const Key('live_kim')), findsNothing, reason: id);
+        expect(find.byKey(const Key('filter_live_kim')), findsNothing);
+      }
+    });
+
+    testWidgets('once the time is up, the game master gets the usual end '
+        'view, nothing live (R-GM-09)', (tester) async {
+      await seedWithGameMaster(tester);
+      now = start.add(const Duration(hours: 3, minutes: 1));
+      await pumpGameMaster(tester, 'gil');
+      expect(find.byKey(const Key('live_kim')), findsNothing);
+      expect(find.byKey(const Key('filter_live_kim')), findsNothing);
+      expect(find.byKey(const Key('filter_player_kim')), findsOneWidget);
     });
   });
 }

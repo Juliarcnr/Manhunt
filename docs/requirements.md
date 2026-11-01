@@ -47,6 +47,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-18 | Einstellbar: „Pause zwischen Speedhunts“ (Standard: 30 min, auch für bestehende Gruppen). Gezählt ab dem Ende des vorigen Speedhunts (letzter Speedhunt-Ping bzw. Catch des Ziels, R-SPEED-10); so lange ist kein weiterer Speedhunt möglich (R-SPEED-11). (2026-10-26) |
 | R-SET-19 | Einstellbar: „Mehrmals in Folge auf denselben Spieler“ (Standard: ja, mit 30 min „Pause für denselben Spieler“). **Ja:** Ein Spieler ist erst wieder wählbar, wenn seit dem Ende des letzten Speedhunts auf ihn die Spieler-Pause vergangen ist – auch wenn dazwischen andere Spieler dran waren. Die Spieler-Pause ist nie kürzer als R-SET-18; wer sie darunter senken will, bekommt den Hinweis, zuerst R-SET-18 zu verkürzen; Verlängern von R-SET-18 zieht sie mit. **Nein:** Das Ziel des letzten Speedhunts ist beim nächsten nicht wählbar. Siehe R-SPEED-12. (2026-10-26) |
 | R-SET-20 | Oben in den Einstellungen steht der vollständige Gruppenname (in der Gruppenübersicht und Lobby wird er bei Platzmangel abgekürzt). (2026-10-27) |
+| R-SET-21 | Einstellbar: „Startzeit“ (Uhrzeit, optional; Standard: keine). Antippen öffnet die Uhrzeitauswahl, × entfernt sie. Siehe R-START-02. (2026-11-01) |
 
 ## 3. Beitritt, Lobby & Start (Workflow)
 
@@ -57,12 +58,21 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-03 | Teilnehmende treten nach und nach per Code bei und geben einen Anzeigenamen an. |
 | R-LOBBY-04 | Ein Zufallsgenerator teilt alle Teilnehmenden gemäß Hunter-Anzahl in Hunter und Spieler ein. |
 | R-LOBBY-05 | Nach der Einteilung können Personen getauscht werden (Hunter ↔ Spieler). |
-| R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle. |
+| R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle – mit Startzeit zuerst mit dem Start-Countdown (R-START-01 … 03). |
 | R-LOBBY-07 | Geht ein Handy verloren, tritt man der Gruppe einfach neu bei (keine Wiederherstellung nötig). |
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
 | R-LOBBY-09 | Der Host kann Mitglieder in der Lobby aus der Gruppe entfernen (Symbol neben der Person, mit Rückfrage). Während einer Runde nicht mehr – dort gibt es stattdessen „Catch rückgängig“ (R-CATCH-04, geändert am 2026-10-10). Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 | R-LOBBY-10 | Jede Person kann ihren eigenen Anzeigenamen in der Lobby nachträglich ändern (Stift-Symbol neben dem eigenen Namen). Der Name bleibt verschlüsselt gespeichert. |
+
+### Start-Countdown (2026-11-01)
+
+| ID | Anforderung |
+|---|---|
+| R-START-01 | Ist eine Startzeit eingestellt (R-SET-21), läuft nach „Start“ bei allen Teilnehmenden (Spieler und Hunter) ein Countdown („Start in 02:30“ in der Kopfzeile, darunter „Das Spiel startet um 14:00“). Erst danach beginnt das offizielle Spiel: Ab dann zählen Vorlauf, Ping-Zeitplan, Speedhunt-Sperre und Spieldauer. Ohne Startzeit gibt es keinen Countdown: Das Spiel startet sofort (Serverzeit, wie vor 2026-11-01). |
+| R-START-02 | Mit Startzeit (R-SET-21) läuft der Countdown bis zu dieser Uhrzeit (Beispiel: Startzeit 14:00, Start um 13:57:30 → 2:30 min). Ist sie schon vorbei (oder mehr als 12 h entfernt), gilt der 1-Minuten-Countdown. Kurz nach Mitternacht zählt als kommende Nacht (23:50 → 00:30). Die Uhrzeit gilt nach der Uhr des Host-Handys. |
+| R-START-03 | Während des Countdowns gibt es noch keine Catch-, Speedhunt- oder Joker-Buttons und kein Tracking; Pings kommen erst ab dem offiziellen Start. |
+| R-START-04 | Läuft der Countdown ab, bekommen alle eine Benachrichtigung „Das Spiel hat offiziell begonnen!“ (Banner + Vibration bzw. System-Benachrichtigung, wie R-NOTIF-01/05), Spieler mit „Euer Vorlauf: 15 min – los gehts!“, Hunter mit „Die Spieler haben 15 min Vorlauf.“ (ohne Vorlauf nur der Titel). Nur nach einem Countdown (also mit Startzeit) und nur auf Geräten, die die Spielansicht während des Countdowns offen hatten; wer die App erst danach öffnet, bekommt sie nicht mehr. (2026-11-01) |
 
 ### Mehrere Gruppen
 
@@ -113,7 +123,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | ID | Anforderung |
 |---|---|
 | R-HUNT-01 | Filter-Buttons (Chips) in einer Leiste unter der Kopfzeile, mehrere gleichzeitig aktivierbar: Hunter, Letzte Pings, ein Chip pro Spieler (in seiner Farbe) für dessen Ping-Historie (R-HUNT-04/05) und ein Chip pro Speedhunt (R-HUNT-07); gefangene Spieler verlieren ihre Chips und landen gesammelt im Chip „Gefangen“ (R-HUNT-09). Spieler haben „Meine Pings“ und nach dem Einlösen je einen Chip pro Joker. Alle Chips dunkel; aktive Chips mit farbiger Umrandung und Haken. |
-| R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter als Standort-Pins, alle Hunter einheitlich in der (gedämpften) Hunter-Farbe Orange-Rot, Hunter-Symbol vor dem Namen, ohne Uhrzeit (live). |
+| R-HUNT-02 | Filter „Hunter“: Live-Standorte aller Hunter als Standort-Pins, alle Hunter einheitlich in der (gedämpften) Hunter-Farbe Orange-Rot, Hunter-Symbol vor dem Namen, ohne Uhrzeit (live, alle 5 s aktualisiert; 2026-11-01 – in sehr großen Runden alle 15 s, R-QUOTA-01). |
 | R-HUNT-03 | Filter „Letzte Pings“: letzter Ping jedes Spielers als Location-Pin mit Spielername darüber, **jeder Spieler in eigener Farbe**. Zählt nur normale Pings – Speedhunt-Pings gehören zum Filter „Speedhunts“ (R-HUNT-07). Gefangene Spieler erscheinen hier nicht mehr, nur noch im Chip „Gefangen“ (R-HUNT-09; bis Spielende, R-HUNT-11). |
 | R-HUNT-04 | Ping-Historie einzelner Spieler, nummeriert. Nur normale Pings – Speedhunt-Pings werden nicht mitgezählt, damit die Nummern mit denen auf dem Spielerhandy übereinstimmen (Feldtest 2026-10-06). |
 | R-HUNT-05 | Historie-Punkte mit Linien verbinden, mit kleinen Pfeilen in Laufrichtung (nur normale Pings). Kein eigener Linien-Chip: Tippen auf den Spieler-Chip schaltet reihum Punkte → Punkte mit Linien → aus; bei Linien zeigt der Chip ein Linien-Symbol statt des Farbpunkts. |
@@ -167,6 +177,29 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-OUT-05 | Hunter sehen den Live-Standort als Pin in der Spielerfarbe mit rotem „LIVE“-Schild vor dem Namen und bekommen eine Benachrichtigung „… hat das Spielfeld verlassen“ – mit R-SET-16 als „Spieler n“ (R-ANON-01). Andere Spieler sehen ihn nie. (2026-10-08) |
 | R-OUT-06 | Der Spieler wird sofort gewarnt (Vibration, Benachrichtigung höchstens alle 2 min, rotes Banner mit Countdown „geh innerhalb von … zurück“). Solange die Hunter seinen Live-Standort sehen (auch während der 60 s), zeigt ein rotes Banner das dauerhaft an; Benachrichtigungen beim Start und Ende des Sendens. (2026-10-08) |
 | R-OUT-07 | Zum Einstellen der Schwellen im Feldtest protokolliert das Debug-Log (lange auf die Kopfzeile drücken) jeden Wechsel mit Grund, z.B. „warning (100 m out, ±10 m, needs 50 m)“, sowie höchstens alle 10 s Standorte, die zwar über 30 m draußen lagen, aber wegen der Ungenauigkeit nicht zählten („not counted …“). Das Log bleibt auf dem Gerät. (2026-10-08) |
+
+## 6c. Firebase-Kontingent (2026-11-01)
+
+| ID | Anforderung |
+|---|---|
+| R-QUOTA-01 | Die App kann den echten Firebase-Verbrauch nicht abfragen. Deshalb schätzt der Host beim Start, wie viele Lesevorgänge die Runde braucht (Dauer, Hunter, Spieler, Spielleitung; angenommen die Hälfte der Spieler wird gefangen und schaut zu). Läge sie bei mindestens **70 %** des kostenlosen Tageskontingents (50.000), teilen und sehen die Hunter ihre Live-Standorte diese Runde nur **alle 15 s** statt alle 5 s. Die Entscheidung gilt für alle Geräte bis zum nächsten Start. |
+| R-QUOTA-02 | Der Host sieht vor dem Start in der Lobby, wenn gedrosselt würde, mit dem geschätzten Anteil am Kontingent. Hunter sehen im Spiel die Hinweiszeile „Hunter-Standorte diese Runde alle 15 s“. |
+
+## 6d. Spielleitung (2026-11-01)
+
+| ID | Anforderung |
+|---|---|
+| R-GM-01 | Optionale Rolle **Spielleitung**: 0 bis beliebig viele Mitglieder (auch der Host). Die Spielleitung spielt nicht mit: kein Tracking, keine Pings, keine Catches, Speedhunts, Joker oder Zeichnungen; für den Start zählt sie weder als Hunter noch als Spieler. |
+| R-GM-02 | Der Host vergibt sie in der Lobby: eigener Abschnitt „Spielleitung“ unter den Spielern (für den Host immer sichtbar, mit Hinweis und Knopf „Spielleitung hinzufügen“ → Auswahl eines Mitglieds; für andere nur, wenn besetzt). Tippen auf eine Person der Spielleitung macht sie wieder zum Spieler. „Zufällig einteilen“ lässt die Spielleitung aus und zählt sie nicht mit. Computer-Mitglieder werden nie Spielleitung. |
+| R-GM-03 | Die Spielleitung sieht während Vorlauf und Jagd alle Hunter und alle noch nicht gefangenen Spieler live, mit echten Namen (keine anonymen Nummern, R-ANON-01). Hinweiszeile „Spielleitung – du siehst alle live (alle 15 s)“ nur 15 s lang, sobald die Live-Ansicht beginnt (Spielstart bzw. Öffnen der App); danach steht es in der Übersicht (R-GM-11). (2026-11-01) |
+| R-GM-04 | Filter-Chips der Spielleitung: „Hunter“, „Letzte Pings“ (letzte reguläre Pings der Spieler an die Hunter), je ein Chip pro nicht gefangenem Spieler für dessen Live-Standort (in der Spielerfarbe, an = sichtbar), „Gefangen“ (Ping-Historie und ⚡-Pings der Gefangenen wie bei den Huntern, R-HUNT-09). Dazu die Speedhunt-Chips wie bei den Huntern (R-GM-10). Keine Zeichnungen der Hunter, kein Zeichenmodus-Knopf, keine Außerhalb-Standorte. |
+| R-GM-05 | Live-Standorte für Spielleitung und Gefangene werden **alle 15 s** aktualisiert (öfter würde das kostenlose Firebase-Kontingent gefährden). Spieler senden ihren Live-Standort nur, solange es eine Spielleitung oder einen gefangenen Spieler gibt; die Hunter-Standorte fragen Spielleitung und Gefangene alle 15 s ab. |
+| R-GM-06 | Gefangene Spieler senden keinen Live-Standort mehr; das eigene Handy löscht ihn sofort, ebenso wenn niemand mehr zusehen darf. |
+| R-GM-07 | Ein gefangener Spieler sieht bis zum Spielende dieselbe Ansicht wie die Spielleitung (R-GM-03, R-GM-04). Hunter und Spieler, die noch im Spiel sind, sehen nie Live-Standorte von Spielern. |
+| R-GM-08 | Bevor ein gefangener Spieler die Live-Ansicht bekommt, warnt ihn ein Dialog: ab jetzt sieht er die Live-Standorte aller, die noch im Spiel sind, und darf sie mit keinem Spieler oder Hunter teilen, der noch im Spiel ist. Nur mit „OK“ zu schließen; einmal pro Runde (auf dem Gerät gemerkt). |
+| R-GM-10 | Die Spielleitung (und damit auch gefangene Spieler, R-GM-07) hat die Speedhunt-Chips wie die Hunter: ein Chip „⚡ Name hh:mm“ pro Speedhunt mit den ⚡-Pings des Ziels (R-HUNT-07); neue ⚡-Pings schalten ihn wieder ein (R-HUNT-08); Speedhunts auf Gefangene stehen unter „Gefangen“ (R-HUNT-09). (2026-11-01) |
+| R-GM-11 | In der Übersicht steht für die Spielleitung „Du bist Spielleitung …“; alle sehen dort einen eigenen Abschnitt „Spielleitung“ mit ihren Mitgliedern. (2026-11-01) |
+| R-GM-09 | Sobald Hunter oder Spieler gewonnen haben (Zeit um, letzter Spieler gefangen), wird nichts mehr live geteilt; alle – auch die Spielleitung – bekommen die normale Ansicht nach Spielende (R-GAME-06). „Spiel beenden“ löscht alle Standortdaten unwiderruflich (R-PRIV-03). |
 
 ## 7. Benachrichtigungen
 

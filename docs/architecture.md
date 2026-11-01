@@ -34,7 +34,12 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Kernideen
 - **Kein Server-Timer**: Alle Ping-Zeitpunkte werden aus `startAt` + `GameSettings` deterministisch berechnet
   (`GameClock.regularPingTimes`, `Speedhunt.pingTimes`). Jedes Spieler-Gerät pingt selbst.
-  `startAt` ist ein Firestore-Server-Timestamp; Uhr-Abweichungen der Handys werden später darüber ausgeglichen.
+  `startAt` ist der **offizielle Start nach dem Countdown** (R-START-01/02): Das Host-Handy rechnet ihn beim „Start“ aus
+  (`plannedStartAt`, lib/core/schedule/start_time.dart: nächste Startzeit aus den Einstellungen, ist sie vorbei jetzt + 1 min) und
+  schreibt ihn als festen Zeitpunkt; ohne Startzeit wie bisher Server-Timestamp (sofort). Bis dahin ist die Phase `notStarted` (Countdown in der Kopfzeile, keine Buttons,
+  kein Tracking). Firestore-Regeln unverändert (der Host darf `startAt` frei setzen). Start-Benachrichtigung
+  (R-START-04): `NoticeTracker.onPhase` merkt sich den Countdown und meldet den Übergang einmal (`GameStartedNotice`),
+  geprüft beim Öffnen und im Sekundentakt der Spielansicht.
   Wird der letzte Spieler gefangen (nach Bestätigung, R-GAME-08), setzt derselbe Batch `finishedAt`; `GameClock.endAt`
   ist dann dieser Zeitpunkt, und alles hängt wie bei Zeitablauf an `GamePhase.ended`. Damit die Regeln das Spielende
   kennen, liegt die Dauer zusätzlich als Klartext `durationSec` am Spiel (`roundOver()` in den Regeln); danach sehen
@@ -61,8 +66,9 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 | `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`); nach Spielende alle (R-GAME-06) | Standort | ✔ |
-| `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
+| `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 5 s bzw. 15 s laut `games.hunterLiveSec`, R-QUOTA-01) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/outsideLocs/{uid}` | updatedAt, `data` (live, alle 5 s) – nur solange der Spieler außerhalb des Spielfelds ist + 60 s (R-OUT-03/04); nur Hunter lesen, nur der Spieler selbst schreibt/löscht | Standort | ✔ |
+| `games/{groupId}/playerLocs/{uid}` | updatedAt, `data` (live, alle 15 s) – nur solange es eine Spielleitung oder einen gefangenen Spieler gibt (R-GM-05); lesen nur Spielleitung + gefangene Spieler, solange die Runde läuft und nicht vorbei ist (`watchesLive`, `!roundOver`); nur der nicht gefangene Spieler selbst schreibt, löscht selbst | Standort | ✔ |
 | `games/{groupId}/events/{auto}` | type (catch/speedhunt), createdAt, `data` – Speedhunt-Event **ohne** Ziel | Inhalt | ✔ |
 | `games/{groupId}/speedhuntTargets/{eventId}` | uid (Ziel), createdAt – nur Hunter + Ziel lesbar (Hunter listen alle für R-SET-19) | – | ✔ |
 | `games/{groupId}/jokerRequests/{id}` | uid (Fragender), createdAt – nur Spieler lesbar; nur zusammen mit `playerJokerUsed` | – | ✔ |
@@ -76,7 +82,7 @@ in der Lobby, Beitritt nur als „unassigned“,
 Umbenennen nur sich selbst. Deploy: `firebase deploy --only firestore:rules`.
 
 **Lebenszyklus**: Eine Gruppe lebt über viele Runden (`status`: lobby ↔ running). „Spiel beenden“ (Host)
-löscht alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`, `outsideLocs`, `events`,
+löscht alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`, `outsideLocs`, `playerLocs`, `events`,
 `speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`), setzt caught/jokerUsed zurück und geht in die Lobby.
 **Automatisches Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 3 h) beendet jedes Mitgliedsgerät die Runde
 selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. 1×
@@ -122,6 +128,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Anonyme Spieler 2026-10-08 (R-SET-16, R-ANON-01 … 04): Host würfelt beim Start die Nummern (`shuffleAliases`, lib/core/round/player_aliases.dart),
       gespeichert verschlüsselt in `games/{id}.aliases`, gelöscht bei Rundenende. Nur die Anzeige der Hunter ändert sich
       (`showAliases`); Chips und Farben nach Nummer. Keine Regeländerung nötig (Host darf das Spiel-Dokument frei ändern).
+- [x] Start-Countdown 2026-11-01 (R-SET-21, R-START-01 … 03): optionale Startzeit (`GameSettings.startTime`, Minuten
+      seit Mitternacht als `startTimeMin` in den verschlüsselten Einstellungen); vorbei → 1 min, keine → sofort; siehe Kernideen.
+- [x] Spielleitung 2026-11-01 (R-GM-01 … R-GM-09): siehe Abschnitt unten; Regeländerung (`playerLocs`, `watchesLive`)
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise
@@ -143,10 +152,10 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 ## Runde auf dem Gerät (Phase 5)
 - Standort-Stream: Android `intervalDuration` 1 s, iOS ohne `distanceFilter` → ca. 1 Fix/s; der eigene Punkt und die
   Live-Pins der Hunter gleiten per `AnimatedMarkerLayer` (lib/features/map) zur neuen Position (R-MAP-04). Uploads
-  bleiben gedrosselt (Hunter alle 15 s, Pings nach Zeitplan).
+  bleiben gedrosselt (Hunter alle 5 s, Pings nach Zeitplan).
 - `RoundEngine` (lib/state) gehört dem `GameScreen`: trackt nur in Vorlauf/Jagd und nur für Hunter bzw. nicht
   gefangene Spieler; tickt alle 5 s. Spieler: `duePings` → `sendPing` (Doc-ID `{uid}_{slotId}` ⇒ idempotent,
-  die Regeln verbieten Überschreiben; >3 min verspätete Pings werden verworfen). Hunter: Live-Position alle 15 s.
+  die Regeln verbieten Überschreiben; >3 min verspätete Pings werden verworfen). Hunter: Live-Position alle 5 s.
 - Benachrichtigungen: `NoticeTracker` meldet nur *neue* Catches/Speedhunts (erster Snapshot = Basis).
   Verschwinden alle Catches eines Spielers, meldet er „wieder im Spiel“ (R-CATCH-05) – außer die Runde ist laut Server
   schon beendet (beim Rundenende werden alle Catch-Events gelöscht).
@@ -167,6 +176,30 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   `NoticeTracker.onOutside` meldet neu Hinausgegangene (Namen über `_displayNames`, also ggf. „Spieler n“).
   Schwelle `outsideThresholdM` = 30 m + 2 × Genauigkeit; Debug-Log über `describeFix` (Wechsel mit Grund,
   „not counted“ höchstens alle 10 s) zum Kalibrieren im Feldtest (R-OUT-07).
+
+## Spielleitung und Gefangene sehen alle live (R-GM-01 … R-GM-09)
+- Rolle `Role.gameMaster` (Firestore `'gameMaster'`). Reine Logik in `lib/core/round/observer.dart`:
+  `seesEveryoneLive` (Spielleitung bzw. gefangener Spieler nach „OK“, nur Vorlauf/Jagd), `mustAcceptLiveView`,
+  `hasLiveAudience`. Würfeln (`assignRandomRoles`) lässt die Spielleitung aus; `toggleRole` macht sie zum Spieler.
+- Senden: `RoundEngine._syncLiveLocation` (wie `_syncOutsideLocation`) lädt bei nicht gefangenen Spielern alle 15 s
+  (`playerLiveInterval`) nach `playerLocs` hoch, solange `hasLiveAudience(members)`; sonst, beim Fangen, Spielende
+  und `_stop` wird gelöscht (einmal auch beim Start, falls nach Neustart etwas übrig ist). Die Engine bekommt dafür
+  die Mitgliederliste (`update(members: …)`, auch in `BotRunner`). Die Spielleitung trackt nicht.
+- Lesen: `playerLocationsProvider` (Listener) und `observedHunterLocationsProvider` (`pollHunterLocations`, `get`
+  alle 15 s statt Listener – Hunter schreiben alle 5 s, jeder Listener zahlt jede Änderung). In der Spielansicht ein
+  eigener Zweig vor dem Hunter-Zweig; nach Spielende die normale Ende-Ansicht.
+- Regeln: `watchesLive(gid)` = Runde läuft und (Spielleitung oder gefangener Spieler) → darf `pings`, `hunterLocs`
+  lesen, `playerLocs` nur solange `!roundOver`. Keine Zeichnungen, Außerhalb-Standorte, Joker-Daten.
+- Warnung (R-GM-08): nicht wegklickbarer Dialog; Bestätigung in `SavedJokers.liveViewAccepted` (pro Runde, nur
+  Gerät). Gefragt wird erst, wenn die gespeicherten Daten geladen sind (sonst nach Neustart doppelt).
+- **Drosselung der Hunter** (R-QUOTA-01/02): `lib/core/round/read_budget.dart` schätzt die Lesevorgänge der Runde
+  (`estimateRoundReads`); ab 70 % von 50k gibt `hunterLiveIntervalFor` 15 s statt 5 s. `startGame` schreibt das
+  Ergebnis als `hunterLiveSec` ans Spiel (`GameInfo.hunterLiveInterval`, ohne Feld 5 s), die `RoundEngine` lädt im
+  Takt hoch. Den echten Verbrauch kann die App nicht abfragen (keine Client-API, keine Functions im Spark-Tarif).
+- **Firebase-Kontingent** (Spark: 50k Lesen, 20k Schreiben pro Tag), Beispiel 3 h, 3 Hunter, 6 Spieler: Spieler alle
+  5 s wären ≈ 13k Schreibvorgänge (+ 6,5k Hunter) → zu viel; alle 15 s ≈ 4,3k. Größter Posten beim Lesen sind die
+  Hunter alle 5 s (≈ 3 × 6,5k für die Hunter selbst); Spielleitung/Gefangene kosten je ≤ 4,3k (Spieler) + 2,2k (Hunter).
+  Zwei lange Runden am selben Tag können eng werden.
 
 ## Computer-Mitglieder zum Testen (R-BOT-01 … R-BOT-06)
 - Aktiv über `botsEnabledProvider` (`kDebugMode` oder `--dart-define=MANHUNT_BOTS=true`); Anzahl in
@@ -195,7 +228,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - **App nicht wegwischen**: Android-Foreground-Service bzw. iOS-Hintergrundmodus halten die App am Leben, aber
   „Beenden erzwingen“/Wegwischen stoppt Pings. Herstellerspezifisches Akku-Sparen (Samsung, Xiaomi …) kann ebenfalls
   stören → Mitspielenden empfehlen, Akku-Optimierung für Manhunt abzuschalten.
-- **Uhrzeit**: Ping-Zeitpunkte = Startzeit (Server-Zeit) + n × Intervall, verglichen mit der Handy-Uhr. Bewusst kein
+- **Uhrzeit**: Ping-Zeitpunkte = Startzeit (Server-Zeit bzw. mit Startzeit vom Host-Handy, R-START-01) + n × Intervall, verglichen mit der Handy-Uhr. Bewusst kein
   Countdown-Timer, weil der bei App-Neustart/Hintergrund verloren ginge. Mit automatischer Uhrzeit (Standard) weichen
   Handys < 1 s ab; nur bei manuell verstellter Uhr verschieben sich Pings (Checkliste in `docs/BeforeYourGame.md`).
   Weicht eine Handy-Uhr stark ab,
