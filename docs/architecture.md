@@ -36,7 +36,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
   (`GameClock.regularPingTimes`, `Speedhunt.pingTimes`). Jedes Spieler-Gerät pingt selbst.
   `startAt` ist der **offizielle Start nach dem Countdown** (R-START-01/02): Das Host-Handy rechnet ihn beim „Start“ aus
   (`plannedStartAt`, lib/core/schedule/start_time.dart: nächste Startzeit aus den Einstellungen, ist sie vorbei jetzt + 1 min) und
-  schreibt ihn als festen Zeitpunkt; ohne Startzeit wie bisher Server-Timestamp (sofort). Bis dahin ist die Phase `notStarted` (Countdown in der Kopfzeile, keine Buttons,
+  schreibt ihn als festen Zeitpunkt; ohne Startzeit jetzt + 1 min. Bis dahin ist die Phase `notStarted` (großes Countdown-Overlay, keine Buttons,
   kein Tracking; Overlay `StartCountdownOverlay` in lib/features/game/start_countdown.dart, Anzeige aus
   `countdownSecondsLeft`, R-START-05). Firestore-Regeln unverändert (der Host darf `startAt` frei setzen). Start-Benachrichtigung
   (R-START-04): `NoticeTracker.onPhase` merkt sich den Countdown und meldet den Übergang einmal (`GameStartedNotice`),
@@ -136,12 +136,14 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
       gespeichert verschlüsselt in `games/{id}.aliases`, gelöscht bei Rundenende. Nur die Anzeige der Hunter ändert sich
       (`showAliases`); Chips und Farben nach Nummer. Keine Regeländerung nötig (Host darf das Spiel-Dokument frei ändern).
 - [x] Start-Countdown 2026-11-01 (R-SET-21, R-START-01 … 03): optionale Startzeit (`GameSettings.startTime`, Minuten
-      seit Mitternacht als `startTimeMin` in den verschlüsselten Einstellungen); vorbei → 1 min, keine → sofort; siehe Kernideen.
+      seit Mitternacht als `startTimeMin` in den verschlüsselten Einstellungen); vorbei oder keine → 1 min; siehe Kernideen.
 - [x] Spielleitung 2026-11-01 (R-GM-01 … R-GM-09): siehe Abschnitt unten; Regeländerung (`playerLocs`, `watchesLive`)
 - [x] Rundenkarte in der Historie 2026-11-01 (R-HIST-04 … R-HIST-07, R-GAME-10 neu): Runde endet 1 min nach Spielende
       von selbst; Hunter halten ihren Standort zu jedem Ping-Zeitpunkt fest (`RoundEngine._sendHunterSnapshots`);
       `HistoryMapScreen`/`RoundMapView` (lib/features/history) mit Chips je Spieler/Hunter/Speedhunt und Zeitleiste
-      (`timelineSteps`/`timelineAt`); Lobby zeigt die letzte Runde. Regeländerung (`hunterSnaps`, `historyMaps`, 1 min).
+      (`timelineSteps`/`timelineAt`); Lobby zeigt die letzte Runde. Standort bei Spielende (R-HIST-08): Spielerhandys schicken
+      bis 50 s nach `endAt` einmal einen Ping mit Slot `end` (`RoundEngine._sendEndPosition`, als `regular`, damit ältere
+      Apps ihn lesen können; `regularPings` lässt ihn aus), Hunter über `hunterLocs`; in der Karte `RoundMap.endPlayers`. Regeländerung (`hunterSnaps`, `historyMaps`, 1 min).
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise
@@ -241,7 +243,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - **App nicht wegwischen**: Android-Foreground-Service bzw. iOS-Hintergrundmodus halten die App am Leben, aber
   „Beenden erzwingen“/Wegwischen stoppt Pings. Herstellerspezifisches Akku-Sparen (Samsung, Xiaomi …) kann ebenfalls
   stören → Mitspielenden empfehlen, Akku-Optimierung für Manhunt abzuschalten.
-- **Uhrzeit**: Ping-Zeitpunkte = Startzeit (Server-Zeit bzw. mit Startzeit vom Host-Handy, R-START-01) + n × Intervall, verglichen mit der Handy-Uhr. Bewusst kein
+- **Uhrzeit**: Ping-Zeitpunkte = Startzeit (vom Host-Handy, R-START-01) + n × Intervall, verglichen mit der Handy-Uhr. Bewusst kein
   Countdown-Timer, weil der bei App-Neustart/Hintergrund verloren ginge. Mit automatischer Uhrzeit (Standard) weichen
   Handys < 1 s ab; nur bei manuell verstellter Uhr verschieben sich Pings (Checkliste in `docs/BeforeYourGame.md`).
   Weicht eine Handy-Uhr stark ab,

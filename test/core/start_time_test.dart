@@ -6,15 +6,15 @@ void main() {
   final now = DateTime(2026, 11, 1, 13, 57, 30);
   Duration time(int h, int m) => Duration(hours: h, minutes: m);
 
-  group('no countdown without a start time (R-START-01)', () {
-    test('the round starts right away', () {
-      expect(plannedStartAt(now), isNull);
+  group('countdown without a start time (R-START-01)', () {
+    test('the official start is one minute after pressing start', () {
+      expect(plannedStartAt(now), now.add(const Duration(minutes: 1)));
     });
   });
 
   group('countdown to the start time (R-SET-21, R-START-02)', () {
     test('a start time later today: countdown until then', () {
-      final at = plannedStartAt(now, startTime: time(14, 0))!;
+      final at = plannedStartAt(now, startTime: time(14, 0));
       expect(at, DateTime(2026, 11, 1, 14));
       expect(at.difference(now), const Duration(minutes: 2, seconds: 30));
     });
@@ -55,7 +55,7 @@ void main() {
     });
 
     test('works with UTC input and returns the same instant', () {
-      final at = plannedStartAt(now.toUtc(), startTime: time(14, 0))!;
+      final at = plannedStartAt(now.toUtc(), startTime: time(14, 0));
       expect(at.isAtSameMomentAs(DateTime(2026, 11, 1, 14)), isTrue);
     });
   });

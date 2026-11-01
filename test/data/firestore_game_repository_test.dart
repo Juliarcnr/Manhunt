@@ -191,13 +191,14 @@ void main() {
   });
 
   group('countdown to the official start (R-START-01, R-SET-21)', () {
-    test('without a start time: right away, by the server clock', () async {
+    test('without a start time: one minute after pressing start', () async {
       await createDefault();
       await repo.startGame(admin);
       final game = await repo.watchGame(admin).first;
-      // The fake server timestamp is the real current time.
-      final lag = DateTime.now().difference(game!.startAt!);
-      expect(lag.inSeconds.abs(), lessThan(5));
+      expect(
+        game!.startAt!.isAtSameMomentAs(now.add(const Duration(minutes: 1))),
+        isTrue,
+      );
     });
 
     test('with a start time that has passed: one minute', () async {
@@ -688,6 +689,8 @@ void main() {
       );
       await rounds.sendPing(guest, slot(regular1, 20), fix(52.501, 20));
       await rounds.sendPing(guest, slot(regular2, 40), fix(52.502, 40));
+      // Kim is still in the game when it is over (R-HIST-08).
+      await rounds.sendPing(guest, slot(endSlotId, 180), fix(52.505, 180));
       await rounds.sendPing(sam, slot(regular1, 20), fix(52.503, 20));
       await rounds.sendPing(sam, slot(shSlot, 70), fix(52.504, 70));
       for (final (id, minutes) in [
@@ -746,6 +749,7 @@ void main() {
       expect(map.hunterSnaps, hasLength(3));
       expect(map.hunterSnaps.map((p) => p.playerId).toSet(), {'h0'});
       expect(map.lastHunters['h0']!.point.lat, 52.52);
+      expect(map.endPlayers[id('Kim')]!.point.lat, 52.505);
       expect(map.catches.single.playerId, id('Sam'));
       expect(map.catches.single.at, at(76));
       // Ended by the catch after two of three pings; target from the pings.

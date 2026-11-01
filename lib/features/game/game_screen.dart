@@ -195,22 +195,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
   RoundResult? _result(List<Member> members) =>
       roundResult(clock: _clock(), now: widget.now(), members: members);
 
-  /// Announces the winners once when the round becomes over (R-GAME-09). The
-  /// first check with loaded members is the baseline: a round already over
-  /// when opening the app is not announced again.
-  /// Tells everyone when the countdown to the start time is over
+  /// Tells everyone when the countdown to the official start is over
   /// (R-START-04).
   void _checkStarted() {
     final clock = _clock();
     if (clock == null) return;
-    _notices
-        .onPhase(
-          clock.phaseAt(widget.now()),
-          countdown: widget.game.settings.startTime != null,
-        )
-        .forEach(_notify);
+    _notices.onPhase(clock.phaseAt(widget.now())).forEach(_notify);
   }
 
+  /// Announces the winners once when the round becomes over (R-GAME-09). The
+  /// first check with loaded members is the baseline: a round already over
+  /// when opening the app is not announced again.
   void _checkRoundOver() {
     final members = ref.read(membersProvider).value;
     // Not loaded yet (the first value may be an empty list): no baseline.
@@ -1766,8 +1761,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 onClear: _drawing.clear,
               ),
             ),
-          // Only with a start time; otherwise the round starts right away.
-          if ((clock, settings.startTime) case (final clock?, _?))
+          if (clock != null)
             if (countdownSecondsLeft(clock.startAt, now) case final seconds?)
               Positioned.fill(
                 child: StartCountdownOverlay(secondsLeft: seconds),

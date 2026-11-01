@@ -259,14 +259,12 @@ class FirestoreGameRepository implements GameRepository {
       for (final doc in (await _members(session).get()).docs)
         _decodeMember(session, doc),
     ]);
-    final startAt = plannedStartAt(_now(), startTime: settings.startTime);
     await _game(session).update({
       'status': GameStatus.running.name,
-      // With a start time: countdown until then, by the host's clock
-      // (R-START-01); without: right away, by the server's clock.
-      'startAt': startAt == null
-          ? FieldValue.serverTimestamp()
-          : Timestamp.fromDate(startAt),
+      // Official start after a countdown, by the host's clock (R-START-01).
+      'startAt': Timestamp.fromDate(
+        plannedStartAt(_now(), startTime: settings.startTime),
+      ),
       // Also for groups created before the field existed (R-GAME-06).
       'durationSec': settings.duration.inSeconds,
       // Same for every device, decided once from the estimated reads

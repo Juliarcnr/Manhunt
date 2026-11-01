@@ -569,7 +569,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsStartTimeHint.
   ///
   /// In en, this message translates to:
-  /// **'Countdown to this time after \"Start\" (1 minute if it has passed). Without a time the game starts right away.'**
+  /// **'Countdown to this time after \"Start\". Without a time, or if it has passed: 1 minute.'**
   String get settingsStartTimeHint;
 
   /// No description provided for @settingsStartTimeNone.
@@ -1759,6 +1759,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next ping'**
   String get historyTimelineNext;
+
+  /// No description provided for @historyEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End of game'**
+  String get historyEnd;
+
+  /// No description provided for @historyTimelineEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End of game · {time}'**
+  String historyTimelineEnd(String time);
 
   /// No description provided for @lobbyLastRound.
   ///

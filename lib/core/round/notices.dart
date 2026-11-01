@@ -130,13 +130,12 @@ class NoticeTracker {
         : const [];
   }
 
-  /// The current [phase]; [countdown]: the round has a start time, so there
-  /// is a countdown worth ending with a notice (R-START-04). Announced once
-  /// when the countdown seen by this tracker runs out; opened after the
-  /// start (or without a start time: right away) there is nothing to tell.
-  List<GameNotice> onPhase(GamePhase phase, {required bool countdown}) {
+  /// The current [phase]: announced once when the countdown seen by this
+  /// tracker runs out (R-START-04); opened after the start there is nothing
+  /// to tell.
+  List<GameNotice> onPhase(GamePhase phase) {
     if (phase == GamePhase.notStarted) {
-      _countingDown = countdown;
+      _countingDown = true;
       return const [];
     }
     final ended = _countingDown;

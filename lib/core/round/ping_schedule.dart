@@ -5,6 +5,14 @@ import '../schedule/speedhunt.dart';
 
 enum PingKind { regular, speedhunt }
 
+/// Slot of the position every player still in the game sends once more when
+/// the round is over (R-HIST-08). Sent as a regular ping (older app versions
+/// know no other kind), but never counted or numbered as one.
+const endSlotId = 'end';
+
+/// Whether [p] is the position at the end of the round (R-HIST-08).
+bool isEndPing(PingRecord p) => p.slotId == endSlotId;
+
 /// One planned location ping of a player. [id] is deterministic, so every
 /// device (and a restarted app) agrees on it and a ping is never sent twice.
 class PingSlot {
@@ -139,10 +147,10 @@ Map<String, List<PingRecord>> pingsByPlayer(Iterable<PingRecord> pings) {
 }
 
 /// Only the regular pings – histories are numbered without speedhunt pings
-/// (R-HUNT-04, R-HUNT-07).
+/// (R-HUNT-04, R-HUNT-07) and without the position at the end (R-HIST-08).
 List<PingRecord> regularPings(Iterable<PingRecord> pings) => [
   for (final p in pings)
-    if (p.kind == PingKind.regular) p,
+    if (p.kind == PingKind.regular && !isEndPing(p)) p,
 ];
 
 /// Latest regular ping of a chronological list, or null – the "last pings"

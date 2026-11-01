@@ -47,6 +47,7 @@ class RoundMap {
     this.pings = const [],
     this.hunterSnaps = const [],
     this.lastHunters = const {},
+    this.endPlayers = const {},
     this.catches = const [],
     this.speedhunts = const [],
   });
@@ -71,8 +72,16 @@ class RoundMap {
   /// [roundMapHunterId], with the slot id of that ping time.
   final List<PingRecord> hunterSnaps;
 
-  /// Last live position of each hunter, by [roundMapHunterId].
+  /// Last live position of each hunter, by [roundMapHunterId] – also their
+  /// position at the end of the round (R-HIST-08).
   final Map<String, LocationFix> lastHunters;
+
+  /// Position of each player still in the game at its end, by
+  /// [roundMapPlayerId] (R-HIST-08); not part of [pings].
+  final Map<String, LocationFix> endPlayers;
+
+  /// Whether anyone's position at the end is known (R-HIST-08).
+  bool get hasEnd => endPlayers.isNotEmpty || lastHunters.isNotEmpty;
 
   /// Earliest catch of each caught player, by [roundMapPlayerId].
   final List<CatchRecord> catches;
@@ -138,7 +147,11 @@ class RoundMap {
           ),
           null => null,
         };
-    final mapPings = [for (final p in pings) ?rename(p, playerIdOf)];
+    final renamed = [for (final p in pings) ?rename(p, playerIdOf)];
+    final mapPings = [
+      for (final p in renamed)
+        if (!isEndPing(p)) p,
+    ];
     final firstCatch = <String, CatchRecord>{};
     for (final c in catches) {
       final id = playerIdOf[c.playerId];
@@ -162,6 +175,10 @@ class RoundMap {
       players: [for (final uid in playerUids) byId[uid]!.name],
       hunters: [for (final uid in hunterUids) byId[uid]!.name],
       pings: mapPings,
+      endPlayers: {
+        for (final p in renamed)
+          if (isEndPing(p)) p.playerId: p.fix,
+      },
       hunterSnaps: [for (final p in hunterSnaps) ?rename(p, hunterIdOf)],
       lastHunters: {
         for (final e in hunterLocations.entries) ?hunterIdOf[e.key]: e.value,
@@ -250,6 +267,10 @@ class RoundMap {
       for (final e in lastHunters.entries)
         {'h': _index(e.key), 'f': _fix(e.value)},
     ],
+    'endPlayers': [
+      for (final e in endPlayers.entries)
+        {'p': _index(e.key), 'f': _fix(e.value)},
+    ],
     'catches': [
       for (final c in catches) {'p': _index(c.playerId), 't': _sec(c.at)},
     ],
@@ -289,6 +310,10 @@ class RoundMap {
       lastHunters: {
         for (final e in list('lastHunters').cast<Map<String, Object?>>())
           roundMapHunterId(e['h']! as int): _fixFrom(e['f']),
+      },
+      endPlayers: {
+        for (final e in list('endPlayers').cast<Map<String, Object?>>())
+          roundMapPlayerId(e['p']! as int): _fixFrom(e['f']),
       },
       catches: [
         for (final c in list('catches').cast<Map<String, Object?>>())
@@ -356,10 +381,14 @@ class TimelineStep {
 
   /// 1-based; null for regular steps.
   final int? speedhuntNumber;
+
+  /// The last step: everyone's position at the end (R-HIST-08).
+  bool get isEnd => slotId == endSlotId;
 }
 
 /// All regular ping times of the round and the ping times of its
-/// speedhunts, in time order (regular first when both fall together).
+/// speedhunts, in time order (regular first when both fall together), and
+/// last the end of the round, if any position from then is known.
 List<TimelineStep> timelineSteps(RoundMap map) {
   final steps = <TimelineStep>[
     for (
@@ -380,7 +409,12 @@ List<TimelineStep> timelineSteps(RoundMap map) {
   ];
   // Stable: regular steps come first in the list.
   _stableSort(steps, (a, b) => a.at.compareTo(b.at));
-  return steps;
+  return [
+    ...steps,
+    // Last: where everyone was when it was over (R-HIST-08).
+    if (map.hasEnd)
+      TimelineStep(at: map.endedAt, slotId: endSlotId, kind: PingKind.regular),
+  ];
 }
 
 /// Who is on the map at one [TimelineStep].
@@ -397,8 +431,23 @@ class TimelineFrame {
 /// The pings of everyone still in the game at [step] (R-HIST-07): at a
 /// regular ping time every player not caught before it, at a speedhunt ping
 /// only its target – nobody else pinged then –, and always all hunters.
-/// Whoever did not send a ping for the step is left out.
+/// Whoever did not send a ping for the step is left out. The last step shows
+/// everyone's position at the end (R-HIST-08).
 TimelineFrame timelineAt(RoundMap map, TimelineStep step) {
+  if (step.isEnd) {
+    return TimelineFrame(
+      players: {
+        for (final e in map.endPlayers.entries)
+          e.key: PingRecord(
+            playerId: e.key,
+            kind: PingKind.regular,
+            slotId: endSlotId,
+            fix: e.value,
+          ),
+      },
+      hunters: map.lastHunters,
+    );
+  }
   final caughtAt = {for (final c in map.catches) c.playerId: c.at};
   bool inGame(String id) => !(caughtAt[id]?.isBefore(step.at) ?? false);
   return TimelineFrame(

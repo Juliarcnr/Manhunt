@@ -194,17 +194,20 @@ void main() {
       expect(find.byKey(const Key('selfCatchButton')), findsOneWidget);
     });
 
-    testWidgets('no countdown or start notice without a start time', (
+    testWidgets('without a start time: the same countdown and notice', (
       tester,
     ) async {
       now = start.subtract(const Duration(seconds: 2));
       await seed(tester);
       await pumpAs(tester, 'kim');
-      expect(find.byKey(const Key('startCountdown')), findsNothing);
+      expect(countdown(tester), '2');
       now = start;
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
-      expect(notifications.shown, isEmpty);
+      expect(
+        notifications.shown.map((n) => n.title),
+        contains('The game has officially started!'),
+      );
     });
   });
 

@@ -51,7 +51,7 @@ Dauert 2–3 Minuten.
   Speedhunts (Anzahl, Pings, Abstand, frühester Zeitpunkt), Joker, Live-Standort beim Verlassen des Spielfelds –
   oder statt des Spieler-Jokers „Reguläre Pings an alle Spieler“.
 - [ ] Optional eine **Startzeit** einstellen (z.B. 14:00). Nach „Spiel starten“ läuft bei allen ein Countdown bis dahin –
-  1 Minute, wenn sie schon vorbei ist. Erst danach zählen Vorlauf und Pings. Ohne Startzeit geht es sofort los.
+  1 Minute, wenn sie schon vorbei ist. Erst danach zählen Vorlauf und Pings. Ohne Startzeit: 1 Minute Countdown.
 - [ ] Optional eine **Spielleitung** bestimmen (Lobby → „Spielleitung hinzufügen“): spielt nicht mit, sieht alle
   live und wird beim Würfeln nicht mit eingeteilt.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.

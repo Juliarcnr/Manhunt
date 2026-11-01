@@ -53,6 +53,9 @@ void main() {
     lastHunters: {
       'h0': LocationFix(point: const GeoPoint(52.516, 13.4), at: at(59)),
     },
+    endPlayers: {
+      'p1': LocationFix(point: const GeoPoint(52.506, 13.4), at: at(60)),
+    },
     catches: [CatchRecord(playerId: 'p0', at: at(30))],
     speedhunts: [
       RoundMapSpeedhunt(startedAt: at(50), pingTimes: [at(50)], targetId: 'p1'),
@@ -141,6 +144,7 @@ void main() {
       await openMap(tester);
       expect(find.text('Round 4'), findsOneWidget);
       for (final id in [
+        'end',
         'lastPings',
         'player_p0',
         'player_p1',
@@ -150,10 +154,18 @@ void main() {
       ]) {
         expect(chip(id), findsOneWidget, reason: id);
       }
-      // Like after the round: all last pings; a hunter's last position.
+      // Everyone's position at the end (R-HIST-08) instead of the last pings.
+      expect(find.byKey(const Key('endPlayer_p1')), findsOneWidget);
+      expect(find.byKey(const Key('endHunter_h0')), findsOneWidget);
+      expect(find.byKey(const Key('lastPing_p0')), findsNothing);
+
+      await tester.tap(chip('end'));
+      await tester.tap(chip('lastPings'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('endPlayer_p1')), findsNothing);
+      expect(find.byKey(const Key('endHunter_h0')), findsNothing);
       expect(find.byKey(const Key('lastPing_p0')), findsOneWidget);
       expect(find.byKey(const Key('lastPing_p1')), findsOneWidget);
-      expect(find.byKey(const Key('lastHunter_h0')), findsOneWidget);
     });
 
     testWidgets('a hunter chip cycles points → lines → off; player chips '
@@ -168,8 +180,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('hunterHistory_h0_1')), findsOneWidget);
       expect(find.byKey(const Key('hunterHistory_h0_2')), findsOneWidget);
-      // Shown as history instead of the last position.
-      expect(find.byKey(const Key('lastHunter_h0')), findsNothing);
       expect(find.byKey(const Key('arrow_h0_0')), findsNothing);
 
       await tester.tap(chip('hunter_h0'));
@@ -179,7 +189,6 @@ void main() {
       await tester.tap(chip('hunter_h0'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('hunterHistory_h0_1')), findsNothing);
-      expect(find.byKey(const Key('lastHunter_h0')), findsOneWidget);
     });
 
     testWidgets('a speedhunt chip shows the hunters at its ping times', (
@@ -191,7 +200,12 @@ void main() {
       expect(find.byKey(Key('hunterSnap_h0_$slot')), findsOneWidget);
       expect(find.byKey(Key('hunterSnap_h1_$slot')), findsOneWidget);
 
-      await tester.tap(chip('speedhunt_p1_${at(50).millisecondsSinceEpoch}'));
+      final speedhuntChip = chip(
+        'speedhunt_p1_${at(50).millisecondsSinceEpoch}',
+      );
+      await tester.ensureVisible(speedhuntChip);
+      await tester.pumpAndSettle();
+      await tester.tap(speedhuntChip);
       await tester.pumpAndSettle();
       expect(find.byKey(Key('speedhunt_p1_$slot')), findsNothing);
       expect(find.byKey(Key('hunterSnap_h0_$slot')), findsNothing);
@@ -234,7 +248,15 @@ void main() {
       expect(find.byKey(Key('speedhunt_p1_${sh}_1')), findsOneWidget);
       expect(find.byKey(const Key('timelineHunter_h0')), findsOneWidget);
       expect(find.byKey(const Key('timelineHunter_h1')), findsOneWidget);
-      // The last step.
+
+      // Last: where everyone was at the end (R-HIST-08).
+      await tester.tap(find.byKey(const Key('timelineNext')));
+      await tester.pumpAndSettle();
+      expect(label(tester), startsWith('End of game · '));
+      expect(find.byKey(const Key('timelinePlayer_p1')), findsOneWidget);
+      expect(find.byKey(const Key('timelinePlayer_p0')), findsNothing);
+      expect(find.byKey(const Key('timelineHunter_h0')), findsOneWidget);
+      expect(find.byKey(const Key('timelineHunter_h1')), findsNothing);
       expect(
         tester
             .widget<IconButton>(find.byKey(const Key('timelineNext')))
@@ -244,7 +266,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('timelineBack')));
       await tester.pumpAndSettle();
-      expect(label(tester), startsWith('Ping 2 · '));
+      expect(label(tester), startsWith('⚡1 Sam · '));
     });
   });
 }

@@ -1844,3 +1844,20 @@ describe('history map (R-HIST-04, R-HIST-06)', () => {
     await assertFails(deleteDoc(doc(as('kim'), 'games', GID, 'history', 'h1')));
   });
 });
+
+describe('position at the end of the round (R-HIST-08)', () => {
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+  const endPing = (uid) => ({ uid, kind: 'regular', slot: 'end', createdAt: serverTimestamp(), data: 'enc' });
+
+  test('a player still in the game sends it once when time is up; then everyone reads it', async () => {
+    await startRound();
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(60.2), durationSec: 3600 }),
+    );
+    const ref = doc(as('kim'), 'games', GID, 'pings', 'kim_end');
+    await assertSucceeds(setDoc(ref, endPing('kim')));
+    await assertFails(setDoc(ref, endPing('kim')));
+    await assertFails(setDoc(doc(as('admin'), 'games', GID, 'pings', 'admin_end'), endPing('admin')));
+    await assertSucceeds(getDocs(collection(as('sam'), 'games', GID, 'pings')));
+  });
+});

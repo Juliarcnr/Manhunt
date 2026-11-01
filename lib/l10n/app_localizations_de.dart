@@ -277,7 +277,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsStartTimeHint =>
-      'Nach „Start“ läuft ein Countdown bis zu dieser Uhrzeit (1 Minute, wenn sie schon vorbei ist). Ohne Uhrzeit startet das Spiel sofort.';
+      'Nach „Start“ läuft ein Countdown bis zu dieser Uhrzeit. Ohne Uhrzeit oder wenn sie schon vorbei ist: 1 Minute.';
 
   @override
   String get settingsStartTimeNone => 'keine';
@@ -1014,6 +1014,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get historyTimelineNext => 'Nächster Ping';
+
+  @override
+  String get historyEnd => 'Spielende';
+
+  @override
+  String historyTimelineEnd(String time) {
+    return 'Spielende · $time';
+  }
 
   @override
   String lobbyLastRound(int number) {

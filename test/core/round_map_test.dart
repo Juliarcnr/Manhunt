@@ -48,6 +48,8 @@ void main() {
           ping('us', 'regular_3', 52.5, 60),
           ping('us', sh(1), 52.6, 70),
           ping('us', sh(2), 52.7, 75),
+          // Sam's position at the end (R-HIST-08).
+          ping('us', endSlotId, 52.8, 100),
           // Someone who left the group.
           ping('gone', 'regular_1', 51, 20),
         ],
@@ -93,6 +95,7 @@ void main() {
     test('no uids are kept; people who left are dropped', () {
       final map = build();
       expect(map.pings, hasLength(7));
+      expect(map.pings.where(isEndPing), isEmpty);
       expect(map.pings.map((p) => p.playerId).toSet(), {'p0', 'p1'});
       expect(map.hunterSnaps.map((p) => p.playerId).toSet(), {'h0', 'h1'});
       expect(map.lastHunters.keys, ['h0']);
@@ -132,7 +135,9 @@ void main() {
       );
       expect(back.speedhunts.single.targetId, 'p0');
       expect(back.speedhunts.single.pingTimes, [at(70), at(75)]);
+      expect(back.endPlayers['p0']!.point, const GeoPoint(52.8, 13.4));
       expect(back.speedhunts.single.startedAt, at(70));
+      expect(back.endPlayers['p0']!.point, const GeoPoint(52.8, 13.4));
     });
 
     test('coordinates are rounded to about 10 cm', () {
@@ -193,8 +198,10 @@ void main() {
           (sh(1), at(70)),
           (sh(2), at(75)),
           ('regular_4', at(80)),
+          (endSlotId, at(100)),
         ],
       );
+      expect(steps.last.isEnd, isTrue);
       expect(steps[3].kind, PingKind.speedhunt);
       expect(steps[3].targetId, 'p0');
       expect(steps[3].speedhuntNumber, 1);
@@ -259,6 +266,38 @@ void main() {
       );
       // No ping exactly at the end (R-PING-02).
       expect(timelineSteps(map).map((s) => s.slotId), ['regular_1']);
+    });
+  });
+  group('positions at the end of the round (R-HIST-08)', () {
+    test('kept apart from the pings, shown as the last timeline step', () {
+      final map = build();
+      expect(map.endPlayers.keys, ['p0']);
+      expect(map.hasEnd, isTrue);
+      final frame = timelineAt(map, timelineSteps(map).last);
+      expect(frame.players['p0']!.fix.point.lat, 52.8);
+      // The hunters' last live position is where they were at the end.
+      expect(frame.hunters['h0']!.point.lat, 53.9);
+    });
+
+    test('no end step without any position from then (e.g. older rounds)', () {
+      final map = RoundMap(
+        area: const [],
+        startedAt: start,
+        endedAt: at(30),
+        pingInterval: const Duration(minutes: 20),
+        players: const ['Kim'],
+        hunters: const [],
+      );
+      expect(map.hasEnd, isFalse);
+      expect(timelineSteps(map).map((s) => s.slotId), ['regular_1']);
+    });
+
+    test('never numbered as a regular ping', () {
+      final pings = [
+        ping('uk', 'regular_1', 52.1, 20),
+        ping('uk', endSlotId, 52.2, 30),
+      ];
+      expect(regularPings(pings).map((p) => p.slotId), ['regular_1']);
     });
   });
 

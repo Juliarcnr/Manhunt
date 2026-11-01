@@ -71,7 +71,11 @@ class RoundMapView extends StatefulWidget {
 class _RoundMapViewState extends State<RoundMapView> {
   final _controller = MapController();
   var _view = _View.chips;
-  var _filters = const MapFilters();
+
+  /// Starts with everyone's position at the end (R-HIST-08) instead of the
+  /// last regular pings, so a pin per person is enough.
+  var _filters = const MapFilters(lastPings: false);
+  var _showEnd = true;
 
   /// Like [MapFilters.playerHistories], for the hunters; missing means off.
   var _hunterModes = const <String, HistoryMode>{};
@@ -248,21 +252,33 @@ class _RoundMapViewState extends State<RoundMapView> {
           names: _names,
           colors: _playerColors,
         ),
-      // Like the players' last pings: each hunter's last position, unless
-      // their history is shown.
-      if (filters.lastPings)
+      // Where everyone was when the round was over (R-HIST-08).
+      if (_showEnd) ...[
         namedPinsLayer(
-          keyPrefix: 'lastHunter',
-          positions: {
-            for (final e in widget.map.lastHunters.entries)
-              if (!shownHunters.contains(e.key)) e.key: e.value,
-          },
+          keyPrefix: 'endHunter',
+          positions: widget.map.lastHunters,
           names: _names,
           colors: _hunterColors,
           hunters: true,
         ),
+        namedPinsLayer(
+          keyPrefix: 'endPlayer',
+          positions: widget.map.endPlayers,
+          names: _names,
+          colors: _playerColors,
+        ),
+      ],
     ];
     final chips = [
+      if (widget.map.hasEnd)
+        FilterItem(
+          id: 'end',
+          label: l10n.historyEnd,
+          icon: Icons.flag,
+          color: AppColors.speedhunt,
+          selected: _showEnd,
+          onChanged: (v) => setState(() => _showEnd = v),
+        ),
       FilterItem(
         id: 'lastPings',
         label: l10n.filterLastPings,
@@ -359,7 +375,9 @@ class _RoundMapViewState extends State<RoundMapView> {
     final regularNumber = int.tryParse(
       step.slotId.substring(step.slotId.lastIndexOf('_') + 1),
     );
-    final label = step.kind == PingKind.speedhunt
+    final label = step.isEnd
+        ? l10n.historyTimelineEnd(clock(step.at))
+        : step.kind == PingKind.speedhunt
         ? l10n.historyTimelineSpeedhunt(
             step.speedhuntNumber ?? 0,
             _names[step.targetId] ?? '?',

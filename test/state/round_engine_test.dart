@@ -627,6 +627,65 @@ void main() {
       expect(sent, isEmpty);
     });
 
+    group('position at the end of the round (R-HIST-08)', () {
+      Future<List<PingRecord>> endPings() async => [
+        for (final p in await rounds.watchAllPings(hunterSession).first)
+          if (isEndPing(p)) p,
+      ];
+
+      test(
+        'a player still in the game sends it once when time is up',
+        () async {
+          engine = await engineFor('kim');
+          engine.update(game: game(), me: player, speedhuntsOnMe: []);
+          now = at(59);
+          location.emit(fix(52.43));
+          await flush();
+          await engine.tick();
+          expect(await endPings(), isEmpty);
+
+          now = at(60);
+          await engine.tick();
+          await flush();
+          now = at(60).add(const Duration(seconds: 10));
+          await engine.tick();
+          final end = (await endPings()).single;
+          expect(end.playerId, 'kim');
+          expect(end.fix.point.lat, 52.43);
+          // Not announced like a ping.
+          expect(sent.where((s) => s.id == endSlotId), isEmpty);
+        },
+      );
+
+      test('without a recent position it asks the GPS', () async {
+        engine = await engineFor('kim');
+        engine.update(game: game(), me: player, speedhuntsOnMe: []);
+        location.position = const GeoPoint(52.44, 13.4);
+        now = at(60);
+        await engine.tick();
+        expect((await endPings()).single.fix.point.lat, 52.44);
+      });
+
+      test(
+        'not by caught players or hunters, not long after the end',
+        () async {
+          for (final me in [player.copyWith(caught: true), hunter]) {
+            engine = await engineFor(me.id);
+            engine.update(game: game(), me: me, speedhuntsOnMe: []);
+            location.position = const GeoPoint(52.44, 13.4);
+            now = at(60);
+            await engine.tick();
+          }
+          engine = await engineFor('kim');
+          engine.update(game: game(), me: player, speedhuntsOnMe: []);
+          location.position = const GeoPoint(52.44, 13.4);
+          now = at(61);
+          await engine.tick();
+          expect(await endPings(), isEmpty);
+        },
+      );
+    });
+
     test('players keep none', () async {
       engine = await engineFor('kim');
       engine.update(

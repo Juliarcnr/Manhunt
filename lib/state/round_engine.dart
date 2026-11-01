@@ -342,6 +342,7 @@ class RoundEngine {
 
   void _acceptFix(LocationFix fix) {
     _lastFix = fix;
+    _finalFix = fix;
     position.value = fix;
     _setStatus((s) => s.copyWith(state: TrackingState.ok, lastFixAt: fix.at));
     _stepBoundary(fix: fix);
@@ -528,6 +529,7 @@ class RoundEngine {
     // Phases change with time alone (e.g. time is up), not only on updates;
     // this also restarts tracking after an error.
     _sync();
+    await _sendEndPosition();
     final me = _me;
     if (_busy || !_shouldTrack || me == null) return;
     _busy = true;
@@ -700,6 +702,60 @@ class RoundEngine {
         return;
       }
       _snapshotsSent.add(slot.id);
+    }
+  }
+
+  /// How long after the end of the round its last position is still sent,
+  /// before the round is saved a minute later (R-GAME-10).
+  static const endPositionGrace = Duration(seconds: 50);
+
+  /// Last position while tracking; unlike [_lastFix] kept when tracking
+  /// stops, for the position at the end of the round.
+  LocationFix? _finalFix;
+  var _endSent = false;
+  var _endBusy = false;
+
+  /// When the round is over, every player still in the game sends their
+  /// position once more, for the history map (R-HIST-08). Hunters need not:
+  /// their last live position is kept anyway. No notice, nothing logged.
+  Future<void> _sendEndPosition() async {
+    final me = _me;
+    final clock = _clock;
+    if (_endSent || _endBusy || me == null || clock == null) return;
+    if (_game?.status != GameStatus.running || !me.isPlayer || me.caught) {
+      return;
+    }
+    final now = _now();
+    if (now.isBefore(clock.endAt) ||
+        now.difference(clock.endAt) > endPositionGrace) {
+      return;
+    }
+    _endBusy = true;
+    try {
+      var fix = _finalFix;
+      if (fix == null || now.difference(fix.at) > maxFixAge) {
+        final direct = await location.currentFix();
+        if (direct == null) return; // retried on the next tick
+        fix = LocationFix(
+          point: direct.point,
+          at: now.toUtc(),
+          accuracyM: direct.accuracyM,
+        );
+      }
+      final slot = PingSlot(
+        id: endSlotId,
+        kind: PingKind.regular,
+        at: clock.endAt,
+      );
+      await rounds.sendPing(session, slot, fix);
+      _endSent = true;
+    } on FirebaseException catch (e) {
+      // Already sent before an app restart (no overwriting).
+      if (e.code == 'permission-denied') _endSent = true;
+    } on Exception {
+      // Offline etc.: retried on the next tick.
+    } finally {
+      _endBusy = false;
     }
   }
 
