@@ -1061,8 +1061,20 @@ abstract class AppLocalizations {
   /// No description provided for @gamePhaseStarting.
   ///
   /// In en, this message translates to:
-  /// **'Starts in'**
+  /// **'Countdown'**
   String get gamePhaseStarting;
+
+  /// No description provided for @countdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'The game starts in'**
+  String get countdownLabel;
+
+  /// No description provided for @countdownGo.
+  ///
+  /// In en, this message translates to:
+  /// **'GO!'**
+  String get countdownGo;
 
   /// No description provided for @gamePhaseHeadStart.
   ///
@@ -1097,32 +1109,20 @@ abstract class AppLocalizations {
   /// No description provided for @gameTimeUpHint.
   ///
   /// In en, this message translates to:
-  /// **'The round keeps running so you can look at the locations together. The host ends it – otherwise it ends automatically at {time}.'**
-  String gameTimeUpHint(String time);
+  /// **'The round is over and will be saved in a moment. Then you will find the map with all pings and hunter positions in the group history.'**
+  String get gameTimeUpHint;
 
   /// No description provided for @gameEndButton.
   ///
   /// In en, this message translates to:
-  /// **'End game'**
+  /// **'Abort game'**
   String get gameEndButton;
-
-  /// No description provided for @gameEndConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'End game?'**
-  String get gameEndConfirmTitle;
 
   /// No description provided for @gameEndConfirmText.
   ///
   /// In en, this message translates to:
-  /// **'For privacy, all sensitive data of this round – especially all locations – will now be deleted permanently for everyone. The group stays and you can start a new round.'**
+  /// **'The round is saved with its map in the group history. All other data of this round is deleted for everyone. The group stays and you can start a new round.'**
   String get gameEndConfirmText;
-
-  /// No description provided for @gameEndConfirmAction.
-  ///
-  /// In en, this message translates to:
-  /// **'End and delete'**
-  String get gameEndConfirmAction;
 
   /// No description provided for @gameAbortTitle.
   ///
@@ -1171,12 +1171,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next ping in {time}'**
   String gameNextPing(String time);
-
-  /// No description provided for @gameStartsAt.
-  ///
-  /// In en, this message translates to:
-  /// **'The game starts at {time}'**
-  String gameStartsAt(String time);
 
   /// No description provided for @gameNextPings.
   ///
@@ -1430,6 +1424,12 @@ abstract class AppLocalizations {
   /// **'Time is up – {names} {count, plural, =1{has} other{have}} won!'**
   String noticePlayersWon(String names, int count);
 
+  /// No description provided for @noticeRoundOverBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You will find the map with all pings and hunter positions in the group history in a moment.'**
+  String get noticeRoundOverBody;
+
   /// No description provided for @nameList.
   ///
   /// In en, this message translates to:
@@ -1649,7 +1649,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No finished rounds yet. After „End game“ each round appears here – without locations.'**
+  /// **'No finished rounds yet. After each game the round appears here – with a map of all pings.'**
   String get historyEmpty;
 
   /// No description provided for @historyRound.
@@ -1681,6 +1681,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All players caught!'**
   String get historyAllCaught;
+
+  /// No description provided for @historyShowMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Show map'**
+  String get historyShowMap;
+
+  /// No description provided for @historyNoMap.
+  ///
+  /// In en, this message translates to:
+  /// **'No map was saved for this round.'**
+  String get historyNoMap;
+
+  /// No description provided for @historyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete round'**
+  String get historyDelete;
+
+  /// No description provided for @historyDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete round {number}?'**
+  String historyDeleteTitle(int number);
+
+  /// No description provided for @historyDeleteText.
+  ///
+  /// In en, this message translates to:
+  /// **'All data of this round – summary, map and all locations – will be deleted permanently for everyone.'**
+  String get historyDeleteText;
+
+  /// No description provided for @historyDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for good'**
+  String get historyDeleteAction;
+
+  /// No description provided for @historyViewChips.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get historyViewChips;
+
+  /// No description provided for @historyViewTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get historyViewTimeline;
+
+  /// No description provided for @historyTimelineRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Ping {number} · {time}'**
+  String historyTimelineRegular(int number, String time);
+
+  /// No description provided for @historyTimelineSpeedhunt.
+  ///
+  /// In en, this message translates to:
+  /// **'⚡{number} {name} · {time}'**
+  String historyTimelineSpeedhunt(int number, String name, String time);
+
+  /// No description provided for @historyTimelineEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'There were no pings in this round.'**
+  String get historyTimelineEmpty;
+
+  /// No description provided for @historyTimelineBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous ping'**
+  String get historyTimelineBack;
+
+  /// No description provided for @historyTimelineNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next ping'**
+  String get historyTimelineNext;
+
+  /// No description provided for @lobbyLastRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Last round: round {number}'**
+  String lobbyLastRound(int number);
+
+  /// No description provided for @lobbyLastRoundHuntersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'The hunters won.'**
+  String get lobbyLastRoundHuntersWon;
+
+  /// No description provided for @lobbyLastRoundPlayersWon.
+  ///
+  /// In en, this message translates to:
+  /// **'{names} {count, plural, =1{has} other{have}} won.'**
+  String lobbyLastRoundPlayersWon(String names, int count);
 
   /// No description provided for @drawMode.
   ///

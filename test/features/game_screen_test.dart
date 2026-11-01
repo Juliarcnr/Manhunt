@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,16 +60,16 @@ void main() {
     expect(find.text('10:00'), findsOneWidget);
   });
 
-  testWidgets('round keeps running after time is up (R-GAME-06)', (
-    tester,
-  ) async {
+  testWidgets('time up: nothing to end, the round is saved by itself '
+      '(R-GAME-06, R-GAME-10)', (tester) async {
     await pumpGame(
       tester,
       userId: 'admin',
-      now: start.add(const Duration(hours: 4)),
+      now: start.add(const Duration(hours: 3, seconds: 30)),
     );
     expect(find.text('TIME IS UP'), findsOneWidget);
-    expect(find.byKey(const Key('endRoundButton')), findsOneWidget);
+    expect(find.byKey(const Key('endRoundButton')), findsNothing);
+    expect(find.textContaining('saved in a moment'), findsOneWidget);
   });
 
   testWidgets('only the host can end the game', (tester) async {
@@ -80,43 +79,6 @@ void main() {
       now: start.add(const Duration(hours: 1)),
     );
     expect(find.byKey(const Key('endRoundButton')), findsNothing);
-  });
-
-  testWidgets('end game warns about deleting locations, then ends round '
-      '(R-GAME-06, R-PRIV-03)', (tester) async {
-    final (db, session) = await pumpGame(
-      tester,
-      userId: 'admin',
-      now: start.add(const Duration(hours: 4)),
-    );
-    final repo = deviceRepo(db);
-    await tester.runAsync(() async {
-      await repo.createGame(session, name: 'Julia', settings: defaultSettings);
-      await repo.startGame(session);
-    });
-
-    await tester.tap(find.byKey(const Key('endRoundButton')));
-    await tester.pumpAndSettle();
-    expect(find.text('End game?'), findsOneWidget);
-    expect(find.textContaining('all locations'), findsOneWidget);
-
-    // Cancel keeps the round.
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(
-      (await tester.runAsync(() => repo.watchGame(session).first))!.status,
-      GameStatus.running,
-    );
-
-    await tester.tap(find.byKey(const Key('endRoundButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('confirmEndRound')));
-    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-    await tester.pump();
-    expect(
-      (await tester.runAsync(() => repo.watchGame(session).first))!.status,
-      GameStatus.lobby,
-    );
   });
 
   testWidgets('aborting early needs two confirmations (R-GAME-07)', (
@@ -150,7 +112,7 @@ void main() {
     await tester.tap(find.byKey(const Key('confirmAbortFirst')));
     await tester.pumpAndSettle();
     expect(find.text('Really abort?'), findsOneWidget);
-    expect(find.textContaining('all locations'), findsOneWidget);
+    expect(find.textContaining('saved with its map'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(await status(), GameStatus.running);
@@ -169,41 +131,19 @@ void main() {
       () => repo.watchHistory(session).first,
     );
     expect(history!.single.abortedEarly, isTrue);
+    expect(history.single.hasMap, isTrue);
   });
 
-  testWidgets('after the hunters won, ending needs one confirmation and is '
-      'no abort (R-GAME-08, R-GAME-07)', (tester) async {
+  testWidgets('after the hunters won there is nothing to end (R-GAME-08, '
+      'R-GAME-10)', (tester) async {
     final finishedAt = start.add(const Duration(hours: 1));
-    final (db, session) = await pumpGame(
+    await pumpGame(
       tester,
       userId: 'admin',
-      now: finishedAt.add(const Duration(minutes: 10)),
+      now: finishedAt.add(const Duration(seconds: 30)),
       finishedAt: finishedAt,
     );
-    final repo = deviceRepo(db);
-    await tester.runAsync(() async {
-      await repo.createGame(session, name: 'Julia', settings: defaultSettings);
-      await repo.startGame(session);
-      await db.collection('games').doc(session.groupId).update({
-        'finishedAt': Timestamp.fromDate(finishedAt),
-      });
-    });
     expect(find.text('HUNTERS WON'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('endRoundButton')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('confirmAbortFirst')), findsNothing);
-    expect(find.text('End game?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('confirmEndRound')));
-    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-    await tester.pump();
-
-    final game = await tester.runAsync(() => repo.watchGame(session).first);
-    expect(game!.status, GameStatus.lobby);
-    expect(game.finishedAt, isNull);
-    final history = await tester.runAsync(
-      () => repo.watchHistory(session).first,
-    );
-    expect(history!.single.abortedEarly, isFalse);
+    expect(find.byKey(const Key('endRoundButton')), findsNothing);
   });
 }

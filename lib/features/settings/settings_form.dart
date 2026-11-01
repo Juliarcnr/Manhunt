@@ -410,6 +410,8 @@ class StartTimeTile extends StatelessWidget {
     Future<void> pick() async {
       final picked = await showTimePicker(
         context: context,
+        // Hours and minutes typed on the number pad, no clock dial.
+        initialEntryMode: TimePickerEntryMode.inputOnly,
         initialTime: time == null
             ? const TimeOfDay(hour: 14, minute: 0)
             : TimeOfDay(hour: time.inHours, minute: time.inMinutes % 60),

@@ -55,13 +55,14 @@ Dauert 2–3 Minuten.
 - [ ] Optional eine **Spielleitung** bestimmen (Lobby → „Spielleitung hinzufügen“): spielt nicht mit, sieht alle
   live und wird beim Würfeln nicht mit eingeteilt.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
-- [ ] Nach dem Spiel **„Spiel beenden“** drücken: Erst dann werden alle Standorte gelöscht. Vorher könnt ihr euch die
-  Pings gemeinsam auf der Karte anschauen – nach Ablauf der Zeit oder sobald der letzte Spieler gefangen ist, sehen
-  **alle** (auch Spieler) alle Standorte, und Gefangene haben wieder ihre eigenen Chips. Die Rundenübersicht (wer wann gefangen wurde) bleibt in der Historie.
-  Vergessen? Spätestens 3 h nach Spielende beendet ein Handy der Gruppe die Runde automatisch.
+- [ ] Nach dem Spiel müsst ihr **nichts drücken**: 1 Minute nach Ablauf der Zeit (oder nach dem letzten Catch) endet
+  die Runde von selbst. Alle Pings, ⚡-Pings und die Hunter-Positionen zu jedem Ping-Zeitpunkt landen als
+  **Rundenkarte in der Gruppenhistorie** („Karte ansehen“, mit Zeitleiste) – zum gemeinsamen Anschauen. Alle anderen
+  Standortdaten werden gelöscht. Der Host kann eine Runde in der Historie endgültig löschen.
 
 ## 4. Datenschutz in einem Satz
 
 Kein Konto, keine E-Mail; alle Standorte sind Ende-zu-Ende-verschlüsselt, Spieler sehen keine fremden Pings (außer
 der Host stellt „Reguläre Pings an alle Spieler“ ein – dann nur den jeweils letzten), und mit
-„Spiel beenden“ werden sämtliche Standorte gelöscht. Details: [privacy.md](privacy.md).
+dem Ende der Runde werden alle Live-Standorte gelöscht – nur die verschlüsselte Rundenkarte bleibt in der Historie,
+bis der Host sie oder die Gruppe löscht. Details: [privacy.md](privacy.md).

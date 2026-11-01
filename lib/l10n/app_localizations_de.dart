@@ -564,7 +564,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyBackHome => 'Zurück zu meinen Gruppen';
 
   @override
-  String get gamePhaseStarting => 'Start in';
+  String get gamePhaseStarting => 'Countdown';
+
+  @override
+  String get countdownLabel => 'Das Spiel startet in';
+
+  @override
+  String get countdownGo => 'START';
 
   @override
   String get gamePhaseHeadStart => 'Vorlauf';
@@ -590,22 +596,15 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String gameTimeUpHint(String time) {
-    return 'Die Runde läuft weiter, damit ihr euch die Standorte noch gemeinsam anschauen könnt. Der Host beendet sie – sonst endet sie um $time Uhr automatisch.';
-  }
+  String get gameTimeUpHint =>
+      'Die Runde ist vorbei und wird gleich gespeichert. Danach findet ihr die Karte mit allen Pings und Hunter-Standorten in der Gruppenhistorie.';
 
   @override
-  String get gameEndButton => 'Spiel beenden';
-
-  @override
-  String get gameEndConfirmTitle => 'Spiel beenden?';
+  String get gameEndButton => 'Spiel abbrechen';
 
   @override
   String get gameEndConfirmText =>
-      'Aus Datenschutzgründen werden jetzt alle sensiblen Daten dieser Runde – insbesondere alle Standorte – für alle endgültig gelöscht. Die Gruppe bleibt bestehen und ihr könnt eine neue Runde starten.';
-
-  @override
-  String get gameEndConfirmAction => 'Beenden und löschen';
+      'Die Runde wird mit ihrer Karte in der Gruppenhistorie gespeichert. Alle übrigen Daten dieser Runde werden für alle gelöscht. Die Gruppe bleibt bestehen und ihr könnt eine neue Runde starten.';
 
   @override
   String get gameAbortTitle => 'Spiel vorzeitig abbrechen?';
@@ -633,11 +632,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String gameNextPing(String time) {
     return 'Nächster Ping in $time';
-  }
-
-  @override
-  String gameStartsAt(String time) {
-    return 'Das Spiel startet um $time';
   }
 
   @override
@@ -807,6 +801,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get noticeRoundOverBody =>
+      'Die Karte mit allen Pings und Hunter-Standorten findest du gleich in der Gruppenhistorie.';
+
+  @override
   String nameList(String rest, String last) {
     return '$rest und $last';
   }
@@ -952,7 +950,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get historyEmpty =>
-      'Noch keine beendeten Runden. Nach „Spiel beenden“ erscheint hier jede Runde – ohne Standorte.';
+      'Noch keine beendeten Runden. Nach jedem Spiel erscheint hier die Runde – mit einer Karte aller Pings.';
 
   @override
   String historyRound(int number) {
@@ -970,6 +968,71 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get historyAllCaught => 'Alle Spieler gefangen!';
+
+  @override
+  String get historyShowMap => 'Karte ansehen';
+
+  @override
+  String get historyNoMap => 'Für diese Runde ist keine Karte gespeichert.';
+
+  @override
+  String get historyDelete => 'Runde löschen';
+
+  @override
+  String historyDeleteTitle(int number) {
+    return 'Runde $number löschen?';
+  }
+
+  @override
+  String get historyDeleteText =>
+      'Alle Daten dieser Runde – Übersicht, Karte und alle Standorte – werden für alle unwiderruflich gelöscht.';
+
+  @override
+  String get historyDeleteAction => 'Endgültig löschen';
+
+  @override
+  String get historyViewChips => 'Filter';
+
+  @override
+  String get historyViewTimeline => 'Zeitleiste';
+
+  @override
+  String historyTimelineRegular(int number, String time) {
+    return 'Ping $number · $time';
+  }
+
+  @override
+  String historyTimelineSpeedhunt(int number, String name, String time) {
+    return '⚡$number $name · $time';
+  }
+
+  @override
+  String get historyTimelineEmpty => 'In dieser Runde gab es keine Pings.';
+
+  @override
+  String get historyTimelineBack => 'Ping davor';
+
+  @override
+  String get historyTimelineNext => 'Nächster Ping';
+
+  @override
+  String lobbyLastRound(int number) {
+    return 'Letzte Runde: Runde $number';
+  }
+
+  @override
+  String get lobbyLastRoundHuntersWon => 'Die Hunter haben gewonnen.';
+
+  @override
+  String lobbyLastRoundPlayersWon(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'haben',
+      one: 'hat',
+    );
+    return '$names $_temp0 gewonnen.';
+  }
 
   @override
   String get drawMode => 'Zeichenmodus';

@@ -1,4 +1,5 @@
 import '../core/crypto/group_crypto.dart';
+import '../core/history/round_map.dart';
 import '../core/history/round_summary.dart';
 import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
@@ -122,19 +123,28 @@ abstract interface class GameRepository {
   /// them as not caught; they play on as usual.
   Future<void> undoCatch(GroupSession session, String playerId);
 
-  /// Host ends the round (R-GAME-06): saves a [RoundSummary] to the history
-  /// (R-HIST-02), deletes all locations and round events (R-PRIV-03), resets
-  /// caught/joker and returns the group to the lobby.
+  /// Host aborts the round (R-GAME-07): saves a [RoundSummary] and a
+  /// [RoundMap] to the history (R-HIST-02, R-HIST-04), deletes all round data
+  /// incl. locations (R-PRIV-03), resets caught/joker and returns the group
+  /// to the lobby.
   Future<void> endRound(GroupSession session);
 
-  /// Any member: ends the round like [endRound] if the host left it running
-  /// for 3 h (`GameClock.autoEndDelay`) after it was over (R-GAME-10); otherwise
-  /// does nothing. Safe to call from several devices at once: the round is
-  /// saved to the history only once. Returns whether it ended the round.
+  /// Any member: ends the round like [endRound] once it has been over for
+  /// `GameClock.autoEndDelay` (R-GAME-10); otherwise does nothing. Safe to
+  /// call from several devices at once: the round is saved to the history
+  /// only once. Returns whether it ended the round.
   Future<bool> autoEndRound(GroupSession session);
 
   /// Finished rounds, newest first (R-HIST-03).
   Stream<List<RoundSummary>> watchHistory(GroupSession session);
+
+  /// The map saved with history entry [historyId] (R-HIST-04), loaded once;
+  /// null for rounds without one.
+  Future<RoundMap?> loadRoundMap(GroupSession session, String historyId);
+
+  /// Host only: deletes a round from the history with its map, for good
+  /// (R-HIST-06).
+  Future<void> deleteHistoryEntry(GroupSession session, String historyId);
 
   /// Host deletes the whole group with everything in it.
   Future<void> deleteGame(GroupSession session);

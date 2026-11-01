@@ -11,6 +11,7 @@ import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
+import 'package:manhunt/core/schedule/start_time.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
@@ -126,32 +127,37 @@ void main() {
     now = start.add(const Duration(minutes: 30));
   });
 
-  group('countdown before the official start (R-START-01, R-START-03, '
-      'R-START-04)', () {
+  group('countdown before the official start (R-START-01, R-START-03 … '
+      'R-START-05)', () {
     final timed = settings.copyWith(startTime: const Duration(hours: 14));
+    String countdown(WidgetTester tester) =>
+        tester.widget<Text>(find.byKey(const Key('startCountdownText'))).data!;
 
-    testWidgets('hunter: countdown and start time, no buttons, no tracking', (
-      tester,
-    ) async {
+    testWidgets('hunter: big countdown over the map, no buttons, no '
+        'tracking', (tester) async {
       now = start.subtract(const Duration(seconds: 90));
       await seed(tester, gameSettings: timed);
       await pumpAs(tester, 'alex', gameSettings: timed);
-      expect(find.text('STARTS IN'), findsOneWidget);
-      expect(find.text('01:30'), findsOneWidget);
-      expect(
-        find.text(
-          'The game starts at ${DateFormat.Hm('en').format(start.toLocal())}',
-        ),
-        findsOneWidget,
-      );
+      // Only over the map, not in the header (R-START-05).
+      expect(find.text('COUNTDOWN'), findsOneWidget);
+      expect(find.byKey(const Key('gameCountdown')), findsNothing);
+      expect(find.text('THE GAME STARTS IN'), findsOneWidget);
+      expect(countdown(tester), '01:30');
       expect(find.byKey(const Key('catchButton')), findsNothing);
       expect(find.byKey(const Key('speedhuntButton')), findsNothing);
       expect(location.isTracking, isFalse);
 
-      // At the official start the head start begins (R-GAME-04).
+      // Under a minute: only the seconds.
+      now = start.subtract(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 1));
+      expect(countdown(tester), '3');
+
+      // At the official start the head start begins (R-GAME-04) and "GO!"
+      // shows briefly.
       now = start;
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
+      expect(countdown(tester), 'GO!');
       expect(find.text('HEAD START'), findsOneWidget);
       expect(find.byKey(const Key('catchButton')), findsOneWidget);
       // Everyone is told that it starts now (R-START-04).
@@ -164,6 +170,11 @@ void main() {
         notifications.shown.map((n) => n.title),
         contains('The game has officially started!'),
       );
+
+      // Then the map is free again.
+      now = start.add(startFlash);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byKey(const Key('startCountdown')), findsNothing);
     });
 
     testWidgets('player: no joker or self-catch before the start', (
@@ -172,7 +183,7 @@ void main() {
       now = start.subtract(const Duration(seconds: 30));
       await seed(tester, gameSettings: timed);
       await pumpAs(tester, 'kim', gameSettings: timed);
-      expect(find.text('STARTS IN'), findsOneWidget);
+      expect(countdown(tester), '30');
       expect(find.byKey(const Key('jokerButton')), findsNothing);
       expect(find.byKey(const Key('selfCatchButton')), findsNothing);
 
@@ -183,10 +194,13 @@ void main() {
       expect(find.byKey(const Key('selfCatchButton')), findsOneWidget);
     });
 
-    testWidgets('no start notice without a start time', (tester) async {
+    testWidgets('no countdown or start notice without a start time', (
+      tester,
+    ) async {
       now = start.subtract(const Duration(seconds: 2));
       await seed(tester);
       await pumpAs(tester, 'kim');
+      expect(find.byKey(const Key('startCountdown')), findsNothing);
       now = start;
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
@@ -1592,7 +1606,7 @@ void main() {
           ),
         ),
       );
-      now = start.add(settings.duration + const Duration(minutes: 5));
+      now = start.add(settings.duration + const Duration(seconds: 30));
       await pumpAs(tester, 'alex');
 
       expect(find.byKey(const Key('filter_caught')), findsNothing);
@@ -2187,10 +2201,7 @@ void main() {
   });
 
   group('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () {
-    const timeUpHint =
-        'The round keeps running so you can look at the '
-        'locations together. The host ends it – otherwise it ends '
-        'automatically at ';
+    const timeUpHint = 'The round is over and will be saved in a moment.';
 
     Future<void> regularPing(WidgetTester tester, String player) =>
         tester.runAsync(
@@ -2252,7 +2263,7 @@ void main() {
         '(R-GAME-06)', (tester) async {
       await seed(tester);
       await regularPing(tester, 'sam');
-      now = start.add(settings.duration + const Duration(minutes: 5));
+      now = start.add(settings.duration + const Duration(seconds: 30));
       await pumpAs(tester, 'kim');
 
       for (final id in ['hunters', 'lastPings', 'player_kim', 'player_sam']) {
@@ -2265,11 +2276,15 @@ void main() {
       expect(find.byKey(const Key('jokerButton')), findsNothing);
     });
 
-    testWidgets('3 h after the end the game screen ends the round by itself, '
-        'on any phone (R-GAME-10)', (tester) async {
+    testWidgets('1 min after the end the game screen ends the round by itself '
+        'and saves its map, on any phone (R-GAME-10, R-HIST-04)', (
+      tester,
+    ) async {
       await seed(tester);
       await regularPing(tester, 'sam');
-      final autoEndAt = start.add(settings.duration + const Duration(hours: 3));
+      final autoEndAt = start.add(
+        settings.duration + const Duration(minutes: 1),
+      );
       // Fake Firestore stores serverTimestamp as real time; pin it.
       final groupId = (await tester.runAsync(() => testSession(code, 'kim')))!
           .groupId;
@@ -2280,8 +2295,7 @@ void main() {
       );
       now = autoEndAt.subtract(const Duration(seconds: 2));
       await pumpAs(tester, 'kim');
-      final time = DateFormat.Hm('en').format(autoEndAt.toLocal());
-      expect(find.text('$timeUpHint$time.'), findsOneWidget);
+      expect(find.textContaining(timeUpHint), findsOneWidget);
       expect((await gameDoc(tester))['status'], 'running');
 
       now = autoEndAt;
@@ -2294,6 +2308,11 @@ void main() {
         () => db.collection('games').doc(groupId).collection('pings').get(),
       );
       expect(pings!.docs, isEmpty);
+      final maps = await tester.runAsync(
+        () =>
+            db.collection('games').doc(groupId).collection('historyMaps').get(),
+      );
+      expect(maps!.docs, hasLength(1));
     });
 
     testWidgets('while the game is on players keep their own view', (
@@ -2366,7 +2385,7 @@ void main() {
       await pumpAs(
         tester,
         'kim',
-        finishedAt: now.subtract(const Duration(minutes: 1)),
+        finishedAt: now.subtract(const Duration(seconds: 30)),
       );
       expect(find.text('HUNTERS WON'), findsOneWidget);
       expect(find.textContaining(timeUpHint), findsOneWidget);
@@ -2496,7 +2515,7 @@ void main() {
     testWidgets('opening the app after the end: no banner again, but the '
         'overview tells who won (R-GAME-09)', (tester) async {
       await seed(tester);
-      now = start.add(settings.duration + const Duration(minutes: 5));
+      now = start.add(settings.duration + const Duration(seconds: 30));
       await pumpAs(tester, 'sam');
       await tester.pump(const Duration(seconds: 1));
       expect(find.textContaining('have won!'), findsNothing);

@@ -15,7 +15,7 @@ lib/
     teams/     Zufallseinteilung, Tauschen, StartCheck
     crypto/    GroupCrypto (Schlüssel + Gruppen-ID aus Code, AES-GCM)
     geo/       Punkt-in-Polygon, Fläche/Ausdehnung, Überkreuzungs-Check, AreaDraft (Editor-Logik mit Undo)
-    history/   CatchRecord, RoundSummary (Rundenübersicht für die Historie)
+    history/   CatchRecord, RoundSummary (Rundenübersicht), RoundMap (Rundenkarte, Zeitleiste)
     join_code.dart
   data/        GameRepository (Interface) + FirestoreGameRepository, SessionStore (Gruppenliste + offene
                Gruppe im Keystore), LocationService (geolocator; Phase 4 nur „wo bin ich“)
@@ -37,7 +37,8 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
   `startAt` ist der **offizielle Start nach dem Countdown** (R-START-01/02): Das Host-Handy rechnet ihn beim „Start“ aus
   (`plannedStartAt`, lib/core/schedule/start_time.dart: nächste Startzeit aus den Einstellungen, ist sie vorbei jetzt + 1 min) und
   schreibt ihn als festen Zeitpunkt; ohne Startzeit wie bisher Server-Timestamp (sofort). Bis dahin ist die Phase `notStarted` (Countdown in der Kopfzeile, keine Buttons,
-  kein Tracking). Firestore-Regeln unverändert (der Host darf `startAt` frei setzen). Start-Benachrichtigung
+  kein Tracking; Overlay `StartCountdownOverlay` in lib/features/game/start_countdown.dart, Anzeige aus
+  `countdownSecondsLeft`, R-START-05). Firestore-Regeln unverändert (der Host darf `startAt` frei setzen). Start-Benachrichtigung
   (R-START-04): `NoticeTracker.onPhase` merkt sich den Countdown und meldet den Übergang einmal (`GameStartedNotice`),
   geprüft beim Öffnen und im Sekundentakt der Spielansicht.
   Wird der letzte Spieler gefangen (nach Bestätigung, R-GAME-08), setzt derselbe Batch `finishedAt`; `GameClock.endAt`
@@ -74,22 +75,28 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 | `games/{groupId}/jokerRequests/{id}` | uid (Fragender), createdAt – nur Spieler lesbar; nur zusammen mit `playerJokerUsed` | – | ✔ |
 | `games/{groupId}/jokerAnswers/{requestId}_{uid}` | request, requester, uid, createdAt, `data` – nur der Fragende liest | Standort | ✔ |
 | `games/{groupId}/drawings/{id}` | uid (Autor), createdAt, `data` (Farbe + Punkte, `Stroke`) – nur Hunter lesen/schreiben/löschen (jeder Hunter jeden Strich, R-DRAW-06); Radieren = Strich löschen + Reststücke neu anlegen in einem Batch; Dokument-IDs vergibt das Gerät | Linien (Orte) | ✔ |
-| `games/{groupId}/history/{auto}` | endedAt, `data` (RoundSummary) – überlebt Rundenende | Inhalt | ✔ |
+| `games/{groupId}/hunterSnaps/{uid}_{slotId}` | uid, slot, createdAt, `data` (LocationFix) – Position des Hunters zu jedem regulären und ⚡-Ping-Zeitpunkt (R-HIST-05); anlegen nur Hunter selbst, lesen niemand während der Runde, alle Mitglieder nach Spielende | Standort | ✔ |
+| `games/{groupId}/history/{id}` | endedAt, `data` (RoundSummary) – überlebt Rundenende; ID `auto_{startAt ms}` bzw. zufällig beim Abbruch | Inhalt | ✔ |
+| `games/{groupId}/historyMaps/{id}` | endedAt, `data` (RoundMap, kompakt: Indizes statt UIDs, Koordinaten auf 6 Stellen) – gleiche ID wie die Übersicht, die zuerst existieren muss; lesen alle Mitglieder, löschen Host (R-HIST-06) | Standorte | ✔ |
 
 Security Rules (`firestore.rules`, getestet in `firestore-tests/`): Spiele nur per ID abrufbar (nicht auflistbar),
 Mitgliederliste nur für Mitglieder, Einstellungen/Rollen/Start/Löschen nur Host, Spielfeld (`area`) alle Mitglieder
 in der Lobby, Beitritt nur als „unassigned“,
 Umbenennen nur sich selbst. Deploy: `firebase deploy --only firestore:rules`.
 
-**Lebenszyklus**: Eine Gruppe lebt über viele Runden (`status`: lobby ↔ running). „Spiel beenden“ (Host)
-löscht alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`, `outsideLocs`, `playerLocs`, `events`,
-`speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`), setzt caught/jokerUsed zurück und geht in die Lobby.
-**Automatisches Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 3 h) beendet jedes Mitgliedsgerät die Runde
-selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. 1×
-pro Minute). Reihenfolge anders als beim Host: Historie unter fester ID `history/auto_{startAt ms}` (zweites Gerät bzw.
+**Lebenszyklus**: Eine Gruppe lebt über viele Runden (`status`: lobby ↔ running). Jedes Rundenende speichert
+Übersicht (`history`) und Rundenkarte (`historyMaps`, `RoundMap.build` aus Pings, `hunterSnaps`, `hunterLocs`, Catches,
+Speedhunt-Events) und löscht dann alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`,
+`outsideLocs`, `playerLocs`, `events`, `speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`, `hunterSnaps`),
+setzt caught/jokerUsed zurück und geht in die Lobby. **Abbruch** durch den Host (`endRound`, R-GAME-07): Übersicht,
+Lobby, dann erst Karte (vorher darf ein Host, der kein Hunter ist, nicht alle Positionen lesen), dann löschen.
+**Normales Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 1 min) beendet jedes Mitgliedsgerät die Runde
+selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. alle
+10 s). Reihenfolge: Übersicht und Karte unter fester ID `auto_{startAt ms}` (`_createOnce`: zweites Gerät bzw.
 Wiederholung legt nichts doppelt an; Überschreiben verbieten die Regeln), dann Rundendaten löschen, **zuletzt** Lobby –
 denn Nicht-Hosts dürfen die Rundendaten nur lesen/löschen, solange die Runde noch läuft (`canAutoEnd` in den Regeln,
-gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 3 h). Jede Host-Aktion setzt
+gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 1 min). Rundennummer = höchste bisher + 1
+(`nextRoundNumber`), damit sie sich nach dem Löschen einer Runde (`deleteHistoryEntry`: erst Karte, dann Übersicht) nicht wiederholt. Jede Host-Aktion setzt
 `expiresAt` = jetzt + 180 Tage; zusätzlich verlängert jedes Öffnen durch ein Mitglied (`checkIn`, max. 1× pro Tag). **TTL gibt es im Spark-Tarif nicht**; stattdessen ruft `SessionController.build`
 beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlängern (Regeln: Mitglieder dürfen nur `expiresAt` setzen, max. +181 Tage; löschen erst nach Ablauf).
 
@@ -131,6 +138,10 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Start-Countdown 2026-11-01 (R-SET-21, R-START-01 … 03): optionale Startzeit (`GameSettings.startTime`, Minuten
       seit Mitternacht als `startTimeMin` in den verschlüsselten Einstellungen); vorbei → 1 min, keine → sofort; siehe Kernideen.
 - [x] Spielleitung 2026-11-01 (R-GM-01 … R-GM-09): siehe Abschnitt unten; Regeländerung (`playerLocs`, `watchesLive`)
+- [x] Rundenkarte in der Historie 2026-11-01 (R-HIST-04 … R-HIST-07, R-GAME-10 neu): Runde endet 1 min nach Spielende
+      von selbst; Hunter halten ihren Standort zu jedem Ping-Zeitpunkt fest (`RoundEngine._sendHunterSnapshots`);
+      `HistoryMapScreen`/`RoundMapView` (lib/features/history) mit Chips je Spieler/Hunter/Speedhunt und Zeitleiste
+      (`timelineSteps`/`timelineAt`); Lobby zeigt die letzte Runde. Regeländerung (`hunterSnaps`, `historyMaps`, 1 min).
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise
@@ -199,7 +210,9 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - **Firebase-Kontingent** (Spark: 50k Lesen, 20k Schreiben pro Tag), Beispiel 3 h, 3 Hunter, 6 Spieler: Spieler alle
   5 s wären ≈ 13k Schreibvorgänge (+ 6,5k Hunter) → zu viel; alle 15 s ≈ 4,3k. Größter Posten beim Lesen sind die
   Hunter alle 5 s (≈ 3 × 6,5k für die Hunter selbst); Spielleitung/Gefangene kosten je ≤ 4,3k (Spieler) + 2,2k (Hunter).
-  Zwei lange Runden am selben Tag können eng werden.
+  Zwei lange Runden am selben Tag können eng werden. Rundenkarte: ≈ 100 Schreibvorgänge pro Runde für die
+  Hunter-Positionen (1 pro Hunter und Ping-Zeitpunkt) + 1 Karte; Speichern liest Pings und Positionen einmal (ein
+  Gerät), eine Karte öffnen = 1 Lesevorgang. Eine Karte hat etwa 15–50 KB, 1 GiB Speicher reicht für > 10.000 Runden.
 
 ## Computer-Mitglieder zum Testen (R-BOT-01 … R-BOT-06)
 - Aktiv über `botsEnabledProvider` (`kDebugMode` oder `--dart-define=MANHUNT_BOTS=true`); Anzahl in
@@ -209,7 +222,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
   gehören: Slot-UID ∈ Mitgliederliste.
 - Art steht im Namen (je Art eine eigene Namensliste, z.B. `🤖 Stromius` = Hunter, `🤖 Adelgunde` = Spieler; `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
-  Mensch mit dieser Rolle, sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
+  Mensch mit dieser Rolle, sonst erster mitspielende Mensch (Hunter/Spieler – die Spielleitung trackt nicht, R-BOT-07), sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
   aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
 - Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
   `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:

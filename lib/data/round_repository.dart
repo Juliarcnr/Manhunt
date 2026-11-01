@@ -24,6 +24,14 @@ abstract interface class RoundRepository {
   /// Hunter shares their live position with the other hunters (R-HUNT-02).
   Future<void> updateHunterLocation(GroupSession session, LocationFix fix);
 
+  /// Hunter keeps their position at a regular or speedhunt ping time for the
+  /// round's map in the history (R-HIST-05). Idempotent per slot.
+  Future<void> sendHunterSnapshot(
+    GroupSession session,
+    PingSlot slot,
+    LocationFix fix,
+  );
+
   /// Live hunter positions by hunter id – hunters only.
   Stream<Map<String, LocationFix>> watchHunterLocations(GroupSession session);
 

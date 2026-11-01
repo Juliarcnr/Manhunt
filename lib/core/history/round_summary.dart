@@ -55,9 +55,10 @@ class CatchEntry {
 }
 
 /// Summary of a finished round, kept in the group history (R-HIST-02).
-/// Contains no locations.
+/// Contains no locations – those are in the separate RoundMap (R-HIST-04).
 class RoundSummary {
   const RoundSummary({
+    this.id = '',
     required this.round,
     required this.startedAt,
     required this.endedAt,
@@ -66,7 +67,11 @@ class RoundSummary {
     required this.catches,
     this.abortedEarly = false,
     this.autoEnded = false,
+    this.hasMap = false,
   });
+
+  /// Id of the history entry (also of its `RoundMap`); not part of the JSON.
+  final String id;
 
   final int round;
   final DateTime startedAt;
@@ -83,6 +88,9 @@ class RoundSummary {
   /// Nobody ended the round, so a device did 3 h after it was over
   /// (R-GAME-10).
   final bool autoEnded;
+
+  /// A map of the round was saved too (R-HIST-04); older rounds have none.
+  final bool hasMap;
 
   Duration get duration => endedAt.difference(startedAt);
 
@@ -104,21 +112,25 @@ class RoundSummary {
     'catches': [for (final c in catches) c.toJson()],
     'abortedEarly': abortedEarly,
     if (autoEnded) 'autoEnded': true,
+    if (hasMap) 'hasMap': true,
   };
 
-  factory RoundSummary.fromJson(Map<String, Object?> json) => RoundSummary(
-    round: json['round']! as int,
-    startedAt: DateTime.parse(json['startedAt']! as String),
-    endedAt: DateTime.parse(json['endedAt']! as String),
-    hunters: (json['hunters']! as List<Object?>).cast<String>(),
-    players: (json['players']! as List<Object?>).cast<String>(),
-    catches: [
-      for (final c in json['catches']! as List<Object?>)
-        CatchEntry.fromJson(c! as Map<String, Object?>),
-    ],
-    abortedEarly: json['abortedEarly'] as bool? ?? false,
-    autoEnded: json['autoEnded'] as bool? ?? false,
-  );
+  factory RoundSummary.fromJson(Map<String, Object?> json, {String id = ''}) =>
+      RoundSummary(
+        id: id,
+        round: json['round']! as int,
+        startedAt: DateTime.parse(json['startedAt']! as String),
+        endedAt: DateTime.parse(json['endedAt']! as String),
+        hunters: (json['hunters']! as List<Object?>).cast<String>(),
+        players: (json['players']! as List<Object?>).cast<String>(),
+        catches: [
+          for (final c in json['catches']! as List<Object?>)
+            CatchEntry.fromJson(c! as Map<String, Object?>),
+        ],
+        abortedEarly: json['abortedEarly'] as bool? ?? false,
+        autoEnded: json['autoEnded'] as bool? ?? false,
+        hasMap: json['hasMap'] as bool? ?? false,
+      );
 
   /// Builds the summary at round end from the members and recorded catches.
   /// A player caught twice (e.g. reported by hunter and self) counts once,
@@ -139,6 +151,9 @@ class RoundSummary {
 
     /// Ended by a device, not the host (R-GAME-10).
     bool autoEnded = false,
+
+    /// A `RoundMap` is saved with it (R-HIST-04).
+    bool hasMap = false,
   }) {
     final names = {for (final m in members) m.id: m.name};
     final sorted = [...catches]..sort((a, b) => a.at.compareTo(b.at));
@@ -163,6 +178,7 @@ class RoundSummary {
           plannedDuration != null &&
           endedAt.isBefore(startedAt.add(plannedDuration)),
       autoEnded: autoEnded,
+      hasMap: hasMap,
     );
   }
 }

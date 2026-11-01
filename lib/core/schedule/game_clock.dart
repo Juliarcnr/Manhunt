@@ -18,9 +18,10 @@ class GameClock {
   /// round then counts as over as if the time were up.
   final DateTime? finishedAt;
 
-  /// How long a round stays open for looking at the locations once it is
-  /// over, if the host does not end it (R-GAME-10).
-  static const autoEndDelay = Duration(hours: 3);
+  /// Grace time after the round is over (time up or the hunters won) before
+  /// a device ends it automatically (R-GAME-10): late pings and hunter
+  /// positions still arrive, then the round is saved to the history.
+  static const autoEndDelay = Duration(minutes: 1);
 
   DateTime get huntersReleaseAt => startAt.add(settings.headStart);
 

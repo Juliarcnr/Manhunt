@@ -13,6 +13,55 @@ Map<String, Color> playerColors(List<String> playerIds) => {
     id: AppColors.playerPalette[i % AppColors.playerPalette.length],
 };
 
+/// Colour per hunter on the round's map in the history (R-HIST-05).
+Map<String, Color> hunterColors(List<String> hunterIds) => {
+  for (final (i, id) in hunterIds.indexed)
+    id: AppColors.hunterPalette[i % AppColors.hunterPalette.length],
+};
+
+/// Hunters' positions at speedhunt ping times (R-HIST-05): a ⚡ badge with
+/// the ping's number, filled in the hunter's colour – the target's own ⚡
+/// pings are dark with a ring in the player's colour.
+MarkerLayer hunterSnapsLayer({
+  required List<PingRecord> snaps,
+  required Map<String, Color> colors,
+}) => MarkerLayer(
+  markers: [
+    for (final p in snaps)
+      Marker(
+        key: Key('hunterSnap_${p.playerId}_${p.slotId}'),
+        point: p.fix.point.toLatLng(),
+        width: 34,
+        height: 28,
+        child: _NumberDot(
+          text: '⚡${p.speedhuntNumber ?? ''}',
+          color: colors[p.playerId] ?? AppColors.hunter,
+          textColor: Colors.white,
+          ring: Colors.white,
+          wide: true,
+        ),
+      ),
+  ],
+);
+
+/// Named pins, e.g. for one step of the history's timeline (R-HIST-07):
+/// players in their colour, hunters in theirs with the hunter symbol.
+MarkerLayer namedPinsLayer({
+  required String keyPrefix,
+  required Map<String, LocationFix> positions,
+  required Map<String, String> names,
+  required Map<String, Color> colors,
+  bool hunters = false,
+}) => _positionsLayer(
+  keyPrefix: keyPrefix,
+  positions: positions,
+  names: names,
+  colors: colors,
+  fallbackColor: hunters ? AppColors.hunter : AppColors.player,
+  icon: hunters ? Icons.location_on : Icons.person_pin_circle,
+  labelIcon: hunters ? Icons.track_changes : null,
+);
+
 /// Last regular ping of players (see [lastRegularPings], [sharedLastPings])
 /// as a location pin with the name above, in the player's own colour
 /// (R-HUNT-03, R-PLAY-05); [greyed] players (caught) in grey.

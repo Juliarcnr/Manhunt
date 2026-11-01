@@ -125,8 +125,34 @@ void main() {
       expect(botCarrier(BotKind.player, [host]), 'h');
       expect(botCarrier(BotKind.hunter, [kim]), 'k');
       const unassigned = Member(id: 'u', name: 'Uli');
-      expect(botCarrier(BotKind.hunter, [unassigned, kim]), 'u');
+      expect(botCarrier(BotKind.hunter, [unassigned]), 'u');
       expect(botCarrier(BotKind.hunter, [bot('b', BotKind.hunter, 1)]), isNull);
+    });
+
+    test('a playing phone goes before one that does not track: all bots '
+        'walk around the one phone that plays (R-BOT-07)', () {
+      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
+      const unassigned = Member(id: 'u', name: 'Uli');
+      // The game master joined first (e.g. as host): the hunter carries the
+      // computer players too.
+      expect(botCarrier(BotKind.player, [gm, host]), 'h');
+      expect(botCarrier(BotKind.hunter, [gm, unassigned, kim]), 'k');
+      // Nobody plays yet (lobby): the first human, as before.
+      expect(botCarrier(BotKind.player, [gm, unassigned]), 'g');
+    });
+
+    test('making the first phone game master moves its bots to the playing '
+        'phone (R-BOT-07)', () {
+      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
+      final mine = bot('b', BotKind.player, 1);
+      final members = [gm, host, mine];
+      expect(plan(members, 'g', mine: {'b'}).remove, ['b']);
+      // The old bot leaves; its name stays taken until it is gone.
+      expect(plan(members, 'h').create, [
+        (kind: BotKind.hunter, name: '🤖 Stromius'),
+        (kind: BotKind.player, name: '🤖 Pankratius'),
+        (kind: BotKind.player, name: '🤖 Notburga'),
+      ]);
     });
 
     test('carriers create the missing bots, numbered uniquely', () {

@@ -2,21 +2,25 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart' hide GeoPoint;
 
+import '../core/history/round_map.dart';
 import '../core/history/round_summary.dart';
 import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
+import '../core/round/ping_schedule.dart';
 import '../core/round/player_aliases.dart';
 import '../core/round/read_budget.dart';
 import '../core/schedule/game_clock.dart';
+import '../core/schedule/speedhunt.dart';
 import '../core/schedule/start_time.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
 /// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), sharedPings + durationSec (plain, for the rules), aliases (encrypted, per round), startAt, finishedAt (per round), createdAt, expiresAt
 /// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
-/// - `games/{groupId}/{pings,hunterLocs,outsideLocs,events,speedhuntTargets,jokerRequests,jokerAnswers,drawings}/…`: per-round data, deleted when the round ends
-/// - `games/{groupId}/history/{auto}`: endedAt, data (encrypted RoundSummary, no locations)
+/// - `games/{groupId}/{pings,hunterLocs,hunterSnaps,outsideLocs,playerLocs,events,speedhuntTargets,jokerRequests,jokerAnswers,drawings}/…`: per-round data, deleted when the round ends
+/// - `games/{groupId}/history/{id}`: endedAt, data (encrypted RoundSummary, no locations)
+/// - `games/{groupId}/historyMaps/{id}`: endedAt, data (encrypted RoundMap, same id as its history entry)
 class FirestoreGameRepository implements GameRepository {
   FirestoreGameRepository(this._db, {DateTime Function()? now, Random? random})
     : _now = now ?? DateTime.now,
@@ -44,6 +48,7 @@ class FirestoreGameRepository implements GameRepository {
     'jokerRequests',
     'jokerAnswers',
     'drawings',
+    'hunterSnaps',
   ];
 
   /// Firestore allows at most 500 writes per batch.
@@ -351,11 +356,16 @@ class FirestoreGameRepository implements GameRepository {
 
   @override
   Future<void> endRound(GroupSession session) async {
-    // History first: if anything below fails, the summary is not lost.
-    // Then back to the lobby: only then the rules let the host read (and so
-    // delete) the round data. Leftovers are also cleared on the next start.
-    await _saveSummary(session, endedAt: _now());
+    // History first: if anything below fails, the summary is not lost. The
+    // round's facts are read now – the lobby clears start time and numbers.
+    final round = await _endedRound(session, endedAt: _now());
+    final entry = _game(session).collection('history').doc();
+    await _saveSummary(session, round, entry);
+    // Then back to the lobby: only then the rules let a host who is not a
+    // hunter read all positions for the map – and delete the round data.
+    // Leftovers are also cleared on the next start.
     await _backToLobby(session);
+    await _saveMap(session, round, entry.id);
     await _deleteRoundData(session);
   }
 
@@ -373,24 +383,20 @@ class FirestoreGameRepository implements GameRepository {
       finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
     );
     if (_now().isBefore(clock.autoEndAt)) return false;
+    // Ending automatically is the normal case now, so it is not marked
+    // (`RoundSummary.autoEnded` stays for rounds of older versions).
+    final round = await _endedRound(session, endedAt: clock.endAt);
     // One history entry per round: whoever comes second (another device, or
     // this one after an interruption) does not add it again.
-    final entry = _game(session)
-        .collection('history')
-        .doc('auto_${startAt.millisecondsSinceEpoch}');
-    if (!(await entry.get()).exists) {
-      try {
-        await _saveSummary(
-          session,
-          endedAt: clock.autoEndAt,
-          autoEnded: true,
-          entry: entry,
-        );
-      } on FirebaseException {
-        // Another device was faster; the rules do not let us overwrite it.
-        if (!(await entry.get()).exists) rethrow;
-      }
-    }
+    final id = 'auto_${startAt.millisecondsSinceEpoch}';
+    await _createOnce(
+      _game(session).collection('history').doc(id),
+      (entry) => _saveSummary(session, round, entry),
+    );
+    await _createOnce(
+      _game(session).collection('historyMaps').doc(id),
+      (_) => _saveMap(session, round, id),
+    );
     // Unlike the host, members may read (and so delete) the round data only
     // while the round still runs: clean up before going back to the lobby.
     await _deleteRoundData(session);
@@ -419,25 +425,63 @@ class FirestoreGameRepository implements GameRepository {
     await batch.commit();
   }
 
-  /// Saves the current round to the history, under [entry] or a new id.
-  Future<void> _saveSummary(
+  /// Creates [entry] with [create] unless it exists: another device (or this
+  /// one before an interruption) may have been faster, and the rules do not
+  /// let us overwrite it.
+  Future<void> _createOnce(
+    DocumentReference<Map<String, dynamic>> entry,
+    Future<void> Function(DocumentReference<Map<String, dynamic>>) create,
+  ) async {
+    if ((await entry.get()).exists) return;
+    try {
+      await create(entry);
+    } on FirebaseException {
+      if (!(await entry.get()).exists) rethrow;
+    }
+  }
+
+  /// The facts of the running round for its history entry, read while the
+  /// group is still in the round (start time, numbers, settings).
+  Future<_EndedRound> _endedRound(
     GroupSession session, {
     required DateTime endedAt,
-    bool autoEnded = false,
-    DocumentReference<Map<String, dynamic>>? entry,
   }) async {
     final game = (await _game(session).get()).data()!;
     final startedAt = (game['startAt'] as Timestamp?)?.toDate() ?? endedAt;
-    final settings = await _settings(session, game);
     final members = await Future.wait([
       for (final doc in (await _members(session).get()).docs)
         _decodeMember(session, doc),
     ]);
+    final aliasesEnc = game['aliases'] as String?;
+    final aliases = aliasesEnc == null
+        ? const <String, int>{}
+        : {
+            for (final e in (await session.crypto.decryptJson(
+              aliasesEnc,
+            ) as Map<String, Object?>).entries)
+              e.key: e.value! as int,
+          };
+    return _EndedRound(
+      startedAt: startedAt,
+      endedAt: endedAt,
+      finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
+      settings: await _settings(session, game),
+      area: await _area(session, game),
+      members: members,
+      playerOrder: byAlias(aliases, [
+        for (final m in members)
+          if (m.isPlayer) m.id,
+      ]),
+      catches: await _catches(session),
+    );
+  }
+
+  Future<List<CatchRecord>> _catches(GroupSession session) async {
     final events = await _game(session)
         .collection('events')
         .where('type', isEqualTo: 'catch')
         .get();
-    final catches = await Future.wait([
+    return Future.wait([
       for (final doc in events.docs)
         session.crypto
             .decryptJson(doc.data()['data'] as String)
@@ -445,22 +489,164 @@ class FirestoreGameRepository implements GameRepository {
               (json) => CatchRecord.fromJson(json! as Map<String, Object?>),
             ),
     ]);
-    final history = _game(session).collection('history');
-    final round = (await history.count().get()).count! + 1;
+  }
+
+  /// Saves the [round]'s summary to the history as [entry] (R-HIST-02).
+  Future<void> _saveSummary(
+    GroupSession session,
+    _EndedRound round,
+    DocumentReference<Map<String, dynamic>> entry,
+  ) async {
+    final history = await _game(session).collection('history').get();
+    final numbers = <int>[];
+    for (final doc in history.docs) {
+      try {
+        final json = await session.crypto.decryptJson(
+          doc.data()['data'] as String,
+        );
+        numbers.add((json! as Map<String, Object?>)['round']! as int);
+      } on Object {
+        // Unreadable entry: does not count.
+      }
+    }
     final summary = RoundSummary.build(
-      round: round,
-      startedAt: startedAt,
-      endedAt: endedAt,
-      members: members,
-      catches: catches,
-      plannedDuration: settings.duration,
-      finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
-      autoEnded: autoEnded,
+      round: nextRoundNumber(numbers),
+      startedAt: round.startedAt,
+      endedAt: round.endedAt,
+      members: round.members,
+      catches: round.catches,
+      plannedDuration: round.settings.duration,
+      finishedAt: round.finishedAt,
+      hasMap: true,
     );
-    await (entry ?? history.doc()).set({
-      'endedAt': Timestamp.fromDate(endedAt),
+    await entry.set({
+      'endedAt': Timestamp.fromDate(round.endedAt),
       'data': await session.crypto.encryptJson(summary.toJson()),
     });
+  }
+
+  /// Saves what everyone saw once the round was over (R-HIST-04) under the
+  /// id of its history entry. Undecodable leftovers are skipped.
+  Future<void> _saveMap(
+    GroupSession session,
+    _EndedRound round,
+    String historyId,
+  ) async {
+    final game = _game(session);
+    Future<List<PingRecord>> decode(String collection) async {
+      final docs = (await game.collection(collection).get()).docs;
+      return [for (final doc in docs) ?await _decodePing(session, doc.data())];
+    }
+
+    final hunters = <String, LocationFix>{};
+    for (final doc in (await game.collection('hunterLocs').get()).docs) {
+      if (await _decodeFix(session, doc.data()) case final fix?) {
+        hunters[doc.id] = fix;
+      }
+    }
+    final speedhunts = <Speedhunt>[];
+    final events = await game
+        .collection('events')
+        .where('type', isEqualTo: 'speedhunt')
+        .get();
+    for (final doc in events.docs) {
+      try {
+        final json = await session.crypto.decryptJson(
+          doc.data()['data'] as String,
+        );
+        speedhunts.add(
+          Speedhunt.fromJson({
+            ...json! as Map<String, Object?>,
+            'targetId': '',
+          }),
+        );
+      } on Object {
+        // Not a readable speedhunt.
+      }
+    }
+    final map = RoundMap.build(
+      area: round.area,
+      startedAt: round.startedAt,
+      endedAt: round.endedAt,
+      pingInterval: round.settings.pingInterval,
+      members: round.members,
+      playerOrder: round.playerOrder,
+      pings: await decode('pings'),
+      hunterSnaps: await decode('hunterSnaps'),
+      hunterLocations: hunters,
+      catches: round.catches,
+      speedhunts: applyCatches(speedhunts, round.catches),
+    );
+    await game.collection('historyMaps').doc(historyId).set({
+      'endedAt': Timestamp.fromDate(round.endedAt),
+      'data': await session.crypto.encryptJson(map.toJson()),
+    });
+  }
+
+  Future<LocationFix?> _decodeFix(
+    GroupSession session,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final json = await session.crypto.decryptJson(data['data'] as String);
+      return LocationFix.fromJson(json! as Map<String, Object?>);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// A ping or hunter snapshot document (same layout).
+  Future<PingRecord?> _decodePing(
+    GroupSession session,
+    Map<String, dynamic> data,
+  ) async {
+    final fix = await _decodeFix(session, data);
+    final uid = data['uid'];
+    final slot = data['slot'];
+    if (fix == null || uid is! String || slot is! String) return null;
+    return PingRecord(
+      playerId: uid,
+      kind: slot.startsWith('speedhunt_')
+          ? PingKind.speedhunt
+          : PingKind.regular,
+      slotId: slot,
+      fix: fix,
+    );
+  }
+
+  Future<List<GeoPoint>> _area(
+    GroupSession session,
+    Map<String, dynamic> game,
+  ) async {
+    final areaEnc = game['area'] as String?;
+    if (areaEnc == null) return const [];
+    final json = await session.crypto.decryptJson(areaEnc);
+    return [
+      for (final p in json! as List<Object?>)
+        GeoPoint.fromJson(p! as Map<String, Object?>),
+    ];
+  }
+
+  @override
+  Future<RoundMap?> loadRoundMap(GroupSession session, String historyId) async {
+    final doc = await _game(session)
+        .collection('historyMaps')
+        .doc(historyId)
+        .get();
+    final data = doc.data();
+    if (data == null) return null;
+    final json = await session.crypto.decryptJson(data['data'] as String);
+    return RoundMap.fromJson(json! as Map<String, Object?>);
+  }
+
+  @override
+  Future<void> deleteHistoryEntry(
+    GroupSession session,
+    String historyId,
+  ) async {
+    // Map first: without its summary nobody would find it any more.
+    await _game(session).collection('historyMaps').doc(historyId).delete();
+    await _game(session).collection('history').doc(historyId).delete();
   }
 
   Future<GameSettings> _settings(
@@ -483,8 +669,10 @@ class FirestoreGameRepository implements GameRepository {
                 session.crypto
                     .decryptJson(doc.data()['data'] as String)
                     .then(
-                      (json) =>
-                          RoundSummary.fromJson(json! as Map<String, Object?>),
+                      (json) => RoundSummary.fromJson(
+                        json! as Map<String, Object?>,
+                        id: doc.id,
+                      ),
                     ),
             ]),
           );
@@ -500,11 +688,13 @@ class FirestoreGameRepository implements GameRepository {
           .update({'status': GameStatus.lobby.name, 'expiresAt': _newExpiry()});
     }
     await _deleteRoundData(session);
-    await _deleteAll(
-      (await _game(
-        session,
-      ).collection('history').get()).docs.map((d) => d.reference),
-    );
+    for (final name in ['historyMaps', 'history']) {
+      await _deleteAll(
+        (await _game(
+          session,
+        ).collection(name).get()).docs.map((d) => d.reference),
+      );
+    }
     // Own member doc last: until then the rules still see us as a member.
     await _deleteAll(
       (await _members(session).get()).docs
@@ -557,4 +747,28 @@ class FirestoreGameRepository implements GameRepository {
       await batch.commit();
     }
   }
+}
+
+/// What a history entry needs of the round that just ended; read before
+/// going back to the lobby clears start time and numbers.
+class _EndedRound {
+  const _EndedRound({
+    required this.startedAt,
+    required this.endedAt,
+    required this.finishedAt,
+    required this.settings,
+    required this.area,
+    required this.members,
+    required this.playerOrder,
+    required this.catches,
+  });
+
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final DateTime? finishedAt;
+  final GameSettings settings;
+  final List<GeoPoint> area;
+  final List<Member> members;
+  final List<String> playerOrder;
+  final List<CatchRecord> catches;
 }

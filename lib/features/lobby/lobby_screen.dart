@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/bots/bot_plan.dart';
+import '../../core/history/round_summary.dart';
 import '../../core/models/member.dart';
 import '../../core/round/read_budget.dart';
 import '../../core/teams/start_check.dart';
@@ -13,6 +14,7 @@ import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../settings/settings_form.dart';
 import '../history/history_button.dart';
+import '../history/history_map_screen.dart';
 import '../map/area_card.dart';
 import '../settings/settings_screen.dart';
 import 'bot_lobby_keeper.dart';
@@ -153,7 +155,7 @@ class LobbyScreen extends ConsumerWidget {
                   ],
                 ),
           actions: [
-            const HistoryButton(),
+            HistoryButton(isHost: _isAdmin),
             // Everyone sees the settings, only the host edits (R-SET-14).
             IconButton(
               key: const Key('settingsButton'),
@@ -208,6 +210,11 @@ class LobbyScreen extends ConsumerWidget {
             children: [
               _CodeCard(code: session.code),
               const SizedBox(height: 16),
+              // Who won the last round and its map (R-GAME-09, R-HIST-04).
+              if (ref.watch(historyProvider).value case [final last, ...]) ...[
+                _LastRoundCard(summary: last),
+                const SizedBox(height: 16),
+              ],
               AreaCard(
                 area: game.settings.area,
                 onChanged: (area) => run(() => repo.updateArea(session, area)),
@@ -466,6 +473,88 @@ Future<bool> _confirm(BuildContext context, String text, String action) async {
     ),
   );
   return result ?? false;
+}
+
+/// The newest round of the history: who won, with its map (R-GAME-09,
+/// R-HIST-04) – the round ends by itself, so the lobby says how it went.
+class _LastRoundCard extends StatelessWidget {
+  const _LastRoundCard({required this.summary});
+
+  final RoundSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final survivors = summary.survivors;
+    final huntersWon = survivors.isEmpty;
+    final names = survivors.length < 2
+        ? survivors.join()
+        : l10n.nameList(
+            survivors.sublist(0, survivors.length - 1).join(', '),
+            survivors.last,
+          );
+    return Card(
+      key: const Key('lastRoundCard'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.lobbyLastRound(summary.round).toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.emoji_events_outlined,
+                  color: huntersWon ? AppColors.hunter : AppColors.speedhunt,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    huntersWon
+                        ? l10n.lobbyLastRoundHuntersWon
+                        : l10n.lobbyLastRoundPlayersWon(
+                            names,
+                            survivors.length,
+                          ),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            if (summary.abortedEarly)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  l10n.historyAborted,
+                  style: const TextStyle(color: AppColors.speedhunt),
+                ),
+              ),
+            if (summary.hasMap) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('lastRoundMap'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HistoryMapScreen(summary: summary),
+                  ),
+                ),
+                icon: const Icon(Icons.map_outlined),
+                label: Text(l10n.historyShowMap),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CodeCard extends StatelessWidget {

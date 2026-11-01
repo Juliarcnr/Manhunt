@@ -345,18 +345,29 @@ void main() {
       expect(find.byKey(const Key('startTimeClear')), findsNothing);
     });
 
-    testWidgets('picked with the time picker and removed again', (
+    testWidgets('typed in as hours and minutes and removed again', (
       tester,
     ) async {
       final current = await pumpEditable(tester);
       await tester.tap(find.byKey(const Key('startTimeTile')));
       await tester.pumpAndSettle();
+      // No clock dial: two number fields with the number pad.
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(2));
+      expect(
+        tester.widget<TextField>(fields.first).keyboardType,
+        TextInputType.number,
+      );
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byIcon(Icons.access_time), findsNothing);
+      await tester.enterText(fields.first, '15');
+      await tester.enterText(fields.last, '30');
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
-      expect(current().startTime, const Duration(hours: 14));
+      expect(current().startTime, const Duration(hours: 15, minutes: 30));
       expect(
         tester.widget<Text>(find.byKey(const Key('startTimeValue'))).data,
-        '14:00',
+        '15:30',
       );
 
       await tester.tap(find.byKey(const Key('startTimeClear')));

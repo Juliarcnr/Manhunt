@@ -26,3 +26,15 @@ DateTime? plannedStartAt(DateTime now, {Duration? startTime}) {
       ? now.add(startCountdown)
       : at;
 }
+
+/// How long "START" stays on screen after the countdown (R-START-05).
+const startFlash = Duration(milliseconds: 1500);
+
+/// What the countdown overlay shows at [now] (R-START-05): the whole seconds
+/// left until [startAt] (rounded up), 0 for "START" right after it, null once
+/// that is over.
+int? countdownSecondsLeft(DateTime startAt, DateTime now) {
+  final left = startAt.difference(now);
+  if (left > Duration.zero) return (left.inMilliseconds / 1000).ceil();
+  return -left < startFlash ? 0 : null;
+}

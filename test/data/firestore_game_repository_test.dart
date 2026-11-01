@@ -1,11 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide GeoPoint;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:manhunt/core/history/round_map.dart';
 import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
 import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
+import 'package:manhunt/core/round/ping_schedule.dart';
+import 'package:manhunt/core/schedule/speedhunt.dart';
 import 'package:manhunt/data/firestore_game_repository.dart';
+import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
 
 import '../helpers.dart';
@@ -414,7 +418,7 @@ void main() {
     });
   });
 
-  group('automatic end 3 h after the round is over (R-GAME-10)', () {
+  group('automatic end 1 min after the round is over (R-GAME-10)', () {
     late DateTime start;
 
     setUp(() async {
@@ -435,8 +439,11 @@ void main() {
     Future<int> historyCount() async =>
         (await gameDoc().collection('history').get()).docs.length;
 
+    Future<int> mapCount() async =>
+        (await gameDoc().collection('historyMaps').get()).docs.length;
+
     test('nothing happens before', () async {
-      now = start.add(const Duration(hours: 5, minutes: 59));
+      now = start.add(const Duration(hours: 3, seconds: 59));
       expect(await repo.autoEndRound(guest), isFalse);
       expect((await repo.watchGame(admin).first)!.status, GameStatus.running);
       expect(await roundDocCount(), greaterThan(0));
@@ -467,36 +474,45 @@ void main() {
       expect(kim.jokerUsed, isFalse);
       expect(kim.role, Role.player);
       final round = (await repo.watchHistory(admin).first).single;
-      expect(round.autoEnded, isTrue);
+      // The normal way to end a round now: not marked.
+      expect(round.autoEnded, isFalse);
       expect(round.abortedEarly, isFalse);
+      expect(round.hasMap, isTrue);
       expect(round.catches.single.player, 'Kim');
-      // Ended when it was due, not whenever someone opened the app.
-      expect(round.duration, const Duration(hours: 6));
+      // The round's real time, not whenever someone opened the app.
+      expect(round.duration, const Duration(hours: 3));
+      expect(await mapCount(), 1);
     });
 
-    test('3 h after the hunters won', () async {
+    test('1 min after the hunters won', () async {
       final won = start.add(const Duration(minutes: 30));
       await gameDoc().update({'finishedAt': Timestamp.fromDate(won)});
-      now = won.add(const Duration(hours: 2, minutes: 59));
+      now = won.add(const Duration(seconds: 59));
       expect(await repo.autoEndRound(guest), isFalse);
-      now = won.add(const Duration(hours: 3));
+      now = won.add(const Duration(minutes: 1));
       expect(await repo.autoEndRound(guest), isTrue);
       final round = (await repo.watchHistory(admin).first).single;
-      expect(round.duration, const Duration(hours: 3, minutes: 30));
+      expect(round.duration, const Duration(minutes: 30));
+      expect(round.abortedEarly, isFalse);
     });
 
-    test('a second device or a retry adds no second history entry', () async {
-      now = start.add(const Duration(hours: 6));
-      // Interrupted after the summary was saved.
-      await gameDoc()
-          .collection('history')
-          .doc('auto_${start.millisecondsSinceEpoch}')
-          .set({'endedAt': Timestamp.fromDate(now), 'data': 'saved'});
-      expect(await repo.autoEndRound(admin), isTrue);
-      expect(await historyCount(), 1);
-      expect(await repo.autoEndRound(guest), isFalse); // already in the lobby
-      expect(await historyCount(), 1);
-    });
+    test(
+      'a second device or a retry adds no second history entry or map',
+      () async {
+        now = start.add(const Duration(hours: 3, minutes: 1));
+        // Interrupted after the summary was saved.
+        await gameDoc()
+            .collection('history')
+            .doc('auto_${start.millisecondsSinceEpoch}')
+            .set({'endedAt': Timestamp.fromDate(now), 'data': 'saved'});
+        expect(await repo.autoEndRound(admin), isTrue);
+        expect(await historyCount(), 1);
+        expect(await mapCount(), 1);
+        expect(await repo.autoEndRound(guest), isFalse); // already in the lobby
+        expect(await historyCount(), 1);
+        expect(await mapCount(), 1);
+      },
+    );
 
     test('opening the group ends it, the group stays', () async {
       now = start.add(const Duration(hours: 7));
@@ -620,6 +636,186 @@ void main() {
       await playRound(catches: []);
       await repo.deleteGame(admin);
       expect((await gameDoc().collection('history').get()).docs, isEmpty);
+      expect((await gameDoc().collection('historyMaps').get()).docs, isEmpty);
+    });
+  });
+
+  group('history map (R-HIST-04 … R-HIST-06)', () {
+    late DateTime start;
+    late GroupSession sam;
+    late FirestoreRoundRepository rounds;
+    DateTime at(int minutes) => start.add(Duration(minutes: minutes));
+    LocationFix fix(double lat, int minutes) =>
+        LocationFix(point: GeoPoint(lat, 13.4), at: at(minutes));
+
+    setUp(() async {
+      rounds = FirestoreRoundRepository(db);
+      await repo.createGame(
+        admin,
+        name: 'Julia',
+        settings: const GameSettings(area: area),
+      );
+      await repo.joinGame(guest, name: 'Kim');
+      sam = await testSession(code, 'sam');
+      await repo.joinGame(sam, name: 'Sam');
+      final members = await repo.watchMembers(admin).first;
+      await repo.setRoles(admin, [
+        for (final m in members)
+          m.copyWith(role: m.id == 'admin' ? Role.hunter : Role.player),
+      ]);
+      start = now;
+      await repo.startGame(admin);
+      await gameDoc().update({'startAt': Timestamp.fromDate(start)});
+
+      // Kim pings twice, Sam once plus one speedhunt ping; the hunter keeps
+      // their position at both ping times and the speedhunt's.
+      const regular1 = 'regular_1';
+      const regular2 = 'regular_2';
+      final speedhunt = Speedhunt(
+        targetId: 'sam',
+        startedAt: at(70),
+        pings: 3,
+        interval: const Duration(minutes: 5),
+      );
+      await rounds.startSpeedhunt(admin, speedhunt);
+      final shSlot = 'speedhunt_${at(70).millisecondsSinceEpoch}_1';
+      PingSlot slot(String id, int minutes) => PingSlot(
+        id: id,
+        kind: id.startsWith('speedhunt')
+            ? PingKind.speedhunt
+            : PingKind.regular,
+        at: at(minutes),
+      );
+      await rounds.sendPing(guest, slot(regular1, 20), fix(52.501, 20));
+      await rounds.sendPing(guest, slot(regular2, 40), fix(52.502, 40));
+      await rounds.sendPing(sam, slot(regular1, 20), fix(52.503, 20));
+      await rounds.sendPing(sam, slot(shSlot, 70), fix(52.504, 70));
+      for (final (id, minutes) in [
+        (regular1, 20),
+        (regular2, 40),
+        (shSlot, 70),
+      ]) {
+        await rounds.sendHunterSnapshot(
+          admin,
+          slot(id, minutes),
+          fix(52.51, minutes),
+        );
+      }
+      await rounds.updateHunterLocation(admin, fix(52.52, 179));
+      // Sam is caught during the speedhunt (R-SPEED-10).
+      await repo.recordCatch(
+        admin,
+        CatchRecord(playerId: 'sam', at: at(76), endsSpeedhunt: at(70)),
+      );
+    });
+
+    Future<RoundMap> savedMap() async {
+      final entry = (await repo.watchHistory(guest).first).single;
+      expect(entry.hasMap, isTrue);
+      return (await repo.loadRoundMap(guest, entry.id))!;
+    }
+
+    test('the automatic end saves everything the map showed (R-HIST-04, '
+        'R-HIST-05)', () async {
+      now = at(181);
+      expect(await repo.autoEndRound(guest), isTrue);
+
+      final map = await savedMap();
+      expect(map.area, area);
+      expect(map.startedAt, start);
+      expect(map.endedAt, at(180));
+      expect(map.pingInterval, const Duration(minutes: 20));
+      // Real names (R-ANON-02), in the order of the anonymous numbers.
+      expect(map.players.toSet(), {'Kim', 'Sam'});
+      expect(map.hunters, ['Julia']);
+      final names = map.names;
+      String id(String name) =>
+          names.entries.firstWhere((e) => e.value == name).key;
+      expect(
+        {
+          for (final p in map.pings)
+            '${names[p.playerId]} ${p.slotId} ${p.fix.point.lat}',
+        },
+        {
+          'Kim regular_1 52.501',
+          'Kim regular_2 52.502',
+          'Sam regular_1 52.503',
+          'Sam speedhunt_${at(70).millisecondsSinceEpoch}_1 52.504',
+        },
+      );
+      expect(map.hunterSnaps, hasLength(3));
+      expect(map.hunterSnaps.map((p) => p.playerId).toSet(), {'h0'});
+      expect(map.lastHunters['h0']!.point.lat, 52.52);
+      expect(map.catches.single.playerId, id('Sam'));
+      expect(map.catches.single.at, at(76));
+      // Ended by the catch after two of three pings; target from the pings.
+      final speedhunt = map.speedhunts.single;
+      expect(speedhunt.pingTimes, [at(70), at(75)]);
+      expect(speedhunt.targetId, id('Sam'));
+      // Round data is gone, the map stays.
+      expect((await gameDoc().collection('hunterSnaps').get()).docs, isEmpty);
+      expect((await gameDoc().collection('pings').get()).docs, isEmpty);
+    });
+
+    test('the host aborting also saves the map', () async {
+      now = at(100);
+      await repo.endRound(admin);
+      final map = await savedMap();
+      expect(map.endedAt, at(100));
+      expect(map.pings, hasLength(4));
+      expect(map.hunterSnaps, hasLength(3));
+      expect(
+        (await repo.watchHistory(guest).first).single.abortedEarly,
+        isTrue,
+      );
+    });
+
+    test('the map is encrypted', () async {
+      now = at(181);
+      await repo.autoEndRound(guest);
+      final docs = await gameDoc().collection('historyMaps').get();
+      final raw = docs.docs.single.data().toString();
+      expect(raw, isNot(contains('Kim')));
+      expect(raw, isNot(contains('52.50')));
+    });
+
+    test('no map for unknown or older rounds', () async {
+      expect(await repo.loadRoundMap(guest, 'old'), isNull);
+    });
+
+    test('the host deletes a round for good; numbers do not repeat '
+        '(R-HIST-06)', () async {
+      now = at(181);
+      await repo.autoEndRound(guest);
+      final first = (await repo.watchHistory(admin).first).single;
+      for (var i = 0; i < 2; i++) {
+        final startAt = now;
+        await repo.startGame(admin);
+        await gameDoc().update({'startAt': Timestamp.fromDate(startAt)});
+        now = startAt.add(const Duration(hours: 3, minutes: 1));
+        await repo.autoEndRound(guest);
+      }
+      final second = (await repo.watchHistory(admin).first)[1];
+      expect(second.round, 2);
+
+      await repo.deleteHistoryEntry(admin, second.id);
+      expect(await repo.loadRoundMap(guest, second.id), isNull);
+      expect((await repo.watchHistory(admin).first).map((r) => r.round), [
+        3,
+        1,
+      ]);
+      expect(await repo.loadRoundMap(guest, first.id), isNotNull);
+
+      final startAt = now;
+      await repo.startGame(admin);
+      await gameDoc().update({'startAt': Timestamp.fromDate(startAt)});
+      now = startAt.add(const Duration(hours: 3, minutes: 1));
+      await repo.autoEndRound(guest);
+      expect((await repo.watchHistory(admin).first).map((r) => r.round), [
+        4,
+        3,
+        1,
+      ]);
     });
   });
 

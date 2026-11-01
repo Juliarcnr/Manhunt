@@ -66,7 +66,8 @@ class EngineStatus {
 /// Drives this device during a running round, without any server:
 /// - tracks the location only while needed (R-PRIV-04),
 /// - players: sends every due ping automatically (R-PING-01, R-SPEED-03),
-/// - hunters: shares the live position with the other hunters (R-HUNT-02),
+/// - hunters: shares the live position with the other hunters (R-HUNT-02)
+///   and keeps it at every ping time for the history map (R-HIST-05),
 /// - players outside the play area: warns them and, if they stay outside,
 ///   shares their live position with the hunters (R-OUT-01 … R-OUT-04),
 /// - players, while a game master or caught player may watch: shares the
@@ -138,6 +139,7 @@ class RoundEngine {
   DateTime? _lastUpload;
   var _busy = false;
   final _sent = <String>{};
+  final _snapshotsSent = <String>{};
   final _answered = <String>{};
   List<JokerRequest> _jokerRequests = const [];
   final _pingsSent = StreamController<PingSlot>.broadcast();
@@ -542,6 +544,7 @@ class RoundEngine {
       } else if (me.isHunter) {
         final fix = _lastFix;
         if (_isFresh(fix)) await _uploadHunterLocation(fix!);
+        await _sendHunterSnapshots();
       }
     } finally {
       _busy = false;
@@ -668,6 +671,36 @@ class RoundEngine {
       ...speedhuntSnapshots.value,
       for (final slot in due) slot.id: fix,
     };
+  }
+
+  /// At every regular and speedhunt ping time, the hunter keeps their
+  /// position for the round's map in the history (R-HIST-05). Nobody reads
+  /// it while the round runs.
+  Future<void> _sendHunterSnapshots() async {
+    final clock = _clock;
+    if (clock == null) return;
+    final slots = playerPingSlots(clock: clock, speedhuntsOnMe: _speedhunts);
+    final due = duePings(slots, now: _now(), sentIds: _snapshotsSent);
+    if (due.isEmpty) return;
+    final fix = await _fixForPing();
+    if (fix == null) return; // retry on the next tick (within the grace period)
+    for (final slot in due) {
+      try {
+        await rounds.sendHunterSnapshot(session, slot, fix);
+      } on FirebaseException catch (e) {
+        // Usually: already sent before an app restart (no overwriting).
+        if (e.code == 'permission-denied') {
+          _snapshotsSent.add(slot.id);
+          continue;
+        }
+        _setStatus((s) => s.copyWith(lastError: 'Snapshot: ${e.code}'));
+        return; // Offline etc.: retry on the next tick.
+      } on Exception catch (e) {
+        _setStatus((s) => s.copyWith(lastError: 'Snapshot: $e'));
+        return;
+      }
+      _snapshotsSent.add(slot.id);
+    }
   }
 
   Future<void> _uploadHunterLocation(LocationFix fix) async {

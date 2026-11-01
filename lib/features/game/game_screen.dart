@@ -18,6 +18,7 @@ import '../../core/round/player_aliases.dart';
 import '../../core/round/round_result.dart';
 import '../../core/schedule/game_clock.dart';
 import '../../core/schedule/speedhunt.dart';
+import '../../core/schedule/start_time.dart';
 import '../../data/game_repository.dart';
 import '../../data/joker_store.dart';
 import '../../data/location_service.dart';
@@ -35,6 +36,7 @@ import 'joker_sheet.dart';
 import 'map_filters.dart';
 import 'game_map_layers.dart';
 import 'speedhunt_dialog.dart';
+import 'start_countdown.dart';
 
 /// Running round: map with role-specific layers, status, actions, automatic
 /// pings in the background and notifications (phase 5).
@@ -410,24 +412,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
   GamePhase _phaseNow() =>
       _clock()?.phaseAt(widget.now()) ?? GamePhase.notStarted;
 
-  /// The round is over; the host ends it, or a device at [GameClock.autoEndAt].
-  String _timeUpHint(AppLocalizations l10n) {
-    final at = (_clock()?.autoEndAt ?? widget.now()).toLocal();
-    final locale = Localizations.localeOf(context).toString();
-    return l10n.gameTimeUpHint(DateFormat.Hm(locale).format(at));
-  }
-
   DateTime? _autoEndTriedAt;
 
-  /// Ends a round the host left running for 3 h after it was over
-  /// (R-GAME-10). Every device tries; the first one wins, the others are
-  /// refused (or find the lobby) and try again a minute later at most.
+  /// Ends the round a minute after it was over and saves it to the history
+  /// (R-GAME-10, R-HIST-04). Every device tries; the first one wins, the
+  /// others are refused (or find the lobby) and try again a bit later.
   void _checkAutoEnd() {
     final clock = _clock();
     final now = widget.now();
     if (clock == null || now.isBefore(clock.autoEndAt)) return;
     final last = _autoEndTriedAt;
-    if (last != null && now.difference(last) < const Duration(minutes: 1)) {
+    if (last != null && now.difference(last) < const Duration(seconds: 10)) {
       return;
     }
     _autoEndTriedAt = now;
@@ -565,14 +560,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
       },
       RoundOverNotice(result: HuntersWon()) => (
         l10n.noticeHuntersWon,
-        _timeUpHint(l10n),
+        l10n.noticeRoundOverBody,
       ),
       RoundOverNotice(result: final PlayersWon result) => (
         l10n.noticePlayersWon(
           _winnerNames(result, members ?? const []),
           result.playerIds.length,
         ),
-        _timeUpHint(l10n),
+        l10n.noticeRoundOverBody,
       ),
     };
     // The own boundary state has its own permanent banner (R-OUT-06).
@@ -644,44 +639,32 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return ok == true && mounted;
   }
 
-  /// Host ends the round (R-GAME-06). While time is left this is an early
-  /// abort that needs two confirmations (R-GAME-07).
+  /// Host aborts the round early, with two confirmations (R-GAME-07). Once
+  /// it is over it ends by itself (R-GAME-10), so there is nothing to do.
   Future<void> _endRound() async {
     final l10n = AppLocalizations.of(context);
     // After the hunters won the round is over already (R-GAME-08).
     final endAt = _clock()?.endAt;
     final now = widget.now();
-    final early = endAt != null && now.isBefore(endAt);
-
-    if (early) {
-      if (!await _confirm(
-        icon: Icons.warning_amber_rounded,
-        color: AppColors.speedhunt,
-        title: l10n.gameAbortTitle,
-        text: l10n.gameAbortText(formatCountdown(endAt.difference(now))),
-        action: l10n.gameAbortContinue,
-        actionKey: const Key('confirmAbortFirst'),
-      )) {
-        return;
-      }
-      if (!await _confirm(
-        icon: Icons.delete_forever_outlined,
-        color: Colors.redAccent,
-        title: l10n.gameAbortFinalTitle,
-        text: l10n.gameEndConfirmText,
-        action: l10n.gameAbortFinalAction,
-        actionKey: const Key('confirmEndRound'),
-        destructive: true,
-      )) {
-        return;
-      }
-    } else if (!await _confirm(
-      icon: Icons.delete_sweep_outlined,
+    if (endAt == null || !now.isBefore(endAt)) return;
+    if (!await _confirm(
+      icon: Icons.warning_amber_rounded,
       color: AppColors.speedhunt,
-      title: l10n.gameEndConfirmTitle,
+      title: l10n.gameAbortTitle,
+      text: l10n.gameAbortText(formatCountdown(endAt.difference(now))),
+      action: l10n.gameAbortContinue,
+      actionKey: const Key('confirmAbortFirst'),
+    )) {
+      return;
+    }
+    if (!await _confirm(
+      icon: Icons.delete_forever_outlined,
+      color: Colors.redAccent,
+      title: l10n.gameAbortFinalTitle,
       text: l10n.gameEndConfirmText,
-      action: l10n.gameEndConfirmAction,
+      action: l10n.gameAbortFinalAction,
       actionKey: const Key('confirmEndRound'),
+      destructive: true,
     )) {
       return;
     }
@@ -1056,11 +1039,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final playersByColor = playerColors(orderedPlayers);
 
     final (title, color, until) = switch (phase) {
-      // Countdown to the official start (R-START-01).
+      // The countdown itself is big over the map (R-START-05).
       GamePhase.notStarted => (
         l10n.gamePhaseStarting,
         AppColors.textMuted,
-        clock?.startAt,
+        null,
       ),
       GamePhase.headStart => (
         l10n.gamePhaseHeadStart,
@@ -1530,8 +1513,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Hunters: when the next regular pings of all players arrive (R-HUNT-10).
     final nextRegular = isHunter ? clock?.nextRegularPing(now) : null;
     final infoLines = [
-      if (clock != null && phase == GamePhase.notStarted)
-        l10n.gameStartsAt(timeFmt.format(clock.startAt.toLocal())),
       if (nextSlot != null)
         l10n.gameNextPing(formatCountdown(nextSlot.at.difference(now))),
       if (nextRegular != null)
@@ -1550,7 +1531,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           widget.game.hunterLiveThrottled &&
           phase != GamePhase.ended)
         l10n.gameHunterLiveThrottled,
-      if (phase == GamePhase.ended) _timeUpHint(l10n),
+      if (phase == GamePhase.ended) l10n.gameTimeUpHint,
     ];
     // Below the filters the same gap as above them: the info lines if any,
     // the app bar (top inset of the overlay) otherwise.
@@ -1651,7 +1632,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
                   : null,
             ),
           ),
-          if (_isAdmin)
+          // Only while the game is on: afterwards the round ends by itself
+          // (R-GAME-10).
+          if (_isAdmin && phase != GamePhase.ended)
             IconButton(
               key: const Key('endRoundButton'),
               tooltip: l10n.gameEndButton,
@@ -1783,6 +1766,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 onClear: _drawing.clear,
               ),
             ),
+          // Only with a start time; otherwise the round starts right away.
+          if ((clock, settings.startTime) case (final clock?, _?))
+            if (countdownSecondsLeft(clock.startAt, now) case final seconds?)
+              Positioned.fill(
+                child: StartCountdownOverlay(secondsLeft: seconds),
+              ),
           if (_banner case final banner?)
             Positioned(
               left: 12,

@@ -7,10 +7,14 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../settings/settings_form.dart';
+import 'history_map_screen.dart';
 
 /// All finished rounds of the group with catches (R-HIST-01 … 03).
 class HistoryScreen extends ConsumerWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.isHost = false});
+
+  /// The host may delete rounds (R-HIST-06).
+  final bool isHost;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,17 +40,69 @@ class HistoryScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 itemCount: rounds.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => RoundCard(summary: rounds[i]),
+                itemBuilder: (_, i) => RoundCard(
+                  summary: rounds[i],
+                  onDelete: isHost
+                      ? () => _delete(context, ref, rounds[i])
+                      : null,
+                ),
               ),
       ),
     );
   }
+
+  /// Host deletes a round for good, after a warning (R-HIST-06).
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    RoundSummary summary,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(
+          Icons.delete_forever_outlined,
+          color: Colors.redAccent,
+        ),
+        title: Text(l10n.historyDeleteTitle(summary.round)),
+        content: Text(l10n.historyDeleteText),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            key: const Key('confirmDeleteRound'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.historyDeleteAction),
+          ),
+        ],
+      ),
+    );
+    final session = ref.read(sessionControllerProvider).value;
+    if (ok != true || session == null) return;
+    try {
+      await ref
+          .read(gameRepositoryProvider)
+          .deleteHistoryEntry(session, summary.id);
+    } on Exception catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.commonError('$e'))));
+      }
+    }
+  }
 }
 
 class RoundCard extends StatelessWidget {
-  const RoundCard({super.key, required this.summary});
+  const RoundCard({super.key, required this.summary, this.onDelete});
 
   final RoundSummary summary;
+
+  /// Only for the host (R-HIST-06).
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +140,17 @@ class RoundCard extends StatelessWidget {
                   formatDuration(l10n, summary.duration),
                   style: const TextStyle(color: AppColors.textMuted),
                 ),
+                if (onDelete case final onDelete?)
+                  PopupMenuButton<String>(
+                    key: Key('roundMenu_${summary.round}'),
+                    onSelected: (_) => onDelete(),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text(l10n.historyDelete),
+                      ),
+                    ],
+                  ),
               ],
             ),
             Text(date, style: const TextStyle(color: AppColors.textMuted)),
@@ -194,6 +261,20 @@ class RoundCard extends StatelessWidget {
                 label: l10n.historySurvivors,
                 names: survivors,
               ),
+            // The round's map (R-HIST-04); older rounds have none.
+            if (summary.hasMap) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: Key('showMap_${summary.round}'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HistoryMapScreen(summary: summary),
+                  ),
+                ),
+                icon: const Icon(Icons.map_outlined),
+                label: Text(l10n.historyShowMap),
+              ),
+            ],
           ],
         ),
       ),

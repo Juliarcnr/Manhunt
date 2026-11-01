@@ -11,7 +11,6 @@ import {
   deleteDoc,
   deleteField,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   collection,
@@ -75,6 +74,14 @@ const startRound = () =>
       name: 'enc', role: 'player', caught: false, jokerUsed: false, joinedAt: new Date(),
     });
   });
+// As FirestoreGameRepository._saveMap: everything the history map needs.
+const readMapData = async (db) => {
+  await getDocs(collection(db, 'games', GID, 'pings'));
+  await getDocs(collection(db, 'games', GID, 'hunterSnaps'));
+  await getDocs(collection(db, 'games', GID, 'hunterLocs'));
+  await getDocs(query(collection(db, 'games', GID, 'events'), where('type', '==', 'speedhunt')));
+};
+
 const newMember = () => ({
   name: 'enc',
   role: 'unassigned',
@@ -784,8 +791,8 @@ describe('game master and caught players watch live (R-GM-01 … R-GM-09)', () =
     await assertFails(list('kim', 'playerLocs'));
   });
 
-  test('time up: nothing is shared live any more', async () => {
-    await round({ startedMinutesAgo: 61 });
+  test('time up: nothing is shared live any more (within the minute before the automatic end)', async () => {
+    await round({ startedMinutesAgo: 60.5 });
     await assertFails(list('gm', 'playerLocs'));
     await assertFails(setDoc(liveDoc(as('sam'), 'sam'), loc()));
     await assertSucceeds(deleteDoc(liveDoc(as('sam'), 'sam')));
@@ -1093,7 +1100,7 @@ describe('player joker (R-PLAY-03)', () => {
 describe('clean-up flows list before deleting', () => {
   const ROUND = [
     'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
-    'drawings',
+    'drawings', 'hunterSnaps',
   ];
 
   const seed = () =>
@@ -1162,12 +1169,17 @@ describe('clean-up flows list before deleting', () => {
     await setHostRole('player');
     await seed();
     await env.withSecurityRulesDisabled((ctx) =>
-      setDoc(doc(ctx.firestore(), 'games', GID, 'history', 'h1'), { endedAt: new Date(), data: 'enc' }),
+      Promise.all([
+        setDoc(doc(ctx.firestore(), 'games', GID, 'history', 'h1'), { endedAt: new Date(), data: 'enc' }),
+        setDoc(doc(ctx.firestore(), 'games', GID, 'historyMaps', 'h1'), { endedAt: new Date(), data: 'enc' }),
+      ]),
     );
     const db = as('admin');
     await assertSucceeds(listAndDeleteAll('admin'));
-    for (const d of (await getDocs(collection(db, 'games', GID, 'history'))).docs) {
-      await assertSucceeds(deleteDoc(d.ref));
+    for (const name of ['historyMaps', 'history']) {
+      for (const d of (await getDocs(collection(db, 'games', GID, name))).docs) {
+        await assertSucceeds(deleteDoc(d.ref));
+      }
     }
     await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'members', 'kim')));
     await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'members', 'admin')));
@@ -1308,18 +1320,18 @@ describe('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () =>
   });
 
   test('time up: players read all pings and hunter positions', async () => {
-    await runningRound({ startedMinutesAgo: 61 });
+    await runningRound({ startedMinutesAgo: 60.5 });
     await assertSucceeds(readAll('kim'));
     await assertSucceeds(readAll('sam'));
   });
 
   test('time up but no plain duration (older group): still closed', async () => {
-    await runningRound({ startedMinutesAgo: 61, durationSec: null });
+    await runningRound({ startedMinutesAgo: 60.5, durationSec: null });
     await assertFails(readAll('kim'));
   });
 
   test('strangers never read them, also after the time', async () => {
-    await runningRound({ startedMinutesAgo: 61 });
+    await runningRound({ startedMinutesAgo: 60.5 });
     await assertFails(readAll('stranger'));
   });
 
@@ -1456,10 +1468,10 @@ describe('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () =>
   });
 });
 
-describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
+describe('automatic end 1 min after the round is over, with history map (R-GAME-10, R-HIST-04)', () => {
   const ROUND = [
     'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
-    'drawings',
+    'drawings', 'hunterSnaps',
   ];
   const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
   const ENTRY = 'auto_123';
@@ -1490,18 +1502,23 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
     });
   };
 
-  // As FirestoreGameRepository.autoEndRound: check the history entry, read
-  // what the summary needs and save it, delete all round data, then reset
-  // the members and go back to the lobby in one batch.
+  // As FirestoreGameRepository.autoEndRound: read what the history needs,
+  // save the summary and then the map (each only if missing), delete all
+  // round data, then reset the members and go back to the lobby in one batch.
   const autoEnd = async (uid) => {
     const db = as(uid);
+    await getDoc(doc(db, 'games', GID));
+    await getDocs(collection(db, 'games', GID, 'members'));
+    await getDocs(query(collection(db, 'games', GID, 'events'), where('type', '==', 'catch')));
     const entry = doc(db, 'games', GID, 'history', ENTRY);
     if (!(await getDoc(entry)).exists()) {
-      await getDoc(doc(db, 'games', GID));
-      await getDocs(collection(db, 'games', GID, 'members'));
-      await getDocs(query(collection(db, 'games', GID, 'events'), where('type', '==', 'catch')));
-      await getCountFromServer(collection(db, 'games', GID, 'history'));
+      await getDocs(collection(db, 'games', GID, 'history'));
       await setDoc(entry, { endedAt: new Date(), data: 'enc' });
+    }
+    const map = doc(db, 'games', GID, 'historyMaps', ENTRY);
+    if (!(await getDoc(map)).exists()) {
+      await readMapData(db);
+      await setDoc(map, { endedAt: new Date(), data: 'enc' });
     }
     for (const name of ROUND) {
       const snap = await getDocs(collection(db, 'games', GID, name));
@@ -1544,6 +1561,7 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
       assert.equal(kim.caught, false);
       assert.equal(kim.jokerUsed, false);
       assert.equal((await getDocs(collection(db, 'games', GID, 'history'))).size, 1);
+      assert.equal((await getDocs(collection(db, 'games', GID, 'historyMaps'))).size, 1);
     });
 
   const cases = [
@@ -1555,25 +1573,26 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
     ['a hunter', 'lou', 'hunter'],
   ];
   for (const [label, uid, hostRole] of cases) {
-    test(`${label} ends the round 3 h after the time is up, end to end`, async () => {
-      await round({ startedMinutesAgo: 60 + 181, hostRole });
+    test(`${label} ends the round 1 min after the time is up and saves the map, end to end`, async () => {
+      await round({ startedMinutesAgo: 60 + 2, hostRole });
       await assertSucceeds(autoEnd(uid));
       assert.equal(await roundDocsLeft(), 0);
       await expectEnded();
     });
   }
 
-  test('3 h after the hunters won, although the planned time is not up yet', async () => {
-    await round({ startedMinutesAgo: 200, finishedMinutesAgo: 181 });
+  test('1 min after the hunters won, although the planned time is not up yet', async () => {
+    await round({ startedMinutesAgo: 30, finishedMinutesAgo: 2 });
     await assertSucceeds(autoEnd('kim'));
     await expectEnded();
   });
 
-  test('not before: neither 2 h after the time is up nor 2 h after the hunters won', async () => {
-    await round({ startedMinutesAgo: 60 + 120 });
+  test('not before: neither 30 s after the time is up nor 30 s after the hunters won', async () => {
+    await round({ startedMinutesAgo: 60 + 0.5 });
     const db = as('kim');
     await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'enc' }));
     await assertFails(getDocs(collection(db, 'games', GID, 'jokerAnswers')));
+    await assertFails(setDoc(doc(db, 'games', GID, 'historyMaps', ENTRY), { endedAt: new Date(), data: 'enc' }));
     await assertFails(deleteDoc(doc(db, 'games', GID, 'pings', 'd1')));
     await assertFails(
       updateDoc(doc(db, 'games', GID), { status: 'lobby', startAt: null, expiresAt: inDays(180) }),
@@ -1581,7 +1600,7 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
     await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: false }));
 
     await env.withSecurityRulesDisabled((ctx) =>
-      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(150), finishedAt: minutesAgo(120) }),
+      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(30), finishedAt: minutesAgo(0.5) }),
     );
     await assertFails(autoEnd('kim'));
   });
@@ -1592,12 +1611,12 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
   });
 
   test('strangers cannot end it', async () => {
-    await round({ startedMinutesAgo: 60 + 181 });
+    await round({ startedMinutesAgo: 60 + 2 });
     await assertFails(autoEnd('stranger'));
   });
 
   test('only the lobby reset: no other fields, no catches, no new admin', async () => {
-    await round({ startedMinutesAgo: 60 + 181 });
+    await round({ startedMinutesAgo: 60 + 2 });
     const db = as('kim');
     const lobby = { status: 'lobby', startAt: null, expiresAt: inDays(180) };
     await assertFails(updateDoc(doc(db, 'games', GID), { ...lobby, adminUid: 'kim' }));
@@ -1609,14 +1628,219 @@ describe('automatic end 3 h after the round is over (R-GAME-10)', () => {
   });
 
   test('a second device after the first: history not overwritten or added, the lobby stays', async () => {
-    await round({ startedMinutesAgo: 60 + 181 });
+    await round({ startedMinutesAgo: 60 + 2 });
     await assertSucceeds(autoEnd('kim'));
     const db = as('lou');
     await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'x' }));
     await assertFails(setDoc(doc(db, 'games', GID, 'history', 'other'), { endedAt: new Date(), data: 'x' }));
+    await assertFails(setDoc(doc(db, 'games', GID, 'historyMaps', ENTRY), { endedAt: new Date(), data: 'x' }));
     // The app swallows this: the round is in the lobby already.
     await assertFails(autoEnd('lou'));
     await assertFails(getDocs(collection(as('kim'), 'games', GID, 'jokerAnswers')));
     await expectEnded();
+  });
+});
+
+describe('hunter positions at ping times (R-HIST-05)', () => {
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+  const snap = (uid, slot) => ({ uid, slot, createdAt: serverTimestamp(), data: 'enc' });
+  const snapRef = (db, id) => doc(db, 'games', GID, 'hunterSnaps', id);
+
+  // Round of 60 min started [startedMinutesAgo] ago; admin and lou are
+  // hunters, kim and sam players, gm the game master. One snapshot exists.
+  const round = async ({ startedMinutesAgo = 10 } = {}) => {
+    await startRound();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'games', GID), { startAt: minutesAgo(startedMinutesAgo), durationSec: 3600 });
+      for (const [uid, role] of [['lou', 'hunter'], ['gm', 'gameMaster']]) {
+        await setDoc(doc(db, 'games', GID, 'members', uid), {
+          name: 'enc', role, caught: false, jokerUsed: false, joinedAt: new Date(),
+        });
+      }
+      await setDoc(snapRef(db, 'lou_regular_1'), { uid: 'lou', slot: 'regular_1', createdAt: new Date(), data: 'enc' });
+    });
+  };
+
+  test('hunters keep their own position per regular and speedhunt slot', async () => {
+    await round();
+    await assertSucceeds(setDoc(snapRef(as('admin'), 'admin_regular_1'), snap('admin', 'regular_1')));
+    await assertSucceeds(
+      setDoc(snapRef(as('lou'), 'lou_speedhunt_123_1'), snap('lou', 'speedhunt_123_1')),
+    );
+  });
+
+  test('not for others, not by players or game masters, not with a wrong id or extra fields', async () => {
+    await round();
+    await assertFails(setDoc(snapRef(as('admin'), 'lou_regular_2'), snap('lou', 'regular_2')));
+    await assertFails(setDoc(snapRef(as('admin'), 'admin_regular_2'), snap('admin', 'regular_3')));
+    await assertFails(
+      setDoc(snapRef(as('admin'), 'admin_regular_2'), { ...snap('admin', 'regular_2'), extra: 1 }),
+    );
+    await assertFails(setDoc(snapRef(as('kim'), 'kim_regular_1'), snap('kim', 'regular_1')));
+    await assertFails(setDoc(snapRef(as('gm'), 'gm_regular_1'), snap('gm', 'regular_1')));
+  });
+
+  test('never changed afterwards (a resend after a restart is refused)', async () => {
+    await round();
+    await assertFails(setDoc(snapRef(as('lou'), 'lou_regular_1'), snap('lou', 'regular_1')));
+  });
+
+  test('not in the lobby', async () => {
+    await assertFails(setDoc(snapRef(as('admin'), 'admin_regular_1'), snap('admin', 'regular_1')));
+  });
+
+  test('nobody reads them while the round runs: hunters, players, game master, caught players', async () => {
+    await round();
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'sam'), { caught: true }),
+    );
+    for (const uid of ['admin', 'lou', 'kim', 'sam', 'gm']) {
+      await assertFails(getDocs(collection(as(uid), 'games', GID, 'hunterSnaps')));
+    }
+  });
+
+  test('once the round is over every member reads them, strangers never', async () => {
+    await round({ startedMinutesAgo: 60.5 });
+    for (const uid of ['admin', 'lou', 'kim', 'gm']) {
+      await assertSucceeds(getDocs(collection(as(uid), 'games', GID, 'hunterSnaps')));
+    }
+    await assertFails(getDocs(collection(as('stranger'), 'games', GID, 'hunterSnaps')));
+  });
+});
+
+describe('history map (R-HIST-04, R-HIST-06)', () => {
+  const ROUND = [
+    'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
+    'drawings', 'hunterSnaps',
+  ];
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+  const entry = { endedAt: new Date(), data: 'enc' };
+
+  const setHostRole = (role) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+    );
+
+  // Running round (10 of 60 min) with one doc in every round collection.
+  const round = async () => {
+    await startRound();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'games', GID), { startAt: minutesAgo(10), durationSec: 3600, aliases: 'enc' });
+      for (const name of ROUND) {
+        await setDoc(doc(db, 'games', GID, name, 'd1'), {
+          uid: 'sam', requester: 'sam', type: 'speedhunt', slot: 'regular_1', data: 'enc',
+        });
+      }
+    });
+  };
+
+  const seedEntry = (id) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'games', GID, 'history', id), entry);
+      await setDoc(doc(db, 'games', GID, 'historyMaps', id), entry);
+    });
+
+  // As FirestoreGameRepository.endRound: read the round, save the summary,
+  // back to the lobby (one batch), then read everything for the map, save
+  // it and delete the round data.
+  const hostAborts = async () => {
+    const db = as('admin');
+    await getDoc(doc(db, 'games', GID));
+    const members = await getDocs(collection(db, 'games', GID, 'members'));
+    await getDocs(query(collection(db, 'games', GID, 'events'), where('type', '==', 'catch')));
+    await getDocs(collection(db, 'games', GID, 'history'));
+    const summary = doc(collection(db, 'games', GID, 'history'));
+    await setDoc(summary, entry);
+    const batch = writeBatch(db);
+    for (const m of members.docs) {
+      batch.update(m.ref, { caught: false, jokerUsed: false, playerJokerUsed: false });
+    }
+    batch.update(doc(db, 'games', GID), {
+      status: 'lobby',
+      startAt: null,
+      finishedAt: deleteField(),
+      aliases: deleteField(),
+      expiresAt: inDays(180),
+    });
+    await batch.commit();
+    await readMapData(db);
+    await setDoc(doc(db, 'games', GID, 'historyMaps', summary.id), entry);
+    for (const name of ROUND) {
+      const snap = await getDocs(collection(db, 'games', GID, name));
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    }
+  };
+
+  for (const role of ['hunter', 'player', 'unassigned', 'gameMaster']) {
+    test(`host (${role}) aborts the round: summary, map, everything else deleted`, async () => {
+      await round();
+      await setHostRole(role);
+      await assertSucceeds(hostAborts());
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        assert.equal((await getDocs(collection(db, 'games', GID, 'history'))).size, 1);
+        assert.equal((await getDocs(collection(db, 'games', GID, 'historyMaps'))).size, 1);
+        for (const name of ROUND) {
+          assert.equal((await getDocs(collection(db, 'games', GID, name))).size, 0);
+        }
+      });
+    });
+  }
+
+  test('no map without its summary, none by members while the round runs', async () => {
+    await assertFails(setDoc(doc(as('admin'), 'games', GID, 'historyMaps', 'h1'), entry));
+    await round();
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'history', 'h1'), entry),
+    );
+    await assertFails(setDoc(doc(as('kim'), 'games', GID, 'historyMaps', 'h1'), entry));
+    await assertSucceeds(setDoc(doc(as('admin'), 'games', GID, 'historyMaps', 'h1'), entry));
+  });
+
+  test('only the known fields', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'history', 'h1'), entry),
+    );
+    const ref = doc(as('admin'), 'games', GID, 'historyMaps', 'h1');
+    await assertFails(setDoc(ref, { ...entry, extra: 1 }));
+    await assertFails(setDoc(ref, { endedAt: new Date(), data: { lat: 1 } }));
+  });
+
+  test('every member reads a map (also one who joined later), strangers never', async () => {
+    await seedEntry('h1');
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'games', GID, 'members', 'newbie'), {
+        name: 'enc', role: 'unassigned', caught: false, jokerUsed: false, joinedAt: new Date(),
+      }),
+    );
+    for (const uid of ['admin', 'kim', 'newbie']) {
+      await assertSucceeds(getDoc(doc(as(uid), 'games', GID, 'historyMaps', 'h1')));
+    }
+    await assertFails(getDoc(doc(as('stranger'), 'games', GID, 'historyMaps', 'h1')));
+  });
+
+  test('nobody edits a map', async () => {
+    await seedEntry('h1');
+    await assertFails(updateDoc(doc(as('admin'), 'games', GID, 'historyMaps', 'h1'), { data: 'x' }));
+    await assertFails(setDoc(doc(as('admin'), 'games', GID, 'historyMaps', 'h1'), entry));
+  });
+
+  for (const role of ['hunter', 'player', 'unassigned', 'gameMaster']) {
+    test(`host (${role}) deletes a round from the history: map, then summary`, async () => {
+      await setHostRole(role);
+      await seedEntry('h1');
+      const db = as('admin');
+      await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'historyMaps', 'h1')));
+      await assertSucceeds(deleteDoc(doc(db, 'games', GID, 'history', 'h1')));
+    });
+  }
+
+  test('members cannot delete a round from the history', async () => {
+    await seedEntry('h1');
+    await assertFails(deleteDoc(doc(as('kim'), 'games', GID, 'historyMaps', 'h1')));
+    await assertFails(deleteDoc(doc(as('kim'), 'games', GID, 'history', 'h1')));
   });
 });

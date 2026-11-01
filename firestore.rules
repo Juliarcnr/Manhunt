@@ -77,14 +77,14 @@ service cloud.firestore {
         && g.finishedAt >= g.startAt;
     }
 
-    // The host left the round running for 3 h after it was over (time up or
-    // hunters won): any member may end it (R-GAME-10, no server). [g] is the
-    // game's data before the request.
+    // The round has been over (time up or hunters won) for a minute: any
+    // member may end it and save it to the history (R-GAME-10, no server).
+    // [g] is the game's data before the request.
     function autoEndDue(g) {
       return g.status == 'running' && g.get('startAt', null) is timestamp
         && g.get('durationSec', null) is int
-        && (request.time >= g.startAt + duration.value(g.durationSec, 's') + duration.value(3, 'h')
-          || (finishedThisRound(g) && request.time >= g.finishedAt + duration.value(3, 'h')));
+        && (request.time >= g.startAt + duration.value(g.durationSec, 's') + duration.value(1, 'm')
+          || (finishedThisRound(g) && request.time >= g.finishedAt + duration.value(1, 'm')));
     }
 
     function canAutoEnd(gid) {
@@ -112,7 +112,7 @@ service cloud.firestore {
     function isRoundCollection(name) {
       return name in [
         'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests',
-        'jokerAnswers', 'drawings'
+        'jokerAnswers', 'drawings', 'hunterSnaps'
       ];
     }
 
@@ -228,7 +228,8 @@ service cloud.firestore {
         // To delete, the docs must be found first: the host may read leftovers
         // only while no round runs (nothing left to cheat with), anyone after
         // expiry, any member once the round is due to end automatically
-        // (R-GAME-10; everyone has seen all positions for 3 h by then).
+        // (R-GAME-10; everyone has been able to see all positions since the
+        // round was over).
         // During a round reading is defined per collection below.
         allow read: if isRoundCollection(roundCollection)
           && (isExpired(gid) || (isAdmin(gid) && game(gid).status == 'lobby')
@@ -269,6 +270,20 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['updatedAt', 'data'])
           && request.resource.data.data is string;
         allow delete: if signedIn() && request.auth.uid == hunterId;
+      }
+
+      // A hunter's position at each regular and speedhunt ping time, for the
+      // round's map in the history (R-HIST-05). Nobody reads it while the
+      // round runs – not even hunters; once it is over everyone may (like
+      // all positions, R-GAME-06). One doc per hunter and slot, never edited.
+      match /hunterSnaps/{snapId} {
+        allow read: if isMember(gid) && roundOver(gid);
+        allow create: if isRunning(gid) && isHunter(gid)
+          && request.resource.data.keys().hasOnly(['uid', 'slot', 'createdAt', 'data'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.slot is string
+          && snapId == request.auth.uid + '_' + request.resource.data.slot
+          && request.resource.data.data is string;
       }
 
       // Live position of a player outside the play area (R-OUT-03): hunters
@@ -357,11 +372,25 @@ service cloud.firestore {
       }
 
       // Round summaries, kept across rounds (R-HIST-02); written by the host
-      // when ending a round – or by any member ending it automatically
-      // (R-GAME-10) –, never edited, deleted with the group.
+      // when aborting a round – or by any member ending it automatically
+      // (R-GAME-10) –, never edited, deleted by the host (R-HIST-06) or with
+      // the group.
       match /history/{roundId} {
         allow read: if isMember(gid);
         allow create: if (isAdmin(gid) || canAutoEnd(gid))
+          && request.resource.data.keys().hasOnly(['endedAt', 'data'])
+          && request.resource.data.endedAt is timestamp
+          && request.resource.data.data is string;
+        allow delete: if isAdmin(gid) || isExpired(gid);
+      }
+
+      // The map of a round (all positions, encrypted, R-HIST-04), under the
+      // id of its summary, which must exist first. Same writers as the
+      // summary; every member may look at it; never edited.
+      match /historyMaps/{roundId} {
+        allow read: if isMember(gid);
+        allow create: if (isAdmin(gid) || canAutoEnd(gid))
+          && exists(/databases/$(database)/documents/games/$(gid)/history/$(roundId))
           && request.resource.data.keys().hasOnly(['endedAt', 'data'])
           && request.resource.data.endedAt is timestamp
           && request.resource.data.data is string;

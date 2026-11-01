@@ -19,11 +19,13 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Standorte (Pings, Hunter-Live), Speedhunt-/Catch-Ereignisse (ein Catch vermerkt ggf. den Start des Speedhunts, den er beendet – R-SPEED-10) | Firestore | **nein** (AES-GCM). Mit R-SET-15 dürfen auch Spieler die regulären Pings lesen (nie Speedhunt-Pings). Nach Ablauf der Spielzeit oder dem Hunter-Sieg dürfen alle Spieler alle Pings und Hunter-Standorte lesen (R-GAME-06, R-GAME-08) | **beim Beenden der Runde** (ein vom Host rückgängig gemachter Catch sofort, R-CATCH-04) |
 | Live-Standort eines Spielers, der das Spielfeld verlassen hat (R-OUT-03), mit GPS-Genauigkeit – nur solange er eindeutig (30 m + doppelte Ungenauigkeit) und seit 30 s draußen ist, plus 60 s nach der Rückkehr (Einstellung R-SET-17) | Firestore `outsideLocs/{uid}` | **nein** (AES-GCM); nur Hunter dürfen lesen; lesbar ist nur, *dass* eine anonyme ID gerade draußen ist | vom eigenen Handy gelöscht, sobald die 60 s um sind, man gefangen wird oder die Zeit abläuft; spätestens beim Beenden der Runde |
 | Live-Standort jedes nicht gefangenen Spielers für Spielleitung und gefangene Spieler (R-GM-05), alle 15 s überschrieben – nur solange es eine Spielleitung oder einen gefangenen Spieler gibt | Firestore `playerLocs/{uid}` | **nein** (AES-GCM); lesen dürfen nur Spielleitung und gefangene Spieler, solange die Runde läuft und noch niemand gewonnen hat – nie Hunter oder Spieler im Spiel. Gefangene werden in der App gewarnt, nichts weiterzugeben (R-GM-08) | vom eigenen Handy gelöscht, sobald man gefangen wird, niemand mehr zusehen darf oder die Zeit abläuft bzw. die Hunter gewonnen haben; spätestens beim Beenden der Runde |
+| Standort jedes Hunters zu jedem regulären und ⚡-Ping-Zeitpunkt (R-HIST-05), für die Rundenkarte | Firestore `hunterSnaps/{uid}_{slot}` | **nein** (AES-GCM); lesbar sind nur Hunter-UID und Ping-Nummer. Während der Runde liest ihn niemand (auch keine Hunter), danach alle Mitglieder | beim Ende der Runde (Inhalt wandert in die Rundenkarte) |
 | Rolle „Spielleitung“ (R-GM-01) | Firestore `members/{uid}.role` | ja (wie die anderen Rollen, nötig für die Regeln) | mit Gruppe |
 | Zeichnungen der Hunter auf der Karte (R-DRAW-01 … 07): Farbe + Linienpunkte (Koordinaten), Autor-UID, Zeitpunkt | Firestore `drawings/{id}` | **nein** für Farbe und Punkte (AES-GCM); lesbar sind nur Autor-UID, Zeitpunkt und Anzahl der Striche. Nur Hunter dürfen lesen, Spieler nie | per Radiergummi/Mülleimer sofort; spätestens beim Beenden der Runde |
 | Antworten auf den Spieler-Joker (aktueller Standort der anderen Spieler) | Firestore | **nein** (AES-GCM); nur der fragende Spieler darf sie lesen | beim Beenden der Runde |
 | Metadaten der Runde: wer wann gepingt hat (uid, Ping-Nr.), Ziel-uid eines Speedhunts, wer einen Joker wann benutzt hat | Firestore | ja (nötig für die Sicherheitsregeln; nur anonyme IDs, keine Orte) | beim Beenden der Runde (Joker-Zeitpunkte bleiben bis zur nächsten Runde) |
-| Rundenübersicht (Runde, Datum, Dauer, Teams, Catches mit Zeit und Hunter) | Firestore `history` | nein (verschlüsselt), nur Zeitpunkt des Rundenendes lesbar | mit Gruppe (keine Standorte enthalten) |
+| Rundenübersicht (Runde, Datum, Dauer, Teams, Catches mit Zeit) | Firestore `history` | nein (verschlüsselt), nur Zeitpunkt des Rundenendes lesbar | wenn der Host die Runde löscht (R-HIST-06), sonst mit Gruppe (keine Standorte enthalten) |
+| **Rundenkarte** (R-HIST-04): Spielfeld, alle Pings und ⚡-Pings, Hunter-Positionen zu den Ping-Zeiten, letzter Hunter-Standort, Catch-Zeiten, Speedhunts, Namen der Runde – ohne UIDs und ohne GPS-Genauigkeit, Koordinaten auf ca. 10 cm gerundet | Firestore `historyMaps/{id}` (gleiche ID wie die Übersicht) | **nein** (AES-GCM), nur Zeitpunkt des Rundenendes lesbar; alle Mitglieder der Gruppe dürfen sie lesen – auch später Beigetretene | **bleibt** über die Runde hinaus: bis der Host die Runde löscht (R-HIST-06) oder die Gruppe gelöscht wird (auch 180-Tage-Löschung) |
 | Zeitstempel (Erstellung, Beitritt, Rundenstart, Ablauf) | Firestore | ja | mit Gruppe |
 | IP-Adresse | Google (technisch bei jeder Verbindung) | ja | nach Google-Richtlinie |
 | Kartenkacheln-Anfragen (Karte oder Satellit) | MapTiler | ja (welcher Kartenausschnitt, IP) | nach MapTiler-Richtlinie |
@@ -46,21 +48,22 @@ in den Einstellungen.
 Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Reporting, keine Push-Tokens, keine Werbung.
 
 ## Löschung
-- **Runde beenden** (Host, mit Warnhinweis): löscht sofort alle Standorte und Runden-Ereignisse für alle (R-PRIV-03).
-  Nach Ablauf der Spielzeit (oder wenn der letzte Spieler gefangen wurde) läuft die Runde bewusst weiter, damit alle –
-  Hunter und Spieler – die Standorte noch gemeinsam ansehen können.
-- **Automatisch 3 h nach Rundenende** (R-GAME-10): Beendet der Host die Runde nicht, löscht das erste Mitgliedsgerät,
-  das sie 3 h nach Ablauf der Spielzeit bzw. nach dem letzten Catch sieht, alles wie „Runde beenden“. Dafür dürfen ab
-  diesem Zeitpunkt (bis zur Rückkehr in die Lobby) alle Mitglieder die Rundendaten lesen und löschen, die Mitglieder
-  zurücksetzen und einen Historie-Eintrag schreiben. Zu sehen gibt es dabei kaum Neues: Alle Pings und
-  Hunter-Standorte sind dann schon seit 3 h für alle sichtbar (R-GAME-06); dazu kommen nur Zeichnungen der Hunter,
-  Joker-Antworten und Außerhalb-Standorte. Es werden keine neuen Daten gespeichert.
+- **Rundenende** (automatisch 1 min nach Ablauf der Spielzeit bzw. nach dem letzten Catch, R-GAME-10, oder Abbruch
+  durch den Host, R-GAME-07): löscht alle Live-Standorte und Runden-Ereignisse für alle (R-PRIV-03). Vorher wird
+  eine verschlüsselte **Rundenkarte** in die Historie geschrieben (R-HIST-04) – das, was alle nach Spielende ohnehin
+  sehen durften, plus die Hunter-Positionen zu den Ping-Zeiten. Bewusste Entscheidung der Projektinhaberin
+  (2026-11-01): Die Karte bleibt, bis der Host die Runde in der Historie löscht (R-HIST-06) oder die Gruppe gelöscht wird.
+- Das Rundenende erledigt mangels Server das erste Mitgliedsgerät, das die Runde 1 min nach ihrem Ende sieht. Dafür
+  dürfen ab diesem Zeitpunkt (bis zur Rückkehr in die Lobby) alle Mitglieder die Rundendaten lesen und löschen, die
+  Mitglieder zurücksetzen und Historie-Eintrag und Rundenkarte schreiben. Neu zu sehen gibt es dabei kaum etwas:
+  Alle Pings und Hunter-Standorte sind seit Spielende für alle sichtbar (R-GAME-06); dazu kommen nur Zeichnungen der
+  Hunter, Joker-Antworten und Außerhalb-Standorte (die nicht in die Karte übernommen werden).
 - **Gruppe löschen** (Host): löscht alles – Rundendaten, Mitglieder, Gruppe.
 - **180 Tage ohne Öffnen** (R-PRIV-05): Jedes Öffnen der Gruppe durch ein Mitglied (max. 1× pro Tag geschrieben) und
   jede Host-Aktion setzt `expiresAt` auf jetzt + 180 Tage. Firestore-TTL gibt es im Spark-Tarif nicht (nur mit Billing), daher räumt das **erste Gerät der
   Gruppe auf, das die App nach Ablauf öffnet**; die Sicherheitsregeln erlauben das jedem Mitglied nur nach Ablauf.
-  Restrisiko: Öffnet niemand die App mehr, bleibt die Gruppe (verschlüsselte Namen/Einstellungen, ohne Standorte,
-  sofern die Runde beendet wurde) liegen.
+  Restrisiko: Öffnet niemand die App mehr, bleibt die Gruppe (verschlüsselte Namen/Einstellungen und die
+  verschlüsselten Rundenkarten mit Standorten) liegen.
 - Wird eine Runde nie beendet und öffnet danach auch niemand mehr die App, bleiben deren (verschlüsselte) Standorte
   bis zur 180-Tage-Löschung liegen (R-GAME-10 braucht ein Gerät, das die Gruppe öffnet).
 

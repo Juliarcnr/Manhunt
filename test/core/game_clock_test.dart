@@ -64,17 +64,17 @@ void main() {
   });
 
   group('automatic end (R-GAME-10)', () {
-    test('3 h after the time is up', () {
-      expect(clock.autoEndAt, at(180 + 180));
+    test('1 min after the time is up', () {
+      expect(clock.autoEndAt, at(180 + 1));
     });
 
-    test('3 h after the last catch', () {
+    test('1 min after the last catch', () {
       final won = GameClock(
         startAt: start,
         settings: settings,
         finishedAt: at(50),
       );
-      expect(won.autoEndAt, at(50 + 180));
+      expect(won.autoEndAt, at(50 + 1));
     });
 
     test('a leftover from an earlier round does not bring it forward', () {
@@ -83,7 +83,7 @@ void main() {
         settings: settings,
         finishedAt: at(-60),
       );
-      expect(leftover.autoEndAt, at(180 + 180));
+      expect(leftover.autoEndAt, at(180 + 1));
     });
   });
 

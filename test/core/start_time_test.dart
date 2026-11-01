@@ -59,4 +59,22 @@ void main() {
       expect(at.isAtSameMomentAs(DateTime(2026, 11, 1, 14)), isTrue);
     });
   });
+
+  group('countdown overlay (R-START-05)', () {
+    final startAt = DateTime.utc(2026, 11, 1, 14);
+    int? left(int ms) =>
+        countdownSecondsLeft(startAt, startAt.add(Duration(milliseconds: ms)));
+
+    test('whole seconds left, rounded up', () {
+      expect(left(-90000), 90);
+      expect(left(-2400), 3);
+      expect(left(-1), 1);
+    });
+
+    test('"START" right after the start, then nothing', () {
+      expect(left(0), 0);
+      expect(left(1499), 0);
+      expect(left(1500), isNull);
+    });
+  });
 }

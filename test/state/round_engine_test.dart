@@ -570,6 +570,79 @@ void main() {
     });
   });
 
+  group('hunter positions at ping times for the history map (R-HIST-05)', () {
+    final speedhunt = Speedhunt(
+      targetId: '',
+      startedAt: at(25),
+      pings: 3,
+      interval: const Duration(minutes: 5),
+    );
+    final ms = at(25).millisecondsSinceEpoch;
+
+    Future<Map<String, double>> snapshots() async {
+      final docs = await db
+          .collection('games')
+          .doc(hunterSession.groupId)
+          .collection('hunterSnaps')
+          .get();
+      return {
+        for (final d in docs.docs)
+          d.id: LocationFix.fromJson(
+            (await hunterSession.crypto.decryptJson(
+                  d.data()['data'] as String,
+                ))!
+                as Map<String, Object?>,
+          ).point.lat,
+      };
+    }
+
+    test('a hunter keeps the position at every regular and speedhunt ping '
+        'time, once each', () async {
+      engine = await engineFor('h');
+      engine.update(
+        game: game(),
+        me: hunter,
+        speedhuntsOnMe: [],
+        speedhunts: [speedhunt],
+      );
+      location.emit(fix(52.4));
+      await flush();
+      await engine.tick();
+      expect(await snapshots(), isEmpty);
+
+      now = at(20);
+      location.emit(fix(52.41));
+      await flush();
+      await engine.tick();
+      await engine.tick();
+      now = at(25);
+      location.emit(fix(52.42));
+      await flush();
+      await engine.tick();
+      expect(await snapshots(), {
+        'h_regular_1': 52.41,
+        'h_speedhunt_${ms}_1': 52.42,
+      });
+      // Nothing is shown to anyone or logged as a ping.
+      expect(sent, isEmpty);
+    });
+
+    test('players keep none', () async {
+      engine = await engineFor('kim');
+      engine.update(
+        game: game(),
+        me: player,
+        speedhuntsOnMe: [],
+        speedhunts: [speedhunt],
+      );
+      now = at(25);
+      location.emit(fix(52.4));
+      await flush();
+      await engine.tick();
+      expect(await snapshots(), isEmpty);
+    });
+  });
+
   group('leaving the play area (R-OUT-01 … R-OUT-06)', () {
     // ~1 km × 2 km rectangle; positions in metres east of its east edge.
     const lat = 52.5;

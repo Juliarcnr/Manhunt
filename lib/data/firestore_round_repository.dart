@@ -12,6 +12,8 @@ import 'round_repository.dart';
 /// Firestore layout (all under `games/{groupId}`, deleted at round end):
 /// - `pings/{uid}_{slotId}`: uid, kind, slot, createdAt, data (LocationFix)
 /// - `hunterLocs/{uid}`: updatedAt, data (LocationFix)
+/// - `hunterSnaps/{uid}_{slotId}`: uid, slot, createdAt, data (LocationFix) –
+///   the hunter's position at a ping time, for the history map (R-HIST-05)
 /// - `outsideLocs/{uid}`: updatedAt, data (LocationFix) – only while the
 ///   player is outside the play area (R-OUT-03)
 /// - `playerLocs/{uid}`: updatedAt, data (LocationFix) – only while a game
@@ -96,6 +98,23 @@ class FirestoreRoundRepository implements RoundRepository {
       'updatedAt': FieldValue.serverTimestamp(),
       'data': await session.crypto.encryptJson(fix.toJson()),
     });
+  }
+
+  @override
+  Future<void> sendHunterSnapshot(
+    GroupSession session,
+    PingSlot slot,
+    LocationFix fix,
+  ) async {
+    await _game(session)
+        .collection('hunterSnaps')
+        .doc('${session.userId}_${slot.id}')
+        .set({
+          'uid': session.userId,
+          'slot': slot.id,
+          'createdAt': FieldValue.serverTimestamp(),
+          'data': await session.crypto.encryptJson(fix.toJson()),
+        });
   }
 
   Future<Map<String, LocationFix>> _decodeLocations(
