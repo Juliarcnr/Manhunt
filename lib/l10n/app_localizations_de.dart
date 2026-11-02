@@ -595,10 +595,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get gameTimeUpHint =>
-      'Die Runde ist vorbei und wird gleich gespeichert. Danach findet ihr die Karte mit allen Pings und Hunter:innen-Standorten in der Gruppenhistorie.';
-
-  @override
   String get gameEndButton => 'Spiel abbrechen';
 
   @override

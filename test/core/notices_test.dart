@@ -118,14 +118,15 @@ void main() {
   });
 
   group('round over: who won (R-GAME-08, R-GAME-09)', () {
-    test('announced once when the round becomes over, only as a '
-        'notification (R-GAME-09)', () {
+    test('announced once when the round becomes over, banner until the '
+        'round is saved (R-GAME-09, R-GAME-10)', () {
       final tracker = NoticeTracker();
       expect(tracker.onRoundOver(null), isEmpty);
       final notices = tracker.onRoundOver(const PlayersWon(['kim']));
       final notice = notices.single as RoundOverNotice;
       expect((notice.result as PlayersWon).playerIds, ['kim']);
-      expect(showsBanner(notice), isFalse);
+      expect(showsBanner(notice), isTrue);
+      expect(noticeBannerDuration(notice), const Duration(seconds: 15));
       expect(tracker.onRoundOver(const PlayersWon(['kim'])), isEmpty);
     });
 
@@ -133,7 +134,8 @@ void main() {
       final tracker = NoticeTracker()..onRoundOver(null);
       final notice = tracker.onRoundOver(const HuntersWon()).single;
       expect((notice as RoundOverNotice).result, isA<HuntersWon>());
-      expect(showsBanner(notice), isFalse);
+      expect(showsBanner(notice), isTrue);
+      expect(noticeBannerDuration(notice), const Duration(seconds: 15));
     });
 
     test('already over when opening the app: not announced again', () {

@@ -400,6 +400,31 @@ void main() {
       );
     });
 
+    testWidgets('the automatic end deletes the catches before the lobby: no '
+        '"back in the game" either (R-CATCH-05, R-GAME-10)', (tester) async {
+      await seed(tester);
+      await catchSam(tester);
+      now = start.add(settings.duration + const Duration(seconds: 5));
+      await pumpAs(tester, 'kim');
+      // As autoEndRound: round data first, the lobby only afterwards.
+      await tester.runAsync(() async {
+        final events = await db
+            .collection('games')
+            .doc((await testSession(code, 'kim')).groupId)
+            .collection('events')
+            .get();
+        for (final d in events.docs) {
+          await d.reference.delete();
+        }
+      });
+      await settle(tester);
+      expect(find.textContaining('back in the game'), findsNothing);
+      expect(
+        notifications.shown.map((n) => n.title),
+        isNot(contains('Sam is back in the game')),
+      );
+    });
+
     testWidgets('players cannot undo a catch (R-CATCH-04)', (tester) async {
       await seed(tester);
       await catchSam(tester);
@@ -2312,7 +2337,8 @@ void main() {
       expect(find.byKey(const Key('filter_myPings')), findsNothing);
       // Sam's ping, which Kim could not see during the game.
       expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
-      expect(find.textContaining(timeUpHint), findsOneWidget);
+      // No info line: the banner says it (R-GAME-09).
+      expect(find.textContaining(timeUpHint), findsNothing);
       expect(find.byKey(const Key('jokerButton')), findsNothing);
     });
 
@@ -2335,7 +2361,7 @@ void main() {
       );
       now = autoEndAt.subtract(const Duration(seconds: 2));
       await pumpAs(tester, 'kim');
-      expect(find.textContaining(timeUpHint), findsOneWidget);
+      expect(find.text('PLAYERS WIN'), findsOneWidget);
       expect((await gameDoc(tester))['status'], 'running');
 
       now = autoEndAt;
@@ -2428,17 +2454,16 @@ void main() {
         finishedAt: now.subtract(const Duration(seconds: 30)),
       );
       expect(find.text('HUNTERS WON'), findsOneWidget);
-      expect(find.textContaining(timeUpHint), findsOneWidget);
-      // Kim was caught, but now the time-up hint is enough.
-      expect(find.textContaining('You were caught'), findsNothing);
+      // Kim was caught, but now the header with the winner is enough.
+      expect(find.text('CAUGHT'), findsNothing);
       // Caught players split up again, like after the time (R-HUNT-11).
       expect(find.byKey(const Key('filter_caught')), findsNothing);
       expect(find.byKey(const Key('filter_player_sam')), findsOneWidget);
       expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
     });
 
-    testWidgets('time up: a notification names the players who won, no '
-        'banner; the overview keeps it (R-GAME-09)', (tester) async {
+    testWidgets('time up: a banner names the players who won until the '
+        'round is saved; the overview keeps it (R-GAME-09)', (tester) async {
       await seed(tester);
       await catchByRepo(tester, 'kim');
       await pumpAs(tester, 'alex');
@@ -2447,10 +2472,15 @@ void main() {
 
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
+      expect(find.text(banner), findsOneWidget);
       expect(notifications.shown.map((n) => n.title), contains(banner));
-      expect(find.text(banner), findsNothing);
       // Header: no names, they are in the overview.
       expect(find.text('PLAYER WINS'), findsOneWidget);
+      // 15 s – until the round is saved and everyone is back in the lobby.
+      await tester.pump(const Duration(seconds: 14));
+      expect(find.text(banner), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(banner), findsNothing);
 
       await tester.tap(find.byKey(const Key('overviewButton')));
       await tester.pumpAndSettle();
@@ -2466,8 +2496,8 @@ void main() {
       expect(find.byKey(const Key('overviewWinner_alex')), findsNothing);
     });
 
-    testWidgets('the last catch arrives: "hunters won" for everyone, as a '
-        'notification only (R-GAME-08, R-GAME-09)', (tester) async {
+    testWidgets('the last catch arrives: banner "hunters won" for everyone '
+        '(R-GAME-08, R-GAME-09)', (tester) async {
       await seed(tester);
       await catchByRepo(tester, 'kim');
       await pumpAs(tester, 'kim');
@@ -2475,11 +2505,9 @@ void main() {
       // The game document now carries finishedAt.
       await pumpAs(tester, 'kim', finishedAt: now);
       expect(
-        notifications.shown.last.title,
-        'All players caught – the hunters won!',
+        notifications.shown.map((n) => n.title),
+        contains('All players caught – the hunters won!'),
       );
-      // No banner on top of it; the header says it permanently.
-      expect(find.text('All players caught – the hunters won!'), findsNothing);
       expect(find.text('HUNTERS WON'), findsOneWidget);
     });
 

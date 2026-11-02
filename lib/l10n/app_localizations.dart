@@ -1106,12 +1106,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Player wins} other{Players win}}'**
   String gamePhasePlayersWon(int count);
 
-  /// No description provided for @gameTimeUpHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The round is over and will be saved in a moment. Then you will find the map with all pings and hunter positions in the group history.'**
-  String get gameTimeUpHint;
-
   /// No description provided for @gameEndButton.
   ///
   /// In en, this message translates to:

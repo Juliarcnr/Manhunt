@@ -69,7 +69,8 @@ void main() {
     );
     expect(find.text('TIME IS UP'), findsOneWidget);
     expect(find.byKey(const Key('endRoundButton')), findsNothing);
-    expect(find.textContaining('saved in a moment'), findsOneWidget);
+    // No extra info line: the winner banner says it (R-GAME-09).
+    expect(find.textContaining('saved in a moment'), findsNothing);
   });
 
   testWidgets('only the host can end the game', (tester) async {

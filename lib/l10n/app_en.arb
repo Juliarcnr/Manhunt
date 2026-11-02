@@ -195,7 +195,6 @@
   "gamePhaseHuntersWon": "Hunters won",
   "gamePhasePlayersWon": "{count, plural, =1{Player wins} other{Players win}}",
   "@gamePhasePlayersWon": {"placeholders": {"count": {"type": "int"}}},
-  "gameTimeUpHint": "The round is over and will be saved in a moment. Then you will find the map with all pings and hunter positions in the group history.",
   "gameEndButton": "Abort game",
   "gameEndConfirmText": "The round is saved with its map in the group history. All other data of this round is deleted for everyone. The group stays and you can start a new round.",
   "gameAbortTitle": "Abort the game early?",

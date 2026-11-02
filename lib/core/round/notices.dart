@@ -48,20 +48,17 @@ class RoundOverNotice extends GameNotice {
 }
 
 /// How long the in-app banner for [notice] stays visible. A speedhunt notice
-/// carries more text and matters more, so it stays longer (R-NOTIF-06).
+/// carries more text and matters more, so it stays longer (R-NOTIF-06); who
+/// won stays until the round is saved and the group is back in the lobby
+/// (R-GAME-09, R-GAME-10).
 Duration noticeBannerDuration(GameNotice notice) => switch (notice) {
-  SpeedhuntNotice() => const Duration(seconds: 15),
+  SpeedhuntNotice() || RoundOverNotice() => const Duration(seconds: 15),
   _ => const Duration(seconds: 5),
 };
 
-/// Whether an open app shows [notice] as its own banner too, besides the
-/// system notification. Not for the end of the round – the notification
-/// and the header are enough (R-GAME-09) – and not for the own boundary
-/// state, which has a permanent banner (R-OUT-06).
-bool showsBanner(GameNotice notice) => switch (notice) {
-  RoundOverNotice() || OwnBoundaryNotice() => false,
-  _ => true,
-};
+/// Whether an open app shows [notice] as its own banner. Not for the own
+/// boundary state, which has a permanent banner (R-OUT-06).
+bool showsBanner(GameNotice notice) => notice is! OwnBoundaryNotice;
 
 /// Whether [me] is told about [notice] at all. Caught players get no
 /// speedhunt notice: it is not on them, and they follow speedhunts in the

@@ -180,7 +180,6 @@
   "gamePhaseHuntersWon": "Hunter:innen haben gewonnen",
   "gamePhasePlayersWon": "{count, plural, =1{Spieler:in gewinnt} other{Spieler:innen gewinnen}}",
   "@gamePhasePlayersWon": {"placeholders": {"count": {"type": "int"}}},
-  "gameTimeUpHint": "Die Runde ist vorbei und wird gleich gespeichert. Danach findet ihr die Karte mit allen Pings und Hunter:innen-Standorten in der Gruppenhistorie.",
   "gameEndButton": "Spiel abbrechen",
   "gameEndConfirmText": "Die Runde wird mit ihrer Karte in der Gruppenhistorie gespeichert. Alle übrigen Daten dieser Runde werden für alle gelöscht. Die Gruppe bleibt bestehen und ihr könnt eine neue Runde starten.",
   "gameAbortTitle": "Spiel vorzeitig abbrechen?",

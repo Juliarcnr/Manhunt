@@ -476,6 +476,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
   /// but only after the group is back in the lobby – so check the (plain)
   /// status first; the decrypted [GameInfo] may still lag behind.
   Future<void> _announceRelease(ReleaseNotice notice) async {
+    // Once the round is over its data – catches included – is deleted
+    // before the group returns to the lobby (R-GAME-10): no release.
+    if (_phaseNow() == GamePhase.ended) return;
     final status = await ref
         .read(gameRepositoryProvider)
         .watchStatus(widget.session.groupId)
@@ -567,7 +570,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.noticeRoundOverBody,
       ),
     };
-    // E.g. the end of the round: only the notification (R-GAME-09).
+    // The own boundary state has its own permanent banner (R-OUT-06).
     final banner = showsBanner(notice);
     final notifications = ref.read(notificationServiceProvider);
     if (_lifecycle == AppLifecycleState.resumed) {
@@ -1532,7 +1535,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           widget.game.hunterLiveThrottled &&
           phase != GamePhase.ended)
         l10n.gameHunterLiveThrottled,
-      if (phase == GamePhase.ended) l10n.gameTimeUpHint,
+      // Once it is over: the banner says who won and that the map is saved
+      // to the history (R-GAME-09), no extra line.
     ];
     // Below the filters the same gap as above them: the info lines if any,
     // the app bar (top inset of the overlay) otherwise.

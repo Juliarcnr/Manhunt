@@ -589,10 +589,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get gameTimeUpHint =>
-      'The round is over and will be saved in a moment. Then you will find the map with all pings and hunter positions in the group history.';
-
-  @override
   String get gameEndButton => 'Abort game';
 
   @override
