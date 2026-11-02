@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/core/history/round_summary.dart';
 import 'package:manhunt/core/models/game_settings.dart';
+import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/round/notices.dart';
 import 'package:manhunt/core/round/round_result.dart';
 import 'package:manhunt/core/schedule/game_clock.dart';
@@ -81,6 +82,26 @@ void main() {
     });
   });
 
+  group('who is told (R-NOTIF-07)', () {
+    const player = Member(id: 'kim', name: 'Kim', role: Role.player);
+    const hunter = Member(id: 'h', name: 'Alex', role: Role.hunter);
+    const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
+
+    test('caught players get no speedhunt notice', () {
+      final notice = SpeedhuntNotice(sh(10));
+      expect(isAnnouncedTo(notice, player.copyWith(caught: true)), isFalse);
+      for (final me in [player, hunter, gm, null]) {
+        expect(isAnnouncedTo(notice, me), isTrue, reason: '$me');
+      }
+    });
+
+    test('everything else still reaches caught players', () {
+      final caught = player.copyWith(caught: true);
+      expect(isAnnouncedTo(CatchNotice(c('sam', 5)), caught), isTrue);
+      expect(isAnnouncedTo(const ReleaseNotice('kim'), caught), isTrue);
+    });
+  });
+
   group('players outside the play area (R-OUT-05)', () {
     test('announced when they leave, also in the first snapshot', () {
       final tracker = NoticeTracker();
@@ -97,13 +118,14 @@ void main() {
   });
 
   group('round over: who won (R-GAME-08, R-GAME-09)', () {
-    test('announced once when the round becomes over, banner for 15 s', () {
+    test('announced once when the round becomes over, only as a '
+        'notification (R-GAME-09)', () {
       final tracker = NoticeTracker();
       expect(tracker.onRoundOver(null), isEmpty);
       final notices = tracker.onRoundOver(const PlayersWon(['kim']));
       final notice = notices.single as RoundOverNotice;
       expect((notice.result as PlayersWon).playerIds, ['kim']);
-      expect(noticeBannerDuration(notice), const Duration(seconds: 15));
+      expect(showsBanner(notice), isFalse);
       expect(tracker.onRoundOver(const PlayersWon(['kim'])), isEmpty);
     });
 
@@ -111,8 +133,7 @@ void main() {
       final tracker = NoticeTracker()..onRoundOver(null);
       final notice = tracker.onRoundOver(const HuntersWon()).single;
       expect((notice as RoundOverNotice).result, isA<HuntersWon>());
-      // The header says it permanently, so the banner is short.
-      expect(noticeBannerDuration(notice), const Duration(seconds: 5));
+      expect(showsBanner(notice), isFalse);
     });
 
     test('already over when opening the app: not announced again', () {
@@ -120,6 +141,11 @@ void main() {
       expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
       expect(tracker.onRoundOver(const HuntersWon()), isEmpty);
     });
+  });
+
+  test('other notices keep their banner', () {
+    expect(showsBanner(SpeedhuntNotice(sh(10))), isTrue);
+    expect(showsBanner(CatchNotice(c('kim', 5))), isTrue);
   });
 
   group('official start after the countdown (R-START-04)', () {

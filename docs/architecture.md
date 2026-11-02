@@ -90,12 +90,12 @@ Speedhunt-Events) und löscht dann alle Rundendaten (`FirestoreGameRepository.ro
 `outsideLocs`, `playerLocs`, `events`, `speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`, `hunterSnaps`),
 setzt caught/jokerUsed zurück und geht in die Lobby. **Abbruch** durch den Host (`endRound`, R-GAME-07): Übersicht,
 Lobby, dann erst Karte (vorher darf ein Host, der kein Hunter ist, nicht alle Positionen lesen), dann löschen.
-**Normales Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 1 min) beendet jedes Mitgliedsgerät die Runde
+**Normales Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 15 s) beendet jedes Mitgliedsgerät die Runde
 selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. alle
 10 s). Reihenfolge: Übersicht und Karte unter fester ID `auto_{startAt ms}` (`_createOnce`: zweites Gerät bzw.
 Wiederholung legt nichts doppelt an; Überschreiben verbieten die Regeln), dann Rundendaten löschen, **zuletzt** Lobby –
 denn Nicht-Hosts dürfen die Rundendaten nur lesen/löschen, solange die Runde noch läuft (`canAutoEnd` in den Regeln,
-gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 1 min). Rundennummer = höchste bisher + 1
+gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 15 s). Rundennummer = höchste bisher + 1
 (`nextRoundNumber`), damit sie sich nach dem Löschen einer Runde (`deleteHistoryEntry`: erst Karte, dann Übersicht) nicht wiederholt. Jede Host-Aktion setzt
 `expiresAt` = jetzt + 180 Tage; zusätzlich verlängert jedes Öffnen durch ein Mitglied (`checkIn`, max. 1× pro Tag). **TTL gibt es im Spark-Tarif nicht**; stattdessen ruft `SessionController.build`
 beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlängern (Regeln: Mitglieder dürfen nur `expiresAt` setzen, max. +181 Tage; löschen erst nach Ablauf).

@@ -64,17 +64,19 @@ void main() {
   });
 
   group('automatic end (R-GAME-10)', () {
-    test('1 min after the time is up', () {
-      expect(clock.autoEndAt, at(180 + 1));
+    const delay = Duration(seconds: 15);
+
+    test('15 s after the time is up', () {
+      expect(clock.autoEndAt, at(180).add(delay));
     });
 
-    test('1 min after the last catch', () {
+    test('15 s after the last catch', () {
       final won = GameClock(
         startAt: start,
         settings: settings,
         finishedAt: at(50),
       );
-      expect(won.autoEndAt, at(50 + 1));
+      expect(won.autoEndAt, at(50).add(delay));
     });
 
     test('a leftover from an earlier round does not bring it forward', () {
@@ -83,7 +85,7 @@ void main() {
         settings: settings,
         finishedAt: at(-60),
       );
-      expect(leftover.autoEndAt, at(180 + 1));
+      expect(leftover.autoEndAt, at(180).add(delay));
     });
   });
 

@@ -1078,6 +1078,40 @@ void main() {
       expect(find.text('Speedhunt started!'), findsNothing);
     });
 
+    testWidgets('caught players get no speedhunt notice (R-NOTIF-07)', (
+      tester,
+    ) async {
+      now = start.add(const Duration(minutes: 72));
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreGameRepository(db).recordCatch(
+          await testSession(code, 'alex'),
+          CatchRecord(playerId: 'kim', at: now),
+        ),
+      );
+      await pumpAs(tester, 'kim');
+      await tester.tap(find.byKey(const Key('liveViewOk')));
+      await settle(tester);
+      final shownBefore = notifications.shown.length;
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).startSpeedhunt(
+          await testSession(code, 'alex'),
+          Speedhunt.fromSettings(
+            targetId: 'sam',
+            startedAt: start.add(const Duration(minutes: 71)),
+            settings: settings,
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(find.text('Speedhunt started!'), findsNothing);
+      expect(
+        notifications.shown.skip(shownBefore).map((n) => n.title),
+        isNot(contains('Speedhunt started!')),
+      );
+      await tester.pump(const Duration(seconds: 16));
+    });
+
     for (final who in ['kim', 'alex']) {
       testWidgets('$who: below the filters the same gap as above them: '
           '"next ping(s)" (R-MAP-01, R-HUNT-10)', (tester) async {
@@ -1150,7 +1184,10 @@ void main() {
       expect(find.byKey(const Key('liveViewDialog')), findsOneWidget);
       await tester.tap(find.byKey(const Key('liveViewOk')));
       await settle(tester);
-      expect(find.textContaining('You were caught'), findsOneWidget);
+      // The header says it instead of an info line (R-CATCH-06).
+      expect(find.text('CAUGHT'), findsOneWidget);
+      expect(find.byKey(const Key('gameCountdown')), findsOneWidget);
+      expect(find.textContaining('You were caught'), findsNothing);
       expect(find.text('Kim was caught'), findsOneWidget);
       expect(find.byKey(const Key('selfCatchButton')), findsNothing);
       expect(location.isTracking, isFalse);
@@ -2279,14 +2316,14 @@ void main() {
       expect(find.byKey(const Key('jokerButton')), findsNothing);
     });
 
-    testWidgets('1 min after the end the game screen ends the round by itself '
+    testWidgets('15 s after the end the game screen ends the round by itself '
         'and saves its map, on any phone (R-GAME-10, R-HIST-04)', (
       tester,
     ) async {
       await seed(tester);
       await regularPing(tester, 'sam');
       final autoEndAt = start.add(
-        settings.duration + const Duration(minutes: 1),
+        settings.duration + const Duration(seconds: 15),
       );
       // Fake Firestore stores serverTimestamp as real time; pin it.
       final groupId = (await tester.runAsync(() => testSession(code, 'kim')))!
@@ -2400,8 +2437,8 @@ void main() {
       expect(find.byKey(const Key('lastPing_sam')), findsOneWidget);
     });
 
-    testWidgets('time up: a banner names the players who won, then goes; '
-        'the overview keeps it (R-GAME-09)', (tester) async {
+    testWidgets('time up: a notification names the players who won, no '
+        'banner; the overview keeps it (R-GAME-09)', (tester) async {
       await seed(tester);
       await catchByRepo(tester, 'kim');
       await pumpAs(tester, 'alex');
@@ -2410,12 +2447,10 @@ void main() {
 
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text(banner), findsOneWidget);
       expect(notifications.shown.map((n) => n.title), contains(banner));
+      expect(find.text(banner), findsNothing);
       // Header: no names, they are in the overview.
       expect(find.text('PLAYER WINS'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 16));
-      expect(find.text(banner), findsNothing);
 
       await tester.tap(find.byKey(const Key('overviewButton')));
       await tester.pumpAndSettle();
@@ -2431,8 +2466,8 @@ void main() {
       expect(find.byKey(const Key('overviewWinner_alex')), findsNothing);
     });
 
-    testWidgets('the last catch arrives: banner "hunters won" for everyone '
-        '(R-GAME-08, R-GAME-09)', (tester) async {
+    testWidgets('the last catch arrives: "hunters won" for everyone, as a '
+        'notification only (R-GAME-08, R-GAME-09)', (tester) async {
       await seed(tester);
       await catchByRepo(tester, 'kim');
       await pumpAs(tester, 'kim');
@@ -2440,31 +2475,47 @@ void main() {
       // The game document now carries finishedAt.
       await pumpAs(tester, 'kim', finishedAt: now);
       expect(
-        find.text('All players caught – the hunters won!'),
-        findsOneWidget,
+        notifications.shown.last.title,
+        'All players caught – the hunters won!',
       );
-      // Short: the header says it permanently (R-GAME-09).
-      await tester.pump(const Duration(seconds: 6));
+      // No banner on top of it; the header says it permanently.
       expect(find.text('All players caught – the hunters won!'), findsNothing);
       expect(find.text('HUNTERS WON'), findsOneWidget);
     });
 
-    testWidgets('caught while others are still in the game: only the hint, '
-        'no other positions (R-GAME-06, R-CATCH-01)', (tester) async {
+    testWidgets('caught while others are still in the game: "caught" in the '
+        'header and the overview, no positions before the warning '
+        '(R-GAME-06, R-CATCH-01, R-CATCH-06)', (tester) async {
       await seed(tester);
       await regularPing(tester, 'sam');
       await catchByRepo(tester, 'kim');
       await pumpAs(tester, 'kim');
+      expect(find.text('CAUGHT'), findsOneWidget);
+      expect(find.text('HUNT IS ON'), findsNothing);
+      // No info line over the map any more.
       expect(
         find.text('You were caught – your location is no longer shared.'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.textContaining(timeUpHint), findsNothing);
+      // Until the warning is confirmed nothing else is shown (R-GM-08).
+      expect(find.byKey(const Key('liveViewDialog')), findsOneWidget);
       for (final id in ['hunters', 'lastPings', 'player_sam']) {
         expect(find.byKey(Key('filter_$id')), findsNothing, reason: id);
       }
       expect(find.byKey(const Key('lastPing_sam')), findsNothing);
       expect(find.byKey(const Key('selfCatchButton')), findsNothing);
+
+      // The overview says it, including not to pass anything on.
+      await tester.tap(find.byKey(const Key('liveViewOk')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      final hint = tester.widget<Text>(
+        find.byKey(const Key('overviewCaughtSelf')),
+      );
+      expect(hint.data, contains('your location is no longer shared'));
+      expect(hint.data, contains('you must not share these locations'));
     });
 
     testWidgets('time up with several players left: all are named '
@@ -2473,9 +2524,11 @@ void main() {
       await pumpAs(tester, 'kim');
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Time is up – Kim and Sam have won!'), findsOneWidget);
+      expect(
+        notifications.shown.last.title,
+        'Time is up – Kim and Sam have won!',
+      );
       expect(find.text('PLAYERS WIN'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 16));
     });
 
     testWidgets('time up with everyone caught: the hunters won (R-GAME-09)', (
@@ -2491,11 +2544,10 @@ void main() {
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
       expect(
-        find.text('All players caught – the hunters won!'),
-        findsOneWidget,
+        notifications.shown.last.title,
+        'All players caught – the hunters won!',
       );
       expect(find.text('HUNTERS WON'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 16));
       await tester.tap(find.byKey(const Key('overviewButton')));
       await tester.pumpAndSettle();
       expect(
@@ -2673,6 +2725,8 @@ void main() {
       await settle(tester);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('liveViewDialog')), findsNothing);
+      // The dialog was the warning; no extra info line afterwards.
+      expect(find.textContaining('You see everyone live'), findsNothing);
       expect(find.byKey(const Key('live_sam')), findsOneWidget);
       expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
       expect(find.byKey(const Key('filter_live_sam')), findsOneWidget);

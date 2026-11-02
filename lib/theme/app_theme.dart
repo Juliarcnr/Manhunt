@@ -12,18 +12,6 @@ abstract final class AppColors {
   /// colour.
   static const hunter = Color(0xFFDD573C);
 
-  /// One colour per hunter on the round's map in the history (R-HIST-05):
-  /// warm reds and oranges, apart from the players' colours, the speedhunt
-  /// yellow and the outside red.
-  static const hunterPalette = [
-    Color(0xFFDD573C), // hunter orange-red
-    Color(0xFFFF9100), // orange
-    Color(0xFFB71C1C), // dark red
-    Color(0xFFFFAB91), // salmon
-    Color(0xFF8D3B1F), // rust
-    Color(0xFFFF6E40), // coral
-  ];
-
   /// Players: electric teal.
   static const player = Color(0xFF1DE9B6);
 

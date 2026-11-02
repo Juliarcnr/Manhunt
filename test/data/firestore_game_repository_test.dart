@@ -419,7 +419,7 @@ void main() {
     });
   });
 
-  group('automatic end 1 min after the round is over (R-GAME-10)', () {
+  group('automatic end 15 s after the round is over (R-GAME-10)', () {
     late DateTime start;
 
     setUp(() async {
@@ -444,7 +444,7 @@ void main() {
         (await gameDoc().collection('historyMaps').get()).docs.length;
 
     test('nothing happens before', () async {
-      now = start.add(const Duration(hours: 3, seconds: 59));
+      now = start.add(const Duration(hours: 3, seconds: 14));
       expect(await repo.autoEndRound(guest), isFalse);
       expect((await repo.watchGame(admin).first)!.status, GameStatus.running);
       expect(await roundDocCount(), greaterThan(0));
@@ -485,12 +485,12 @@ void main() {
       expect(await mapCount(), 1);
     });
 
-    test('1 min after the hunters won', () async {
+    test('15 s after the hunters won', () async {
       final won = start.add(const Duration(minutes: 30));
       await gameDoc().update({'finishedAt': Timestamp.fromDate(won)});
-      now = won.add(const Duration(seconds: 59));
+      now = won.add(const Duration(seconds: 14));
       expect(await repo.autoEndRound(guest), isFalse);
-      now = won.add(const Duration(minutes: 1));
+      now = won.add(const Duration(seconds: 15));
       expect(await repo.autoEndRound(guest), isTrue);
       final round = (await repo.watchHistory(admin).first).single;
       expect(round.duration, const Duration(minutes: 30));

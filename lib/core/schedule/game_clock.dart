@@ -20,8 +20,9 @@ class GameClock {
 
   /// Grace time after the round is over (time up or the hunters won) before
   /// a device ends it automatically (R-GAME-10): late pings and hunter
-  /// positions still arrive, then the round is saved to the history.
-  static const autoEndDelay = Duration(minutes: 1);
+  /// positions still arrive (the end-of-game pings within seconds), then the
+  /// round is saved to the history. 15 s is enough for that (2026-11-02).
+  static const autoEndDelay = Duration(seconds: 15);
 
   DateTime get huntersReleaseAt => startAt.add(settings.headStart);
 

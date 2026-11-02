@@ -81,7 +81,7 @@ void main() {
     testWidgets('both 30 min by default, repeats allowed', (tester) async {
       await pumpEditable(tester);
       expect(find.text('Pause zwischen Speedhunts'), findsOneWidget);
-      expect(find.text('Pause für denselben Spieler'), findsOneWidget);
+      expect(find.text('Pause für dieselbe Person'), findsOneWidget);
       expect(
         tester
             .widget<SwitchListTile>(
@@ -179,7 +179,7 @@ void main() {
       );
       bool on(String key) =>
           tester.widget<SwitchListTile>(find.byKey(Key(key))).value;
-      expect(find.text('Reguläre Pings an alle Spieler'), findsOneWidget);
+      expect(find.text('Reguläre Pings an alle Spieler:innen'), findsOneWidget);
       expect(on('playerJokerSwitch'), isTrue);
       expect(on('sharedPingsSwitch'), isFalse);
 
@@ -217,7 +217,7 @@ void main() {
         ),
       );
       const key = Key('anonymousPlayersSwitch');
-      expect(find.text('Anonyme Spieler'), findsOneWidget);
+      expect(find.text('Anonyme Spieler:innen'), findsOneWidget);
       expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isTrue);
       await tester.ensureVisible(find.byKey(key));
       await tester.tap(find.byKey(key));
@@ -291,7 +291,7 @@ void main() {
     testWidgets('hidden unless enabled', (tester) async {
       await pump(tester, showBots: false);
       expect(find.byKey(const Key('botSettings')), findsNothing);
-      expect(find.text('Computer-Spieler'), findsNothing);
+      expect(find.text('Computer-Spieler:innen'), findsNothing);
     });
 
     testWidgets('hunters and players are set separately', (tester) async {
@@ -300,12 +300,12 @@ void main() {
         of: find.ancestor(of: find.text(label), matching: find.byType(Row)),
         matching: find.byTooltip('+'),
       );
-      await tester.ensureVisible(find.text('Computer-Spieler'));
-      await tester.tap(plus('Computer-Spieler'));
+      await tester.ensureVisible(find.text('Computer-Spieler:innen'));
+      await tester.tap(plus('Computer-Spieler:innen'));
       await tester.pump();
-      await tester.tap(plus('Computer-Spieler'));
+      await tester.tap(plus('Computer-Spieler:innen'));
       await tester.pump();
-      await tester.tap(plus('Computer-Hunter'));
+      await tester.tap(plus('Computer-Hunter:innen'));
       await tester.pump();
       expect((settings().botHunters, settings().botPlayers), (1, 2));
     });

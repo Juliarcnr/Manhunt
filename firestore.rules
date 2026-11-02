@@ -77,14 +77,14 @@ service cloud.firestore {
         && g.finishedAt >= g.startAt;
     }
 
-    // The round has been over (time up or hunters won) for a minute: any
+    // The round has been over (time up or hunters won) for 15 s: any
     // member may end it and save it to the history (R-GAME-10, no server).
     // [g] is the game's data before the request.
     function autoEndDue(g) {
       return g.status == 'running' && g.get('startAt', null) is timestamp
         && g.get('durationSec', null) is int
-        && (request.time >= g.startAt + duration.value(g.durationSec, 's') + duration.value(1, 'm')
-          || (finishedThisRound(g) && request.time >= g.finishedAt + duration.value(1, 'm')));
+        && (request.time >= g.startAt + duration.value(g.durationSec, 's') + duration.value(15, 's')
+          || (finishedThisRound(g) && request.time >= g.finishedAt + duration.value(15, 's')));
     }
 
     function canAutoEnd(gid) {

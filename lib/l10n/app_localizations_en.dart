@@ -119,10 +119,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Game master – you see everyone live (every 15 s).';
 
   @override
-  String get gameCaughtLiveInfo =>
-      'You see everyone live – don\'t pass anything on to players or hunters still in the game!';
-
-  @override
   String get liveViewTitle => 'Careful: live locations';
 
   @override
@@ -573,6 +569,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gamePhaseHunting => 'Hunt is on';
 
   @override
+  String get gamePhaseCaught => 'Caught';
+
+  @override
   String get gamePhaseTimeUp => 'Time is up';
 
   @override
@@ -634,8 +633,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get gameCaughtSelf =>
-      'You were caught – your location is no longer shared.';
+  String get overviewCaughtSelf =>
+      'You were caught – your location is no longer shared. You now see everyone still in the game live: you must not share these locations with any player or hunter who is still in the game!';
 
   @override
   String gameSpeedhuntNext(int number, int total, String time) {

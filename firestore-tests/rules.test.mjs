@@ -791,8 +791,8 @@ describe('game master and caught players watch live (R-GM-01 … R-GM-09)', () =
     await assertFails(list('kim', 'playerLocs'));
   });
 
-  test('time up: nothing is shared live any more (within the minute before the automatic end)', async () => {
-    await round({ startedMinutesAgo: 60.5 });
+  test('time up: nothing is shared live any more (within the 15 s before the automatic end)', async () => {
+    await round({ startedMinutesAgo: 60.1 });
     await assertFails(list('gm', 'playerLocs'));
     await assertFails(setDoc(liveDoc(as('sam'), 'sam'), loc()));
     await assertSucceeds(deleteDoc(liveDoc(as('sam'), 'sam')));
@@ -1468,7 +1468,7 @@ describe('round over: everyone sees all positions (R-GAME-06, R-GAME-08)', () =>
   });
 });
 
-describe('automatic end 1 min after the round is over, with history map (R-GAME-10, R-HIST-04)', () => {
+describe('automatic end 15 s after the round is over, with history map (R-GAME-10, R-HIST-04)', () => {
   const ROUND = [
     'pings', 'hunterLocs', 'outsideLocs', 'playerLocs', 'events', 'speedhuntTargets', 'jokerRequests', 'jokerAnswers',
     'drawings', 'hunterSnaps',
@@ -1573,7 +1573,7 @@ describe('automatic end 1 min after the round is over, with history map (R-GAME-
     ['a hunter', 'lou', 'hunter'],
   ];
   for (const [label, uid, hostRole] of cases) {
-    test(`${label} ends the round 1 min after the time is up and saves the map, end to end`, async () => {
+    test(`${label} ends the round after the time is up (+15 s) and saves the map, end to end`, async () => {
       await round({ startedMinutesAgo: 60 + 2, hostRole });
       await assertSucceeds(autoEnd(uid));
       assert.equal(await roundDocsLeft(), 0);
@@ -1581,14 +1581,14 @@ describe('automatic end 1 min after the round is over, with history map (R-GAME-
     });
   }
 
-  test('1 min after the hunters won, although the planned time is not up yet', async () => {
+  test('15 s after the hunters won, although the planned time is not up yet', async () => {
     await round({ startedMinutesAgo: 30, finishedMinutesAgo: 2 });
     await assertSucceeds(autoEnd('kim'));
     await expectEnded();
   });
 
-  test('not before: neither 30 s after the time is up nor 30 s after the hunters won', async () => {
-    await round({ startedMinutesAgo: 60 + 0.5 });
+  test('not before: neither 6 s after the time is up nor 6 s after the hunters won', async () => {
+    await round({ startedMinutesAgo: 60 + 0.1 });
     const db = as('kim');
     await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'enc' }));
     await assertFails(getDocs(collection(db, 'games', GID, 'jokerAnswers')));
@@ -1600,7 +1600,7 @@ describe('automatic end 1 min after the round is over, with history map (R-GAME-
     await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: false }));
 
     await env.withSecurityRulesDisabled((ctx) =>
-      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(30), finishedAt: minutesAgo(0.5) }),
+      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(30), finishedAt: minutesAgo(0.1) }),
     );
     await assertFails(autoEnd('kim'));
   });
@@ -1852,7 +1852,7 @@ describe('position at the end of the round (R-HIST-08)', () => {
   test('a player still in the game sends it once when time is up; then everyone reads it', async () => {
     await startRound();
     await env.withSecurityRulesDisabled((ctx) =>
-      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(60.2), durationSec: 3600 }),
+      updateDoc(doc(ctx.firestore(), 'games', GID), { startAt: minutesAgo(60.1), durationSec: 3600 }),
     );
     const ref = doc(as('kim'), 'games', GID, 'pings', 'kim_end');
     await assertSucceeds(setDoc(ref, endPing('kim')));

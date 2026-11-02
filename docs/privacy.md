@@ -49,12 +49,12 @@ in den Einstellungen.
 Kein Konto, keine E-Mail, keine Telefonnummer, kein Analytics, kein Crash-Reporting, keine Push-Tokens, keine Werbung.
 
 ## Löschung
-- **Rundenende** (automatisch 1 min nach Ablauf der Spielzeit bzw. nach dem letzten Catch, R-GAME-10, oder Abbruch
+- **Rundenende** (automatisch 15 s nach Ablauf der Spielzeit bzw. nach dem letzten Catch, R-GAME-10, oder Abbruch
   durch den Host, R-GAME-07): löscht alle Live-Standorte und Runden-Ereignisse für alle (R-PRIV-03). Vorher wird
   eine verschlüsselte **Rundenkarte** in die Historie geschrieben (R-HIST-04) – das, was alle nach Spielende ohnehin
   sehen durften, plus die Hunter-Positionen zu den Ping-Zeiten. Bewusste Entscheidung der Projektinhaberin
   (2026-11-01): Die Karte bleibt, bis der Host die Runde in der Historie löscht (R-HIST-06) oder die Gruppe gelöscht wird.
-- Das Rundenende erledigt mangels Server das erste Mitgliedsgerät, das die Runde 1 min nach ihrem Ende sieht. Dafür
+- Das Rundenende erledigt mangels Server das erste Mitgliedsgerät, das die Runde 15 s nach ihrem Ende sieht. Dafür
   dürfen ab diesem Zeitpunkt (bis zur Rückkehr in die Lobby) alle Mitglieder die Rundendaten lesen und löschen, die
   Mitglieder zurücksetzen und Historie-Eintrag und Rundenkarte schreiben. Neu zu sehen gibt es dabei kaum etwas:
   Alle Pings und Hunter-Standorte sind seit Spielende für alle sichtbar (R-GAME-06); dazu kommen nur Zeichnungen der

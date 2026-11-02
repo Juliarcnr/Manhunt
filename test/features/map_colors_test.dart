@@ -26,6 +26,11 @@ void main() {
     }
   });
 
+  test('in the history all hunters have the hunter orange-red, like in the '
+      'game (R-HUNT-02, R-HIST-05)', () {
+    expect(hunterColors(['h0', 'h1', 'h2']).values.toSet(), {AppColors.hunter});
+  });
+
   test('colours repeat only after the palette is used up', () {
     final ids = [for (var i = 0; i < 12; i++) 'p$i'];
     final colors = playerColors(ids);

@@ -13,36 +13,51 @@ Map<String, Color> playerColors(List<String> playerIds) => {
     id: AppColors.playerPalette[i % AppColors.playerPalette.length],
 };
 
-/// Colour per hunter on the round's map in the history (R-HIST-05).
+/// Colour per hunter on the round's map in the history: the same hunter
+/// orange-red for all, like in the game (R-HUNT-02, R-HIST-05).
 Map<String, Color> hunterColors(List<String> hunterIds) => {
-  for (final (i, id) in hunterIds.indexed)
-    id: AppColors.hunterPalette[i % AppColors.hunterPalette.length],
+  for (final id in hunterIds) id: AppColors.hunter,
 };
 
 /// Hunters' positions at speedhunt ping times (R-HIST-05): a ⚡ badge with
 /// the ping's number, filled in the hunter's colour – the target's own ⚡
-/// pings are dark with a ring in the player's colour.
+/// pings are dark with a ring in the player's colour. Each hunter's latest
+/// one also shows the name and a location pin, like the target's
+/// ([speedhuntPingsLayer], R-HIST-09).
 MarkerLayer hunterSnapsLayer({
   required List<PingRecord> snaps,
   required Map<String, Color> colors,
-}) => MarkerLayer(
-  markers: [
-    for (final p in snaps)
-      Marker(
-        key: Key('hunterSnap_${p.playerId}_${p.slotId}'),
-        point: p.fix.point.toLatLng(),
-        width: 34,
-        height: 28,
-        child: _NumberDot(
-          text: '⚡${p.speedhuntNumber ?? ''}',
-          color: colors[p.playerId] ?? AppColors.hunter,
-          textColor: Colors.white,
-          ring: Colors.white,
-          wide: true,
-        ),
-      ),
-  ],
-);
+  required Map<String, String> names,
+}) {
+  final latest = latestSpeedhuntPings(snaps).values.toSet();
+  return MarkerLayer(
+    markers: [
+      for (final p in snaps)
+        if (latest.contains(p))
+          _speedhuntMarker(
+            p,
+            colors[p.playerId] ?? AppColors.hunter,
+            name: names[p.playerId] ?? '?',
+            keyPrefix: 'hunterSnap',
+            filled: true,
+          )
+        else
+          Marker(
+            key: Key('hunterSnap_${p.playerId}_${p.slotId}'),
+            point: p.fix.point.toLatLng(),
+            width: 34,
+            height: 28,
+            child: _NumberDot(
+              text: '⚡${p.speedhuntNumber ?? ''}',
+              color: colors[p.playerId] ?? AppColors.hunter,
+              textColor: Colors.white,
+              ring: Colors.white,
+              wide: true,
+            ),
+          ),
+    ],
+  );
+}
 
 /// Named pins, e.g. for one step of the history's timeline (R-HIST-07):
 /// players in their colour, hunters in theirs with the hunter symbol.
@@ -229,10 +244,13 @@ MarkerLayer _positionsLayer({
 /// (R-PLAY-01, R-HUNT-04). Speedhunt pings are left out – they have their own
 /// ⚡ numbering (R-HUNT-07), so the numbers match on every device.
 /// [keyPrefix] keeps marker keys unique when several players are shown.
+/// [end]: the position at the end of the round, as a 🏁 after the numbers
+/// (R-HIST-08) – not numbered, it is no ping of the schedule.
 MarkerLayer historyLayer(
   List<PingRecord> pings, {
   required Color color,
   String keyPrefix = 'history',
+  LocationFix? end,
 }) => MarkerLayer(
   markers: [
     for (final (i, p) in regularPings(pings).indexed)
@@ -242,6 +260,14 @@ MarkerLayer historyLayer(
         width: 28,
         height: 28,
         child: _NumberDot(text: '${i + 1}', color: color, ring: Colors.white),
+      ),
+    if (end != null)
+      Marker(
+        key: Key('${keyPrefix}_end'),
+        point: end.point.toLatLng(),
+        width: 28,
+        height: 28,
+        child: _NumberDot(text: '🏁', color: color, ring: Colors.white),
       ),
   ],
 );
@@ -270,12 +296,19 @@ MarkerLayer speedhuntPingsLayer({
 }
 
 /// With a [name] (the player's latest ping) the badge also carries the name
-/// and a location pin sits below it.
-Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
+/// and a location pin sits below it. [filled]: badge in [color] (hunters,
+/// R-HIST-09) instead of dark with a ring.
+Marker _speedhuntMarker(
+  PingRecord p,
+  Color color, {
+  String? name,
+  String keyPrefix = 'speedhunt',
+  bool filled = false,
+}) {
   final label = '⚡${p.speedhuntNumber ?? ''}';
   final pin = name != null;
   return Marker(
-    key: Key('speedhunt_${p.playerId}_${p.slotId}'),
+    key: Key('${keyPrefix}_${p.playerId}_${p.slotId}'),
     point: p.fix.point.toLatLng(),
     width: pin ? 140 : 34,
     height: pin ? 60 : 28,
@@ -289,9 +322,12 @@ Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
                 height: 28,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: filled ? color : AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color, width: 2.5),
+                  border: Border.all(
+                    color: filled ? Colors.white : color,
+                    width: 2.5,
+                  ),
                   boxShadow: const [
                     BoxShadow(blurRadius: 3, color: Colors.black38),
                   ],
@@ -335,14 +371,21 @@ Marker _speedhuntMarker(PingRecord p, Color color, {String? name}) {
 
 /// Connects each selected player's regular pings in time order, with arrows
 /// in the walking direction (R-HUNT-05).
+/// [ends]: positions at the end of the round, by player/hunter id, as the
+/// last point of the path (R-HIST-08).
 List<Widget> pathLayers(
   Map<String, List<PingRecord>> byPlayer,
-  Map<String, Color> colors,
-) {
+  Map<String, Color> colors, {
+  Map<String, LocationFix> ends = const {},
+}) {
   final paths = {
     for (final e in byPlayer.entries)
-      if (regularPings(e.value) case final pings when pings.length > 1)
-        e.key: [for (final p in pings) p.fix.point],
+      if ([
+            for (final p in regularPings(e.value)) p.fix.point,
+            ?ends[e.key]?.point,
+          ]
+          case final points when points.length > 1)
+        e.key: points,
   };
   if (paths.isEmpty) return const [];
   return [

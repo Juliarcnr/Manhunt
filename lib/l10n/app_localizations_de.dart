@@ -71,16 +71,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyRenameMe => 'Namen ändern';
 
   @override
-  String get roleHunter => 'Hunter';
+  String get roleHunter => 'Hunter:in';
 
   @override
-  String get rolePlayer => 'Spieler';
+  String get rolePlayer => 'Spieler:in';
 
   @override
-  String get roleHunters => 'Hunter';
+  String get roleHunters => 'Hunter:innen';
 
   @override
-  String get rolePlayers => 'Spieler';
+  String get rolePlayers => 'Spieler:innen';
 
   @override
   String get roleUnassigned => 'Noch nicht eingeteilt';
@@ -91,19 +91,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String lobbyHunterLiveThrottled(int percent) {
-    return 'Große Runde: Hunter sehen einander diese Runde nur alle 15 s statt alle 5 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt $percent % davon).';
+    return 'Große Runde: Hunter:innen sehen einander diese Runde nur alle 15 s statt alle 5 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt $percent % davon).';
   }
 
   @override
   String get gameHunterLiveThrottled =>
-      'Hunter-Standorte diese Runde alle 15 s (Firebase-Kontingent)';
+      'Hunter:innen-Standorte diese Runde alle 15 s (Firebase-Kontingent)';
 
   @override
   String get roleGameMaster => 'Spielleitung';
 
   @override
   String get lobbyGameMasterHint =>
-      'Optional – spielt nicht mit und sieht alle Hunter und Spieler live. Wird nicht mit ausgewürfelt.';
+      'Optional – spielt nicht mit und sieht alle Hunter:innen und Spieler:innen live. Wird nicht mit ausgewürfelt.';
 
   @override
   String get lobbyAddGameMaster => 'Spielleitung hinzufügen';
@@ -119,15 +119,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Spielleitung – du siehst alle live (alle 15 s).';
 
   @override
-  String get gameCaughtLiveInfo =>
-      'Du siehst alle live – nichts an Spieler oder Hunter im Spiel weitergeben!';
-
-  @override
   String get liveViewTitle => 'Achtung: Live-Standorte';
 
   @override
   String get liveViewText =>
-      'Du bist gefangen. Ab jetzt siehst du die Live-Standorte aller, die noch im Spiel sind – Hunter und Spieler.\n\nDiese darfst du mit keinem Spieler und keinem Hunter teilen, der noch im Spiel ist!';
+      'Du bist gefangen. Ab jetzt siehst du die Live-Standorte aller, die noch im Spiel sind – Hunter:innen und Spieler:innen.\n\nDiese darfst du mit keinen Spieler:innen und keinen Hunter:innen teilen, die noch im Spiel sind!';
 
   @override
   String get liveViewOk => 'OK';
@@ -139,7 +135,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get overviewTitle => 'Übersicht';
 
   @override
-  String get filterHunters => 'Hunter';
+  String get filterHunters => 'Hunter:innen';
 
   @override
   String get filterLastPings => 'Letzte Pings';
@@ -148,7 +144,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filterCaught => 'Gefangen';
 
   @override
-  String get filterSharedPings => 'Letzte Spieler-Pings';
+  String get filterSharedPings => 'Letzte Spieler:innen-Pings';
 
   @override
   String filterSpeedhunt(String name, String time) {
@@ -160,12 +156,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String filterHunterJoker(String time) {
-    return 'Hunter $time';
+    return 'Hunter:innen $time';
   }
 
   @override
   String filterPlayerJoker(String time) {
-    return 'Spieler $time';
+    return 'Spieler:innen $time';
   }
 
   @override
@@ -188,7 +184,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String overviewMyAlias(String alias) {
-    return 'Für die Hunter bist du $alias';
+    return 'Für die Hunter:innen bist du $alias';
   }
 
   @override
@@ -255,7 +251,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsReadOnlyHint =>
-      'Nur der Host kann die Einstellungen ändern.';
+      'Die Einstellungen können nur vom Host geändert werden.';
 
   @override
   String get settingsSectionGame => 'Spiel';
@@ -286,13 +282,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsStartTimeClear => 'Startzeit entfernen';
 
   @override
-  String get settingsHeadStart => 'Vorlauf für Spieler';
+  String get settingsHeadStart => 'Vorlauf für Spieler:innen';
 
   @override
   String get settingsPingInterval => 'Ping alle';
 
   @override
-  String get settingsSpeedhuntCount => 'Speedhunts für Hunter';
+  String get settingsSpeedhuntCount => 'Speedhunts für Hunter:innen';
 
   @override
   String get settingsSpeedhuntPings => 'Pings pro Speedhunt';
@@ -305,7 +301,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSpeedhuntEarliestHint =>
-      'Ab Spielstart (inkl. Vorlauf) gezählt. Vorher können Hunter keinen Speedhunt auslösen.';
+      'Ab Spielstart (inkl. Vorlauf) gezählt. Vorher können Hunter:innen keinen Speedhunt auslösen.';
 
   @override
   String get settingsSpeedhuntFirstDelay => 'Verzögerung bis zum 1. Ping';
@@ -319,61 +315,60 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSpeedhuntCooldownHint =>
-      'Ab dem Ende eines Speedhunts gezählt. So lange können Hunter keinen weiteren auslösen.';
+      'Ab dem Ende eines Speedhunts gezählt. So lange können Hunter:innen keinen weiteren auslösen.';
 
   @override
-  String get settingsSpeedhuntRepeat =>
-      'Mehrmals in Folge auf denselben Spieler';
+  String get settingsSpeedhuntRepeat => 'Mehrmals in Folge auf dieselbe Person';
 
   @override
   String get settingsSpeedhuntRepeatOnHint =>
-      'Derselbe Spieler ist erst nach seiner eigenen Pause wieder wählbar.';
+      'Dieselbe Person ist erst nach ihrer eigenen Pause wieder wählbar.';
 
   @override
   String get settingsSpeedhuntRepeatOffHint =>
       'Das Ziel des letzten Speedhunts kann beim nächsten nicht gewählt werden.';
 
   @override
-  String get settingsSpeedhuntRepeatCooldown => 'Pause für denselben Spieler';
+  String get settingsSpeedhuntRepeatCooldown => 'Pause für dieselbe Person';
 
   @override
   String get settingsSpeedhuntRepeatCooldownHint =>
-      'Ab dem Ende des letzten Speedhunts auf diesen Spieler gezählt.';
+      'Ab dem Ende des letzten Speedhunts auf diese Person gezählt.';
 
   @override
   String get settingsSpeedhuntRepeatCooldownMin =>
-      'Die Pause für denselben Spieler kann nicht kürzer sein als die Pause zwischen Speedhunts. Verkürze zuerst diese.';
+      'Die Pause für dieselbe Person kann nicht kürzer sein als die Pause zwischen Speedhunts. Verkürze zuerst diese.';
 
   @override
-  String get settingsHunterCount => 'Anzahl Hunter';
+  String get settingsHunterCount => 'Anzahl Hunter:innen';
 
   @override
-  String get settingsJoker => 'Joker: Hunter-Standorte';
+  String get settingsJoker => 'Joker: Hunter:innen-Standorte';
 
   @override
   String get settingsJokerHint =>
-      'Jeder Spieler darf einmal sehen, wo die Hunter gerade sind.';
+      'Jede:r Spieler:in darf einmal sehen, wo die Hunter:innen gerade sind.';
 
   @override
-  String get settingsPlayerJoker => 'Joker: Spieler-Standorte';
+  String get settingsPlayerJoker => 'Joker: Spieler:innen-Standorte';
 
   @override
   String get settingsPlayerJokerHint =>
-      'Jeder Spieler darf einmal sehen, wo alle anderen Spieler gerade sind.';
+      'Jede:r Spieler:in darf einmal sehen, wo alle anderen Spieler:innen gerade sind.';
 
   @override
-  String get settingsSharedPings => 'Reguläre Pings an alle Spieler';
+  String get settingsSharedPings => 'Reguläre Pings an alle Spieler:innen';
 
   @override
   String get settingsSharedPingsHint =>
-      'Auch die Spieler sehen den jeweils letzten regulären Ping aller anderen Spieler (keine Historie, keine Speedhunt-Pings). Ersetzt den Joker „Spieler-Standorte“.';
+      'Auch die Spieler:innen sehen den jeweils letzten regulären Ping aller anderen Spieler:innen (keine Historie, keine Speedhunt-Pings). Ersetzt den Joker „Spieler:innen-Standorte“.';
 
   @override
-  String get settingsAnonymousPlayers => 'Anonyme Spieler';
+  String get settingsAnonymousPlayers => 'Anonyme Spieler:innen';
 
   @override
   String get settingsAnonymousPlayersHint =>
-      'Hunter sehen statt der Namen nur „Spieler 1“, „Spieler 2“ … – bis die Zeit abgelaufen ist. Spieler sehen weiterhin die echten Namen.';
+      'Hunter:innen sehen statt der Namen nur „Spieler 1“, „Spieler 2“ … – bis die Zeit abgelaufen ist. Spieler:innen sehen weiterhin die echten Namen.';
 
   @override
   String get settingsOutsideLive =>
@@ -381,20 +376,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsOutsideLiveHint =>
-      'Ist ein Spieler 30 s lang eindeutig außerhalb des Spielfelds (mind. 30 m plus GPS-Ungenauigkeit), sehen die Hunter seinen Live-Standort – bis er zurück ist, plus 1 Minute. Vorher wird er gewarnt.';
+      'Ist ein:e Spieler:in 30 s lang eindeutig außerhalb des Spielfelds (mind. 30 m plus GPS-Ungenauigkeit), sehen die Hunter:innen ihren Live-Standort – bis sie zurück ist, plus 1 Minute. Vorher wird sie gewarnt.';
 
   @override
   String get settingsSectionBots => 'Test (Debug)';
 
   @override
   String get settingsBotsHint =>
-      'Computer-Mitglieder sind direkt als Hunter bzw. Spieler eingeteilt und laufen zufällig in max. 200 m um ein echtes Handy: Computer-Spieler um das des ersten Spielers, Computer-Hunter um das des ersten Hunters – gibt es keins, um das erste Handy der Gruppe. Sie pingen wie echte Handys, solange dort der Spielbildschirm offen ist.';
+      'Computer-Mitglieder sind direkt als Hunter:innen bzw. Spieler:innen eingeteilt und laufen zufällig in max. 200 m um ein echtes Handy: Computer-Spieler:innen um das der ersten Spieler:in, Computer-Hunter:innen um das der ersten Hunter:in – gibt es keins, um das erste Handy der Gruppe. Sie pingen wie echte Handys, solange dort der Spielbildschirm offen ist.';
 
   @override
-  String get settingsBotHunters => 'Computer-Hunter';
+  String get settingsBotHunters => 'Computer-Hunter:innen';
 
   @override
-  String get settingsBotPlayers => 'Computer-Spieler';
+  String get settingsBotPlayers => 'Computer-Spieler:innen';
 
   @override
   String get settingsArea => 'Spielfeld';
@@ -478,10 +473,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get errorSpeedhuntInvalid => 'Bitte Speedhunt-Einstellungen prüfen';
 
   @override
-  String get errorHunterCountInvalid => 'Es braucht mindestens einen Hunter';
+  String get errorHunterCountInvalid =>
+      'Es braucht mindestens eine:n Hunter:in';
 
   @override
-  String get errorNotEnoughPlayers => 'Es braucht mindestens einen Spieler';
+  String get errorNotEnoughPlayers => 'Es braucht mindestens eine:n Spieler:in';
 
   @override
   String get errorAreaMissing => 'Zuerst das Spielfeld einzeichnen';
@@ -517,7 +513,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get lobbyTapToSwitch =>
-      'Tippe auf eine Person, um Hunter ↔ Spieler zu tauschen.';
+      'Tippe auf eine Person, um Hunter:in ↔ Spieler:in zu tauschen.';
 
   @override
   String get lobbyStart => 'Spiel starten';
@@ -579,25 +575,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gamePhaseHunting => 'Die Jagd läuft';
 
   @override
+  String get gamePhaseCaught => 'Gefangen';
+
+  @override
   String get gamePhaseTimeUp => 'Zeit abgelaufen';
 
   @override
-  String get gamePhaseHuntersWon => 'Hunter haben gewonnen';
+  String get gamePhaseHuntersWon => 'Hunter:innen haben gewonnen';
 
   @override
   String gamePhasePlayersWon(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Spieler gewinnen',
-      one: 'Spieler gewinnt',
+      other: 'Spieler:innen gewinnen',
+      one: 'Spieler:in gewinnt',
     );
     return '$_temp0';
   }
 
   @override
   String get gameTimeUpHint =>
-      'Die Runde ist vorbei und wird gleich gespeichert. Danach findet ihr die Karte mit allen Pings und Hunter-Standorten in der Gruppenhistorie.';
+      'Die Runde ist vorbei und wird gleich gespeichert. Danach findet ihr die Karte mit allen Pings und Hunter:innen-Standorten in der Gruppenhistorie.';
 
   @override
   String get gameEndButton => 'Spiel abbrechen';
@@ -640,8 +639,8 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get gameCaughtSelf =>
-      'Du wurdest gefangen – dein Standort wird nicht mehr geteilt.';
+  String get overviewCaughtSelf =>
+      'Du wurdest gefangen – dein Standort wird nicht mehr geteilt. Du siehst jetzt alle live, die noch im Spiel sind: Diese Standorte darfst du mit keinen Spieler:innen und keinen Hunter:innen teilen, die noch im Spiel sind!';
 
   @override
   String gameSpeedhuntNext(int number, int total, String time) {
@@ -684,7 +683,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String speedhuntInfo(int pings, int minutes) {
-    return '$pings Standorte im Abstand von $minutes min. Die Spieler erfahren nur, dass ein Speedhunt läuft – nicht auf wen.';
+    return '$pings Standorte im Abstand von $minutes min. Die Spieler:innen erfahren nur, dass ein Speedhunt läuft – nicht auf wen.';
   }
 
   @override
@@ -717,11 +716,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get speedhuntInvalidTarget =>
-      'Auf diesen Spieler ist kein Speedhunt möglich.';
+      'Auf diese Person ist kein Speedhunt möglich.';
 
   @override
   String get speedhuntSameTarget =>
-      'Mehrere Speedhunts hintereinander auf denselben Spieler sind nicht möglich.';
+      'Mehrere Speedhunts hintereinander auf dieselbe Person sind nicht möglich.';
 
   @override
   String speedhuntTargetCoolingDown(String name, String time) {
@@ -737,40 +736,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get jokerButton => 'Joker';
 
   @override
-  String get jokerHuntersOption => 'Hunter-Standorte';
+  String get jokerHuntersOption => 'Hunter:innen-Standorte';
 
   @override
-  String get jokerHuntersHint => 'Einmalig sehen, wo die Hunter gerade sind';
+  String get jokerHuntersHint =>
+      'Einmalig sehen, wo die Hunter:innen gerade sind';
 
   @override
-  String get jokerPlayersOption => 'Spieler-Standorte';
+  String get jokerPlayersOption => 'Spieler:innen-Standorte';
 
   @override
   String get jokerPlayersHint =>
-      'Einmalig sehen, wo alle anderen Spieler gerade sind';
+      'Einmalig sehen, wo alle anderen Spieler:innen gerade sind';
 
   @override
   String get jokerAlreadyUsed => 'Bereits benutzt';
 
   @override
-  String get jokerPlayersTitle => 'Spieler-Joker einsetzen?';
+  String get jokerPlayersTitle => 'Spieler:innen-Joker einsetzen?';
 
   @override
   String get jokerPlayersText =>
-      'Die Handys aller anderen aktiven Spieler senden dir einmalig ihren aktuellen Standort. Danach ist dieser Joker verbraucht.';
+      'Die Handys aller anderen aktiven Spieler:innen senden dir einmalig ihren aktuellen Standort. Danach ist dieser Joker verbraucht.';
 
   @override
-  String get jokerTitle => 'Hunter-Joker einsetzen?';
+  String get jokerTitle => 'Hunter:innen-Joker einsetzen?';
 
   @override
   String get jokerText =>
-      'Du siehst einmalig die aktuellen Standorte der Hunter. Danach ist der Joker verbraucht.';
+      'Du siehst einmalig die aktuellen Standorte der Hunter:innen. Danach ist der Joker verbraucht.';
 
   @override
   String get jokerConfirm => 'Joker einsetzen';
 
   @override
-  String get jokerNoHunters => 'Gerade keine Hunter-Standorte verfügbar.';
+  String get jokerNoHunters => 'Gerade keine Hunter:innen-Standorte verfügbar.';
 
   @override
   String get noticeGameStarted => 'Das Spiel hat offiziell begonnen!';
@@ -782,12 +782,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String noticeGameStartedHunter(int minutes) {
-    return 'Die Spieler haben $minutes min Vorlauf.';
+    return 'Die Spieler:innen haben $minutes min Vorlauf.';
   }
 
   @override
   String get noticeHuntersWon =>
-      'Alle Spieler gefangen – die Hunter haben gewonnen!';
+      'Alle Spieler:innen gefangen – die Hunter:innen haben gewonnen!';
 
   @override
   String noticePlayersWon(String names, int count) {
@@ -802,7 +802,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noticeRoundOverBody =>
-      'Die Karte mit allen Pings und Hunter-Standorten findest du gleich in der Gruppenhistorie.';
+      'Die Karte mit allen Pings und Hunter:innen-Standorten findest du gleich in der Gruppenhistorie.';
 
   @override
   String nameList(String rest, String last) {
@@ -811,7 +811,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get overviewHuntersWon =>
-      'Die Hunter haben gewonnen – alle Spieler wurden gefangen';
+      'Die Hunter:innen haben gewonnen – alle Spieler:innen wurden gefangen';
 
   @override
   String overviewPlayersWon(String names, int count) {
@@ -842,7 +842,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String noticeSpeedhuntBody(int pings, int minutes) {
-    return 'Ein Spieler wird $pings× im Abstand von $minutes min geortet.';
+    return 'Ein:e Spieler:in wird $pings× im Abstand von $minutes min geortet.';
   }
 
   @override
@@ -850,7 +850,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Auf wen er geht, ist unklar. Du siehst trotzdem deine eigenen ⚡-Pings – das heißt nicht, dass er dich betrifft.';
 
   @override
-  String get noticePingSent => 'Dein Standort wurde an die Hunter gesendet';
+  String get noticePingSent =>
+      'Dein Standort wurde an die Hunter:innen gesendet';
 
   @override
   String get noticePingSentAll => 'Dein Standort wurde an alle gesendet';
@@ -860,11 +861,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String noticeOutsideWarningBody(int seconds) {
-    return 'Geh innerhalb von $seconds s zurück, sonst sehen die Hunter deinen Live-Standort.';
+    return 'Geh innerhalb von $seconds s zurück, sonst sehen die Hunter:innen deinen Live-Standort.';
   }
 
   @override
-  String get noticeOutsideLive => 'Die Hunter sehen deinen Live-Standort';
+  String get noticeOutsideLive => 'Die Hunter:innen sehen deinen Live-Standort';
 
   @override
   String noticeOutsideLiveBody(int seconds) {
@@ -889,16 +890,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String outsideWarning(String time) {
-    return 'Du bist außerhalb des Spielfelds – geh innerhalb von $time zurück, sonst sehen die Hunter deinen Live-Standort';
+    return 'Du bist außerhalb des Spielfelds – geh innerhalb von $time zurück, sonst sehen die Hunter:innen deinen Live-Standort';
   }
 
   @override
   String get outsideLive =>
-      'Die Hunter sehen gerade deinen Live-Standort – geh zurück ins Spielfeld';
+      'Die Hunter:innen sehen gerade deinen Live-Standort – geh zurück ins Spielfeld';
 
   @override
   String outsideAfterglow(String time) {
-    return 'Zurück im Spielfeld – die Hunter sehen deinen Live-Standort noch $time';
+    return 'Zurück im Spielfeld – die Hunter:innen sehen deinen Live-Standort noch $time';
   }
 
   @override
@@ -936,14 +937,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get undoCatchConfirm => 'Rückgängig machen';
 
   @override
-  String get lastCatchTitle => 'Letzter Spieler – Hunter gewinnen';
+  String get lastCatchTitle => 'Letzte Spieler:in – Hunter:innen gewinnen';
 
   @override
   String get lastCatchText =>
-      'Das ist der letzte Spieler, der noch im Spiel ist. Mit diesem Catch haben die Hunter gewonnen.\n\nDas kann nicht rückgängig gemacht werden. Die Runde ist danach noch nicht offiziell beendet, aber alle Hunter und Spieler können sich dann die bisherigen Standorte aller ansehen, bis der Host die Runde beendet.';
+      'Das ist die letzte Spieler:in, die noch im Spiel ist. Mit diesem Catch haben die Hunter:innen gewonnen.\n\nDas kann nicht rückgängig gemacht werden. Die Runde ist danach noch nicht offiziell beendet, aber alle Hunter:innen und Spieler:innen können sich dann die bisherigen Standorte aller ansehen, bis die Runde vom Host beendet wird.';
 
   @override
-  String get lastCatchConfirm => 'Ja, Hunter gewinnen';
+  String get lastCatchConfirm => 'Ja, Hunter:innen gewinnen';
 
   @override
   String get historyTitle => 'Historie';
@@ -967,7 +968,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get historySurvivors => 'Nicht gefangen';
 
   @override
-  String get historyAllCaught => 'Alle Spieler gefangen!';
+  String get historyAllCaught => 'Alle Spieler:innen gefangen!';
 
   @override
   String get historyShowMap => 'Karte ansehen';
@@ -1029,7 +1030,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get lobbyLastRoundHuntersWon => 'Die Hunter haben gewonnen.';
+  String get lobbyLastRoundHuntersWon => 'Die Hunter:innen haben gewonnen.';
 
   @override
   String lobbyLastRoundPlayersWon(String names, int count) {

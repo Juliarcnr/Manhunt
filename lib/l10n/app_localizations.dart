@@ -290,12 +290,6 @@ abstract class AppLocalizations {
   /// **'Game master – you see everyone live (every 15 s).'**
   String get gameMasterInfo;
 
-  /// No description provided for @gameCaughtLiveInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'You see everyone live – don\'t pass anything on to players or hunters still in the game!'**
-  String get gameCaughtLiveInfo;
-
   /// No description provided for @liveViewTitle.
   ///
   /// In en, this message translates to:
@@ -1088,6 +1082,12 @@ abstract class AppLocalizations {
   /// **'Hunt is on'**
   String get gamePhaseHunting;
 
+  /// No description provided for @gamePhaseCaught.
+  ///
+  /// In en, this message translates to:
+  /// **'Caught'**
+  String get gamePhaseCaught;
+
   /// No description provided for @gamePhaseTimeUp.
   ///
   /// In en, this message translates to:
@@ -1178,11 +1178,11 @@ abstract class AppLocalizations {
   /// **'Next pings in {time}'**
   String gameNextPings(String time);
 
-  /// No description provided for @gameCaughtSelf.
+  /// No description provided for @overviewCaughtSelf.
   ///
   /// In en, this message translates to:
-  /// **'You were caught – your location is no longer shared.'**
-  String get gameCaughtSelf;
+  /// **'You were caught – your location is no longer shared. You now see everyone still in the game live: you must not share these locations with any player or hunter who is still in the game!'**
+  String get overviewCaughtSelf;
 
   /// No description provided for @gameSpeedhuntNext.
   ///

@@ -1,4 +1,5 @@
 import '../history/round_summary.dart';
+import '../models/member.dart';
 import '../schedule/game_clock.dart';
 import '../schedule/speedhunt.dart';
 import 'boundary_watch.dart';
@@ -47,13 +48,27 @@ class RoundOverNotice extends GameNotice {
 }
 
 /// How long the in-app banner for [notice] stays visible. A speedhunt notice
-/// carries more text and matters more, so it stays longer (R-NOTIF-06); so
-/// do the names of the players who won. "Hunters won" is also in the
-/// permanent header, so a short banner is enough (R-GAME-09).
+/// carries more text and matters more, so it stays longer (R-NOTIF-06).
 Duration noticeBannerDuration(GameNotice notice) => switch (notice) {
-  SpeedhuntNotice() ||
-  RoundOverNotice(result: PlayersWon()) => const Duration(seconds: 15),
+  SpeedhuntNotice() => const Duration(seconds: 15),
   _ => const Duration(seconds: 5),
+};
+
+/// Whether an open app shows [notice] as its own banner too, besides the
+/// system notification. Not for the end of the round – the notification
+/// and the header are enough (R-GAME-09) – and not for the own boundary
+/// state, which has a permanent banner (R-OUT-06).
+bool showsBanner(GameNotice notice) => switch (notice) {
+  RoundOverNotice() || OwnBoundaryNotice() => false,
+  _ => true,
+};
+
+/// Whether [me] is told about [notice] at all. Caught players get no
+/// speedhunt notice: it is not on them, and they follow speedhunts in the
+/// live view anyway (R-NOTIF-07, R-GM-10).
+bool isAnnouncedTo(GameNotice notice, Member? me) => switch (notice) {
+  SpeedhuntNotice() => !(me != null && me.isPlayer && me.caught),
+  _ => true,
 };
 
 /// A player left the play area; the hunters see their live location

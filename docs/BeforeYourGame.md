@@ -55,7 +55,7 @@ Dauert 2–3 Minuten.
 - [ ] Optional eine **Spielleitung** bestimmen (Lobby → „Spielleitung hinzufügen“): spielt nicht mit, sieht alle
   live und wird beim Würfeln nicht mit eingeteilt.
 - [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
-- [ ] Nach dem Spiel müsst ihr **nichts drücken**: 1 Minute nach Ablauf der Zeit (oder nach dem letzten Catch) endet
+- [ ] Nach dem Spiel müsst ihr **nichts drücken**: 15 Sekunden nach Ablauf der Zeit (oder nach dem letzten Catch) endet
   die Runde von selbst. Alle Pings, ⚡-Pings und die Hunter-Positionen zu jedem Ping-Zeitpunkt landen als
   **Rundenkarte in der Gruppenhistorie** („Karte ansehen“, mit Zeitleiste) – zum gemeinsamen Anschauen. Alle anderen
   Standortdaten werden gelöscht. Der Host kann eine Runde in der Historie endgültig löschen.

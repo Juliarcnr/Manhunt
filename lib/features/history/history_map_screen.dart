@@ -56,9 +56,10 @@ class HistoryMapScreen extends ConsumerWidget {
 enum _View { chips, timeline }
 
 /// The map with the same chips as after the round (R-GAME-06, R-HUNT-11):
-/// last pings, one chip per player and per speedhunt – and one per hunter,
-/// whose positions at the ping times work like a player's history
-/// (R-HIST-05). The timeline shows one ping time at a time (R-HIST-07).
+/// one chip per player and per speedhunt – and one per hunter, whose
+/// positions at the ping times work like a player's history (R-HIST-05).
+/// No "last pings": the end of the game shows where everyone was
+/// (R-HIST-08). The timeline shows one ping time at a time (R-HIST-07).
 class RoundMapView extends StatefulWidget {
   const RoundMapView({super.key, required this.map});
 
@@ -72,9 +73,9 @@ class _RoundMapViewState extends State<RoundMapView> {
   final _controller = MapController();
   var _view = _View.chips;
 
-  /// Starts with everyone's position at the end (R-HIST-08) instead of the
-  /// last regular pings, so a pin per person is enough.
-  var _filters = const MapFilters(lastPings: false);
+  /// Starts with everyone's position at the end (R-HIST-08), a pin per
+  /// person.
+  var _filters = const MapFilters();
   var _showEnd = true;
 
   /// Like [MapFilters.playerHistories], for the hunters; missing means off.
@@ -198,9 +199,12 @@ class _RoundMapViewState extends State<RoundMapView> {
   ) {
     final filters = _filters;
     void set(MapFilters f) => setState(() => _filters = f);
+    final endPlayers = widget.map.endPlayers;
+    final endHunters = widget.map.lastHunters;
+    // A chip also shows its owner's position at the end (R-HIST-08).
     final selected = {
       for (final id in filters.playerHistories.keys)
-        if (_byPlayer.containsKey(id)) id,
+        if (_byPlayer.containsKey(id) || endPlayers.containsKey(id)) id,
     };
     final shownHunters = {
       for (final e in _hunterModes.entries)
@@ -212,46 +216,53 @@ class _RoundMapViewState extends State<RoundMapView> {
     ];
     final layers = <Widget>[
       // Lines below the dots, hunters below players.
-      ...pathLayers({
-        for (final id in shownHunters)
-          if (_hunterModes[id] == HistoryMode.lines) id: ?_hunterHistories[id],
-      }, _hunterColors),
-      ...pathLayers({
-        for (final id in selected)
-          if (filters.historyOf(id) == HistoryMode.lines) id: _byPlayer[id]!,
-      }, _playerColors),
+      ...pathLayers(
+        {
+          for (final id in shownHunters)
+            if (_hunterModes[id] == HistoryMode.lines)
+              id: _hunterHistories[id] ?? const [],
+        },
+        _hunterColors,
+        ends: endHunters,
+      ),
+      ...pathLayers(
+        {
+          for (final id in selected)
+            if (filters.historyOf(id) == HistoryMode.lines)
+              id: _byPlayer[id] ?? const [],
+        },
+        _playerColors,
+        ends: endPlayers,
+      ),
       for (final id in shownHunters)
-        if (_hunterHistories[id] case final list?)
-          historyLayer(
-            list,
-            color: _hunterColors[id] ?? AppColors.hunter,
-            keyPrefix: 'hunterHistory_$id',
-          ),
+        historyLayer(
+          _hunterHistories[id] ?? const [],
+          color: _hunterColors[id] ?? AppColors.hunter,
+          keyPrefix: 'hunterHistory_$id',
+          end: endHunters[id],
+        ),
       for (final id in selected)
         historyLayer(
-          _byPlayer[id]!,
+          _byPlayer[id] ?? const [],
           color: _playerColors[id] ?? AppColors.player,
           keyPrefix: 'history_$id',
+          end: endPlayers[id],
         ),
-      // With each speedhunt the hunters at its ping times (R-HIST-05).
+      // With each speedhunt the hunters at its ping times (R-HIST-05),
+      // the latest one of each with the name (R-HIST-09).
       hunterSnapsLayer(
         snaps: [
           for (final s in shownSpeedhunts)
             ...hunterSnapsForSpeedhunt(widget.map.hunterSnaps, s),
         ],
         colors: _hunterColors,
+        names: _names,
       ),
       speedhuntPingsLayer(
         pings: [for (final s in shownSpeedhunts) ...s.pings],
         colors: _playerColors,
         names: _names,
       ),
-      if (filters.lastPings)
-        lastPingsLayer(
-          pings: lastRegularPings(_byPlayer, skip: selected),
-          names: _names,
-          colors: _playerColors,
-        ),
       // Where everyone was when the round was over (R-HIST-08).
       if (_showEnd) ...[
         namedPinsLayer(
@@ -279,13 +290,6 @@ class _RoundMapViewState extends State<RoundMapView> {
           selected: _showEnd,
           onChanged: (v) => setState(() => _showEnd = v),
         ),
-      FilterItem(
-        id: 'lastPings',
-        label: l10n.filterLastPings,
-        icon: Icons.location_on,
-        selected: filters.lastPings,
-        onChanged: (v) => set(filters.copyWith(lastPings: v)),
-      ),
       // Tap cycles: points → points with lines → off (R-HUNT-04, R-HUNT-05).
       for (final id in widget.map.playerIds)
         FilterItem(

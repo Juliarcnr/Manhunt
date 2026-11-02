@@ -489,6 +489,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     final members = ref.read(membersProvider).value;
+    // E.g. no speedhunt notice for caught players (R-NOTIF-07).
+    if (!isAnnouncedTo(notice, _me(members))) return;
     final names = {for (final m in members ?? const <Member>[]) m.id: m.name};
     // Players also get their own ⚡ pings (R-SPEED-09); tell them that this
     // does not mean the speedhunt is on them (R-NOTIF-06).
@@ -565,8 +567,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.noticeRoundOverBody,
       ),
     };
-    // The own boundary state has its own permanent banner (R-OUT-06).
-    final banner = notice is! OwnBoundaryNotice;
+    // E.g. the end of the round: only the notification (R-GAME-09).
+    final banner = showsBanner(notice);
     final notifications = ref.read(notificationServiceProvider);
     if (_lifecycle == AppLifecycleState.resumed) {
       // App open: own banner + vibration always (also when muted); the
@@ -1040,6 +1042,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
         AppColors.textMuted,
         null,
       ),
+      // Caught players: short "Caught" instead of the phase, the countdown
+      // stays (R-CATCH-06).
+      GamePhase.headStart || GamePhase.hunting when me?.caught ?? false => (
+        l10n.gamePhaseCaught,
+        AppColors.textMuted,
+        phase == GamePhase.headStart ? clock!.huntersReleaseAt : clock!.endAt,
+      ),
       GamePhase.headStart => (
         l10n.gamePhaseHeadStart,
         AppColors.player,
@@ -1512,13 +1521,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
         l10n.gameNextPing(formatCountdown(nextSlot.at.difference(now))),
       if (nextRegular != null)
         l10n.gameNextPings(formatCountdown(nextRegular.difference(now))),
-      // Once the round is over the time-up hint says enough.
-      if ((me?.caught ?? false) && phase != GamePhase.ended)
-        l10n.gameCaughtSelf,
+      // Caught players: the header and the overview say it (R-CATCH-06).
       // Game masters: only for 15 s once the live view starts (the
-      // overview says it afterwards, R-GM-03); caught players keep the
-      // reminder not to pass anything on (R-GM-08).
-      if (observer && !isGameMaster) l10n.gameCaughtLiveInfo,
+      // overview says it afterwards, R-GM-03). Caught players were warned
+      // by the dialog, no extra line (R-GM-08).
       if (observer && isGameMaster && now.isBefore(gameMasterInfoUntil))
         l10n.gameMasterInfo,
       // Hunters know why their colleagues move in bigger steps (R-QUOTA-02).

@@ -84,6 +84,9 @@ class OverviewSheet extends StatelessWidget {
         if (m.isGameMaster) m,
     ];
     final iAmGameMaster = gameMasters.any((m) => m.id == myId);
+    // Once someone has won, the winner box says enough (R-GAME-09).
+    final iAmCaught =
+        winner == null && players.any((p) => p.id == myId && p.caught);
 
     Widget section(String title, Color color, IconData icon) => Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -199,6 +202,28 @@ class OverviewSheet extends StatelessWidget {
                       child: Text(
                         l10n.overviewYouAreGameMaster,
                         key: const Key('overviewGameMaster'),
+                        style: const TextStyle(color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Instead of an info line over the map (R-CATCH-06).
+            if (iAmCaught)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.back_hand_outlined,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.overviewCaughtSelf,
+                        key: const Key('overviewCaughtSelf'),
                         style: const TextStyle(color: AppColors.textMuted),
                       ),
                     ),

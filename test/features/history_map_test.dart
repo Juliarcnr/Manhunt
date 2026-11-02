@@ -145,7 +145,6 @@ void main() {
       expect(find.text('Round 4'), findsOneWidget);
       for (final id in [
         'end',
-        'lastPings',
         'player_p0',
         'player_p1',
         'hunter_h0',
@@ -154,19 +153,42 @@ void main() {
       ]) {
         expect(chip(id), findsOneWidget, reason: id);
       }
-      // Everyone's position at the end (R-HIST-08) instead of the last pings.
+      // No "last pings" chip: the end of the game shows everyone
+      // (R-HIST-08).
+      expect(chip('lastPings'), findsNothing);
       expect(find.byKey(const Key('endPlayer_p1')), findsOneWidget);
       expect(find.byKey(const Key('endHunter_h0')), findsOneWidget);
       expect(find.byKey(const Key('lastPing_p0')), findsNothing);
 
       await tester.tap(chip('end'));
-      await tester.tap(chip('lastPings'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('endPlayer_p1')), findsNothing);
       expect(find.byKey(const Key('endHunter_h0')), findsNothing);
-      expect(find.byKey(const Key('lastPing_p0')), findsOneWidget);
-      expect(find.byKey(const Key('lastPing_p1')), findsOneWidget);
     });
+
+    testWidgets(
+      'the own chip of a player and of a hunter ends with their position '
+      'at the end of the game (R-HIST-08)',
+      (tester) async {
+        await openMap(tester);
+        await tester.tap(chip('end')); // only the chips' own markers
+        await tester.tap(chip('player_p1'));
+        await tester.tap(chip('hunter_h0'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('history_p1_2')), findsOneWidget);
+        expect(find.byKey(const Key('history_p1_end')), findsOneWidget);
+        expect(find.byKey(const Key('hunterHistory_h0_end')), findsOneWidget);
+        // Kim was caught: no position at the end, no 🏁.
+        await tester.tap(chip('player_p0'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('history_p0_1')), findsOneWidget);
+        expect(find.byKey(const Key('history_p0_end')), findsNothing);
+        // With lines the path runs on to the end: Sam has 2 pings + the end.
+        await tester.tap(chip('player_p1'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('arrow_p1_1')), findsOneWidget);
+      },
+    );
 
     testWidgets('a hunter chip cycles points → lines → off; player chips '
         'show no hunters', (tester) async {
@@ -199,6 +221,11 @@ void main() {
       expect(find.byKey(Key('speedhunt_p1_$slot')), findsOneWidget);
       expect(find.byKey(Key('hunterSnap_h0_$slot')), findsOneWidget);
       expect(find.byKey(Key('hunterSnap_h1_$slot')), findsOneWidget);
+      // Like the target, each hunter's last ⚡ position carries the name
+      // (R-HIST-09).
+      expect(find.text('⚡1 Sam'), findsOneWidget);
+      expect(find.text('⚡1 Alex'), findsOneWidget);
+      expect(find.text('⚡1 Lou'), findsOneWidget);
 
       final speedhuntChip = chip(
         'speedhunt_p1_${at(50).millisecondsSinceEpoch}',
