@@ -182,6 +182,7 @@ class RoundEngine {
       startAt: startAt,
       settings: game.settings,
       finishedAt: game.finishedAt,
+      confirmedAt: game.confirmedAt,
     );
   }
 
@@ -705,9 +706,9 @@ class RoundEngine {
     }
   }
 
-  /// How long after the end of the round its last position is still sent,
-  /// before the round is saved a minute later (R-GAME-10).
-  static const endPositionGrace = Duration(seconds: 50);
+  /// How long after the result is known the last position is still sent:
+  /// until the round is saved to the history (R-GAME-10, R-HIST-08).
+  static const endPositionGrace = GameClock.autoEndDelay;
 
   /// Last position while tracking; unlike [_lastFix] kept when tracking
   /// stops, for the position at the end of the round.
@@ -715,9 +716,11 @@ class RoundEngine {
   var _endSent = false;
   var _endBusy = false;
 
-  /// When the round is over, every player still in the game sends their
-  /// position once more, for the history map (R-HIST-08). Hunters need not:
-  /// their last live position is kept anyway. No notice, nothing logged.
+  /// When the round is over and its result known – after the time is up
+  /// only once someone confirmed who else was caught (R-GAME-11) –, every
+  /// player still in the game sends their position once more, for the
+  /// history map (R-HIST-08). Hunters need not: their last live position is
+  /// kept anyway. No notice, nothing logged.
   Future<void> _sendEndPosition() async {
     final me = _me;
     final clock = _clock;
@@ -726,8 +729,9 @@ class RoundEngine {
       return;
     }
     final now = _now();
-    if (now.isBefore(clock.endAt) ||
-        now.difference(clock.endAt) > endPositionGrace) {
+    if (clock.phaseAt(now) != GamePhase.ended ||
+        now.isBefore(clock.decidedAt) ||
+        now.difference(clock.decidedAt) > endPositionGrace) {
       return;
     }
     _endBusy = true;

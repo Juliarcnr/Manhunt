@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -37,6 +38,7 @@ import 'map_filters.dart';
 import 'game_map_layers.dart';
 import 'speedhunt_dialog.dart';
 import 'start_countdown.dart';
+import 'time_up_dialog.dart';
 
 /// Running round: map with role-specific layers, status, actions, automatic
 /// pings in the background and notifications (phase 5).
@@ -98,6 +100,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       // The time running out is no event, so check every second.
       _checkStarted();
+      _checkTimeUp();
       _checkRoundOver();
       _checkAutoEnd();
       setState(() {});
@@ -150,6 +153,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ref.listenManual<AsyncValue<List<Member>>>(membersProvider, (_, next) {
           if (next.value case final members?) unawaited(_bots?.update(members));
           _feedEngine();
+          _checkTimeUp();
           _checkRoundOver();
         }, fireImmediately: true),
       )
@@ -211,6 +215,74 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Not loaded yet (the first value may be an empty list): no baseline.
     if (members == null || !members.any((m) => m.isPlayer)) return;
     _notices.onRoundOver(_result(members)).forEach(_notify);
+  }
+
+  /// The open "who else was caught?" dialog (R-GAME-11), if any.
+  DialogRoute<void>? _timeUpRoute;
+
+  /// Once the time is up, hunters and players still in the game must
+  /// confirm who else was caught (R-GAME-11): opens the dialog for them and
+  /// closes it everywhere as soon as anyone confirmed (or the timeout).
+  /// Everyone else only sees "Time is up" in the header meanwhile.
+  void _checkTimeUp() {
+    if (!mounted) return;
+    final members = ref.read(membersProvider).value;
+    // Not loaded yet (the first value may be an empty list).
+    if (members == null || !members.any((m) => m.isPlayer)) return;
+    final awaiting =
+        widget.game.status == GameStatus.running &&
+        (_clock()?.awaitingConfirmation(widget.now()) ?? false);
+    _notices.onTimeUp(awaiting: awaiting).forEach(_notify);
+    final me = _me(members);
+    final asked = awaiting && confirmsTimeUp(me);
+    final route = _timeUpRoute;
+    if (asked && route == null) {
+      final open = timeUpDialogRoute(
+        context,
+        players: [
+          for (final m in members)
+            if (m.isPlayer && !m.caught) m,
+        ],
+        onConfirm: _confirmTimeUp,
+      );
+      _timeUpRoute = open;
+      // Also called while building (new game data): navigate after it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_timeUpRoute, open)) return;
+        unawaited(
+          Navigator.of(context).push(open).whenComplete(() {
+            if (identical(_timeUpRoute, open)) _timeUpRoute = null;
+          }),
+        );
+      });
+    } else if (!asked && route != null) {
+      _timeUpRoute = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (route.isActive) route.navigator?.removeRoute(route);
+      });
+    }
+  }
+
+  /// Writes who else was caught – at the end of the time – together with the
+  /// confirmation (R-GAME-11). Returns whether the dialog may close.
+  Future<bool> _confirmTimeUp(List<String> caughtIds) async {
+    final clock = _clock();
+    if (clock == null) return true;
+    final l10n = AppLocalizations.of(context);
+    final at = clock.plannedEndAt.toUtc();
+    try {
+      await ref.read(gameRepositoryProvider).confirmTimeUp(widget.session, [
+        for (final id in caughtIds) CatchRecord(playerId: id, at: at),
+      ]);
+      return true;
+    } on Exception catch (e) {
+      // Someone else was faster: their confirmation counts.
+      final faster = e is FirebaseException && e.code == 'permission-denied';
+      if (mounted) {
+        _snack(faster ? l10n.timeUpAlreadyConfirmed : l10n.commonError('$e'));
+      }
+      return faster;
+    }
   }
 
   /// "Kim, Sam and Lou".
@@ -332,7 +404,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
   void didUpdateWidget(GameScreen old) {
     super.didUpdateWidget(old);
     _feedEngine();
-    // The hunters' win arrives with the game (R-GAME-08).
+    // The hunters' win and the confirmation after the time is up arrive
+    // with the game (R-GAME-08, R-GAME-11).
+    _checkTimeUp();
     _checkRoundOver();
     // The start time arrives a moment after "start" (server timestamp).
     unawaited(_loadJokers());
@@ -401,6 +475,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       startAt: startAt,
       settings: widget.game.settings,
       finishedAt: widget.game.finishedAt,
+      confirmedAt: widget.game.confirmedAt,
     );
   }
 
@@ -409,7 +484,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   DateTime? _autoEndTriedAt;
 
-  /// Ends the round a minute after it was over and saves it to the history
+  /// Ends the round [GameClock.autoEndDelay] after it was over and saves it to the history
   /// (R-GAME-10, R-HIST-04). Every device tries; the first one wins, the
   /// others are refused (or find the lobby) and try again a bit later.
   void _checkAutoEnd() {
@@ -558,6 +633,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ),
         BoundaryEvent.ended => (l10n.noticeOutsideEnded, null),
       },
+      TimeUpNotice() => (l10n.noticeTimeUp, l10n.noticeTimeUpBody),
       RoundOverNotice(result: HuntersWon()) => (
         l10n.noticeHuntersWon,
         l10n.noticeRoundOverBody,

@@ -1592,6 +1592,54 @@ abstract class AppLocalizations {
   /// **'Yes, caught'**
   String get catchSelfConfirm;
 
+  /// No description provided for @timeUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time is up'**
+  String get timeUpTitle;
+
+  /// No description provided for @timeUpQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Was anyone else caught who has not been reported yet?'**
+  String get timeUpQuestion;
+
+  /// No description provided for @timeUpNobody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody else was caught'**
+  String get timeUpNobody;
+
+  /// No description provided for @timeUpHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One confirmation is enough – it counts for everyone. Without one, after {minutes} min it counts as nobody else caught.'**
+  String timeUpHint(int minutes);
+
+  /// No description provided for @timeUpConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get timeUpConfirm;
+
+  /// No description provided for @timeUpAlreadyConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else has already confirmed.'**
+  String get timeUpAlreadyConfirmed;
+
+  /// No description provided for @noticeTimeUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Time is up – was anyone else caught?'**
+  String get noticeTimeUp;
+
+  /// No description provided for @noticeTimeUpBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Please confirm in the app, then everyone sees who won.'**
+  String get noticeTimeUpBody;
+
   /// No description provided for @undoCatchAction.
   ///
   /// In en, this message translates to:

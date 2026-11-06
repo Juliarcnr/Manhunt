@@ -77,14 +77,40 @@ service cloud.firestore {
         && g.finishedAt >= g.startAt;
     }
 
-    // The round has been over (time up or hunters won) for 15 s: any
-    // member may end it and save it to the history (R-GAME-10, no server).
-    // [g] is the game's data before the request.
+    // The round's planned time is up (R-GAME-01). [g]: the game's data.
+    function timeUp(g) {
+      return g.status == 'running' && g.get('startAt', null) is timestamp
+        && g.get('durationSec', null) is int
+        && request.time >= g.startAt + duration.value(g.durationSec, 's');
+    }
+
+    // Someone confirmed this round, after the time was up, who else was
+    // caught (R-GAME-11). One from before the end is a leftover.
+    function confirmedThisRound(g) {
+      return g.get('confirmedAt', null) is timestamp
+        && g.get('startAt', null) is timestamp
+        && g.get('durationSec', null) is int
+        && g.confirmedAt >= g.startAt + duration.value(g.durationSec, 's');
+    }
+
+    // After the time is up, the hunters or the players still in the game –
+    // not caught ones – are asked who else was caught (R-GAME-11).
+    function confirmsTimeUp(gid) {
+      return isHunter(gid) || (isPlayer(gid) && myMember(gid).get('caught', false) == false);
+    }
+
+    // The round has been decided for 15 s: any member may end it and save it
+    // to the history (R-GAME-10, no server). Decided: by the hunters' win,
+    // after the time is up by the confirmation (R-GAME-11), or without one
+    // 10 min after the time is up. [g] is the game's data before the request.
     function autoEndDue(g) {
       return g.status == 'running' && g.get('startAt', null) is timestamp
         && g.get('durationSec', null) is int
-        && (request.time >= g.startAt + duration.value(g.durationSec, 's') + duration.value(15, 's')
-          || (finishedThisRound(g) && request.time >= g.finishedAt + duration.value(15, 's')));
+        && ((finishedThisRound(g) && request.time >= g.finishedAt + duration.value(15, 's'))
+          || (!finishedThisRound(g) && confirmedThisRound(g)
+            && request.time >= g.confirmedAt + duration.value(15, 's'))
+          || request.time >= g.startAt + duration.value(g.durationSec, 's')
+            + duration.value(10, 'm') + duration.value(15, 's'));
     }
 
     function canAutoEnd(gid) {
@@ -145,6 +171,10 @@ service cloud.firestore {
           && request.resource.data.status in ['lobby', 'running']
           && request.resource.data.get('name', '') is string
           && request.resource.data.get('sharedPings', false) is bool
+          // The confirmation after the time is up only like everyone else
+          // (below, R-GAME-11); the host may only clear it.
+          && (request.resource.data.get('confirmedAt', null) == resource.data.get('confirmedAt', null)
+            || !('confirmedAt' in request.resource.data))
           && validExpiry())
         // Any member opening the group extends its lifetime (R-PRIV-05).
         || (isMember(gid) && onlyChanges(['expiresAt']) && validExpiry())
@@ -158,16 +188,26 @@ service cloud.firestore {
               || (isPlayer(gid) && myMember(gid).caught == false
                 && getAfter(/databases/$(database)/documents/games/$(gid)/members/$(request.auth.uid))
                      .data.caught == true)))
+        // After the time is up: who else was caught is confirmed (R-GAME-11).
+        // Once per round, by a hunter or a player still in the game (before
+        // the batch: they may report their own catch with it), timestamped
+        // by the server; not after the hunters' win.
+        || (timeUp(resource.data) && onlyChanges(['confirmedAt'])
+            && !finishedThisRound(resource.data)
+            && !confirmedThisRound(resource.data)
+            && request.resource.data.confirmedAt == request.time
+            && confirmsTimeUp(gid))
         // Any member may edit the (encrypted) play area while in the lobby (R-SET-10).
         || (isMember(gid) && resource.data.status == 'lobby'
             && onlyChanges(['area', 'expiresAt'])
             && request.resource.data.area is string && validExpiry())
         // Automatic end (R-GAME-10): back to the lobby exactly as the host does.
         || (isMember(gid) && autoEndDue(resource.data)
-            && onlyChanges(['status', 'startAt', 'finishedAt', 'aliases', 'expiresAt'])
+            && onlyChanges(['status', 'startAt', 'finishedAt', 'confirmedAt', 'aliases', 'expiresAt'])
             && request.resource.data.status == 'lobby'
             && request.resource.data.startAt == null
             && !('finishedAt' in request.resource.data)
+            && !('confirmedAt' in request.resource.data)
             && !('aliases' in request.resource.data)
             && validExpiry());
 
@@ -203,6 +243,14 @@ service cloud.firestore {
             && resource.data.role == 'player'
             && request.resource.data.caught == true
             && (isHunter(gid) || request.auth.uid == uid))
+          // Who else was caught, reported after the time is up (R-GAME-11):
+          // also by a player still in the game for others, but only together
+          // with the confirmation (same batch, same server time).
+          || (isRunning(gid) && onlyChanges(['caught'])
+            && resource.data.role == 'player'
+            && request.resource.data.caught == true
+            && confirmsTimeUp(gid)
+            && getAfter(gamePath(gid)).data.get('confirmedAt', null) == request.time)
           // Joker (R-PLAY-02): once per round, timestamped by the server.
           || (isRunning(gid) && signedIn() && request.auth.uid == uid
             && onlyChanges(['jokerUsed', 'jokerAt'])

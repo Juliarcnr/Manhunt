@@ -47,6 +47,12 @@ class RoundOverNotice extends GameNotice {
   final RoundResult result;
 }
 
+/// The time is up: someone still in the game must confirm who else was
+/// caught before the result is known (R-GAME-11).
+class TimeUpNotice extends GameNotice {
+  const TimeUpNotice();
+}
+
 /// How long the in-app banner for [notice] stays visible. A speedhunt notice
 /// carries more text and matters more, so it stays longer (R-NOTIF-06); who
 /// won stays until the round is saved and the group is back in the lobby
@@ -57,14 +63,18 @@ Duration noticeBannerDuration(GameNotice notice) => switch (notice) {
 };
 
 /// Whether an open app shows [notice] as its own banner. Not for the own
-/// boundary state, which has a permanent banner (R-OUT-06).
-bool showsBanner(GameNotice notice) => notice is! OwnBoundaryNotice;
+/// boundary state, which has a permanent banner (R-OUT-06), and not when the
+/// time is up: the confirmation dialog says it (R-GAME-11).
+bool showsBanner(GameNotice notice) =>
+    notice is! OwnBoundaryNotice && notice is! TimeUpNotice;
 
 /// Whether [me] is told about [notice] at all. Caught players get no
 /// speedhunt notice: it is not on them, and they follow speedhunts in the
 /// live view anyway (R-NOTIF-07, R-GM-10).
 bool isAnnouncedTo(GameNotice notice, Member? me) => switch (notice) {
   SpeedhuntNotice() => !(me != null && me.isPlayer && me.caught),
+  // Only those who are asked to confirm (R-GAME-11).
+  TimeUpNotice() => confirmsTimeUp(me),
   _ => true,
 };
 
@@ -93,6 +103,7 @@ class NoticeTracker {
   var _resultKnown = false;
   RoundResult? _result;
   var _countingDown = false;
+  bool? _awaiting;
 
   static String _catchKey(CatchRecord c) =>
       '${c.playerId}@${c.at.toUtc().toIso8601String()}';
@@ -140,6 +151,15 @@ class NoticeTracker {
     return known && before == null && result != null
         ? [RoundOverNotice(result)]
         : const [];
+  }
+
+  /// Whether the round is [awaiting] the confirmation after the time was up
+  /// (R-GAME-11): announced once when that begins. Opened while already
+  /// waiting, the app announces it too – the dialog needs an answer.
+  List<GameNotice> onTimeUp({required bool awaiting}) {
+    final before = _awaiting;
+    _awaiting = awaiting;
+    return awaiting && before != true ? const [TimeUpNotice()] : const [];
   }
 
   /// The current [phase]: announced once when the countdown seen by this

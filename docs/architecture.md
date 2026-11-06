@@ -64,7 +64,7 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), confirmedAt (Bestätigung nach Zeitablauf, R-GAME-11), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
 | `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`); nach Spielende alle (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 5 s bzw. 15 s laut `games.hunterLiveSec`, R-QUOTA-01) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
@@ -90,12 +90,22 @@ Speedhunt-Events) und löscht dann alle Rundendaten (`FirestoreGameRepository.ro
 `outsideLocs`, `playerLocs`, `events`, `speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`, `hunterSnaps`),
 setzt caught/jokerUsed zurück und geht in die Lobby. **Abbruch** durch den Host (`endRound`, R-GAME-07): Übersicht,
 Lobby, dann erst Karte (vorher darf ein Host, der kein Hunter ist, nicht alle Positionen lesen), dann löschen.
-**Normales Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `endAt` + 15 s) beendet jedes Mitgliedsgerät die Runde
+**Bestätigung nach Zeitablauf** (R-GAME-11): `GameClock.decidedAt` ist der Zeitpunkt, ab dem das Ergebnis feststeht –
+`finishedAt` beim Hunter-Sieg, sonst `confirmedAt` (nur ab dem geplanten Ende gültig) oder ohne Bestätigung
+`plannedEndAt` + `GameClock.confirmTimeout` (10 min). Bis dahin ist `awaitingConfirmation` wahr und `roundResult` null
+(Kopfzeile „Zeit abgelaufen“, keine Siegermeldung); `endAt`/`phaseAt` bleiben beim geplanten Ende. Hunter und freie
+Spieler (`confirmsTimeUp`) bekommen `TimeUpDialog` (lib/features/game/time_up_dialog.dart) als `DialogRoute`, die die
+Spielansicht wieder entfernt, sobald `confirmedAt` ankommt. `confirmTimeUp` schreibt nachgemeldete Catches (Zeit =
+geplantes Ende) und `confirmedAt` (Serverzeit) in **einem** Batch; die Regeln erlauben das einmal pro Runde, nur Hunter
+bzw. nicht gefangenen Spielern, und Spielern das Markieren anderer nur im selben Batch (`getAfter`). Der Host darf
+`confirmedAt` über seinen Admin-Zweig nur löschen. Die Spielende-Position (R-HIST-08) wird von `decidedAt` bis
+`autoEndAt` geschickt.
+**Normales Ende** (R-GAME-10): ab `GameClock.autoEndAt` (= `decidedAt` + 15 s) beendet jedes Mitgliedsgerät die Runde
 selbst (`autoEndRound`, aufgerufen aus `checkIn` beim App-Start und aus dem Sekundentakt der Spielansicht, dort max. alle
 10 s). Reihenfolge: Übersicht und Karte unter fester ID `auto_{startAt ms}` (`_createOnce`: zweites Gerät bzw.
 Wiederholung legt nichts doppelt an; Überschreiben verbieten die Regeln), dann Rundendaten löschen, **zuletzt** Lobby –
 denn Nicht-Hosts dürfen die Rundendaten nur lesen/löschen, solange die Runde noch läuft (`canAutoEnd` in den Regeln,
-gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt` + 15 s). Rundennummer = höchste bisher + 1
+gleiche Zeitrechnung über `startAt`/`durationSec`/`finishedAt`/`confirmedAt` + 15 s bzw. Ende + 10 min + 15 s). Rundennummer = höchste bisher + 1
 (`nextRoundNumber`), damit sie sich nach dem Löschen einer Runde (`deleteHistoryEntry`: erst Karte, dann Übersicht) nicht wiederholt. Jede Host-Aktion setzt
 `expiresAt` = jetzt + 180 Tage; zusätzlich verlängert jedes Öffnen durch ein Mitglied (`checkIn`, max. 1× pro Tag). **TTL gibt es im Spark-Tarif nicht**; stattdessen ruft `SessionController.build`
 beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlängern (Regeln: Mitglieder dürfen nur `expiresAt` setzen, max. +181 Tage; löschen erst nach Ablauf).
@@ -138,12 +148,14 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - [x] Start-Countdown 2026-11-01 (R-SET-21, R-START-01 … 03): optionale Startzeit (`GameSettings.startTime`, Minuten
       seit Mitternacht als `startTimeMin` in den verschlüsselten Einstellungen); vorbei oder keine → 1 min; siehe Kernideen.
 - [x] Spielleitung 2026-11-01 (R-GM-01 … R-GM-09): siehe Abschnitt unten; Regeländerung (`playerLocs`, `watchesLive`)
-- [x] Rundenkarte in der Historie 2026-11-01 (R-HIST-04 … R-HIST-07, R-GAME-10 neu): Runde endet 1 min nach Spielende
-      von selbst; Hunter halten ihren Standort zu jedem Ping-Zeitpunkt fest (`RoundEngine._sendHunterSnapshots`);
+- [x] Rundenkarte in der Historie 2026-11-01 (R-HIST-04 … R-HIST-07, R-GAME-10 neu): Runde endet von selbst kurz nach
+      Spielende (inzwischen 15 s, `GameClock.autoEndDelay`); Hunter halten ihren Standort zu jedem Ping-Zeitpunkt fest (`RoundEngine._sendHunterSnapshots`);
       `HistoryMapScreen`/`RoundMapView` (lib/features/history) mit Chips je Spieler/Hunter/Speedhunt und Zeitleiste
       (`timelineSteps`/`timelineAt`); Lobby zeigt die letzte Runde. Standort bei Spielende (R-HIST-08): Spielerhandys schicken
-      bis 50 s nach `endAt` einmal einen Ping mit Slot `end` (`RoundEngine._sendEndPosition`, als `regular`, damit ältere
-      Apps ihn lesen können; `regularPings` lässt ihn aus), Hunter über `hunterLocs`; in der Karte `RoundMap.endPlayers`. Regeländerung (`hunterSnaps`, `historyMaps`, 1 min).
+      ab `decidedAt` bis zum Rundenende (`autoEndAt`) einmal einen Ping mit Slot `end` (`RoundEngine._sendEndPosition`, als `regular`, damit ältere
+      Apps ihn lesen können; `regularPings` lässt ihn aus), Hunter über `hunterLocs`; in der Karte `RoundMap.endPlayers`. Regeländerung (`hunterSnaps`, `historyMaps`, inzwischen 15 s).
+- [x] Bestätigung nach Zeitablauf 2026-11-06 (R-GAME-11): Dialog „Wurde noch jemand gefangen?“ für Hunter und freie
+      Spieler, eine Bestätigung reicht, 10-min-Frist; Regeländerung (`confirmedAt`, Nachmelden durch Spieler).
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise

@@ -138,6 +138,7 @@ class FirestoreGameRepository implements GameRepository {
       settings: settings,
       startAt: (data['startAt'] as Timestamp?)?.toDate(),
       finishedAt: (data['finishedAt'] as Timestamp?)?.toDate(),
+      confirmedAt: (data['confirmedAt'] as Timestamp?)?.toDate(),
       name: nameEnc == null
           ? null
           : await session.crypto.decryptJson(nameEnc) as String?,
@@ -271,6 +272,7 @@ class FirestoreGameRepository implements GameRepository {
       // (R-QUOTA-01); stays until the next start.
       'hunterLiveSec': hunterLiveIntervalFor(settings, members).inSeconds,
       'finishedAt': FieldValue.delete(),
+      'confirmedAt': FieldValue.delete(),
       'aliases': await _shuffledAliases(session, settings, members),
       'expiresAt': _newExpiry(),
     });
@@ -311,6 +313,26 @@ class FirestoreGameRepository implements GameRepository {
         'finishedAt': FieldValue.serverTimestamp(),
       });
     }
+    await batch.commit();
+  }
+
+  @override
+  Future<void> confirmTimeUp(
+    GroupSession session,
+    List<CatchRecord> catches,
+  ) async {
+    final batch = _db.batch();
+    for (final record in catches) {
+      batch
+        ..set(_game(session).collection('events').doc(), {
+          'type': 'catch',
+          'createdAt': FieldValue.serverTimestamp(),
+          'data': await session.crypto.encryptJson(record.toJson()),
+        })
+        ..update(_members(session).doc(record.playerId), {'caught': true});
+    }
+    // Same batch: the rules let players report others only with it.
+    batch.update(_game(session), {'confirmedAt': FieldValue.serverTimestamp()});
     await batch.commit();
   }
 
@@ -379,6 +401,7 @@ class FirestoreGameRepository implements GameRepository {
       startAt: startAt,
       settings: await _settings(session, game),
       finishedAt: (game['finishedAt'] as Timestamp?)?.toDate(),
+      confirmedAt: (game['confirmedAt'] as Timestamp?)?.toDate(),
     );
     if (_now().isBefore(clock.autoEndAt)) return false;
     // Ending automatically is the normal case now, so it is not marked
@@ -417,6 +440,7 @@ class FirestoreGameRepository implements GameRepository {
       'status': GameStatus.lobby.name,
       'startAt': null,
       'finishedAt': FieldValue.delete(),
+      'confirmedAt': FieldValue.delete(),
       'aliases': FieldValue.delete(),
       'expiresAt': _newExpiry(),
     });

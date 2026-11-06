@@ -78,6 +78,7 @@ void main() {
     String userId, {
     GameSettings gameSettings = settings,
     DateTime? finishedAt,
+    DateTime? confirmedAt,
     Duration hunterLive = const Duration(seconds: 5),
   }) async {
     final session = (await tester.runAsync(() => testSession(code, userId)))!;
@@ -108,6 +109,7 @@ void main() {
               settings: gameSettings,
               startAt: start,
               finishedAt: finishedAt,
+              confirmedAt: confirmedAt,
               aliases: aliases ?? const {},
               hunterLiveInterval: hunterLive,
             ),
@@ -1672,7 +1674,8 @@ void main() {
         ),
       );
       now = start.add(settings.duration + const Duration(seconds: 30));
-      await pumpAs(tester, 'alex');
+      // Someone confirmed who else was caught (R-GAME-11).
+      await pumpAs(tester, 'alex', confirmedAt: now);
 
       expect(find.byKey(const Key('filter_caught')), findsNothing);
       expect(find.byKey(const Key('filter_player_sam')), findsOneWidget);
@@ -2295,6 +2298,20 @@ void main() {
           ),
         );
 
+    /// [userId] confirms after the time is up who else was caught
+    /// (R-GAME-11), at the end of the time like the dialog.
+    Future<void> confirmByRepo(
+      WidgetTester tester,
+      String userId, [
+      List<String> caught = const [],
+    ]) => tester.runAsync(
+      () async => FirestoreGameRepository(db)
+          .confirmTimeUp(await testSession(code, userId), [
+            for (final id in caught)
+              CatchRecord(playerId: id, at: start.add(settings.duration)),
+          ]),
+    );
+
     Future<Map<String, dynamic>> gameDoc(WidgetTester tester) async {
       final session = (await tester.runAsync(() => testSession(code, 'alex')))!;
       final snap = await tester.runAsync(
@@ -2348,19 +2365,20 @@ void main() {
     ) async {
       await seed(tester);
       await regularPing(tester, 'sam');
-      final autoEndAt = start.add(
-        settings.duration + const Duration(seconds: 15),
-      );
+      // Confirmed right at the end who else was caught (R-GAME-11).
+      final confirmedAt = start.add(settings.duration);
+      final autoEndAt = confirmedAt.add(const Duration(seconds: 15));
       // Fake Firestore stores serverTimestamp as real time; pin it.
       final groupId = (await tester.runAsync(() => testSession(code, 'kim')))!
           .groupId;
       await tester.runAsync(
         () => db.collection('games').doc(groupId).update({
           'startAt': Timestamp.fromDate(start),
+          'confirmedAt': Timestamp.fromDate(confirmedAt),
         }),
       );
       now = autoEndAt.subtract(const Duration(seconds: 2));
-      await pumpAs(tester, 'kim');
+      await pumpAs(tester, 'kim', confirmedAt: confirmedAt);
       expect(find.text('PLAYERS WIN'), findsOneWidget);
       expect((await gameDoc(tester))['status'], 'running');
 
@@ -2472,6 +2490,15 @@ void main() {
 
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      // First the hunter confirms that nobody else was caught (R-GAME-11).
+      expect(find.text(banner), findsNothing);
+      await tester.tap(find.byKey(const Key('timeUpNobody')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('confirmTimeUp')));
+      await settle(tester);
+      // The confirmation arrives with the game document.
+      await pumpAs(tester, 'alex', confirmedAt: now);
       expect(find.text(banner), findsOneWidget);
       expect(notifications.shown.map((n) => n.title), contains(banner));
       // Header: no names, they are in the overview.
@@ -2552,6 +2579,8 @@ void main() {
       await pumpAs(tester, 'kim');
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
+      await confirmByRepo(tester, 'alex');
+      await pumpAs(tester, 'kim', confirmedAt: now);
       expect(
         notifications.shown.last.title,
         'Time is up – Kim and Sam have won!',
@@ -2571,6 +2600,11 @@ void main() {
       await tester.pumpAndSettle();
       now = start.add(settings.duration);
       await tester.pump(const Duration(seconds: 1));
+      // Sam is caught: no question, only "time is up" (R-GAME-11).
+      expect(find.byKey(const Key('confirmTimeUp')), findsNothing);
+      expect(find.text('TIME IS UP'), findsOneWidget);
+      await confirmByRepo(tester, 'alex');
+      await pumpAs(tester, 'sam', confirmedAt: now);
       expect(
         notifications.shown.last.title,
         'All players caught – the hunters won!',
@@ -2583,6 +2617,88 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('overviewWinner_alex')), findsOneWidget);
+    });
+
+    testWidgets('time up: a player still in the game reports who else was '
+        'caught; the result follows (R-GAME-11)', (tester) async {
+      await seed(tester);
+      await pumpAs(tester, 'sam');
+      now = start.add(settings.duration);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      // Header without a winner; the dialog asks, nothing chosen yet.
+      expect(find.text('TIME IS UP'), findsOneWidget);
+      expect(find.text('Time is up'), findsOneWidget);
+      expect(
+        notifications.shown.map((n) => n.title),
+        contains('Time is up – was anyone else caught?'),
+      );
+      FilledButton confirm() =>
+          tester.widget<FilledButton>(find.byKey(const Key('confirmTimeUp')));
+      expect(confirm().onPressed, isNull);
+      // Real names, also the player's own (R-ANON-02).
+      expect(find.byKey(const Key('timeUpCaught_kim')), findsOneWidget);
+      expect(find.byKey(const Key('timeUpCaught_sam')), findsOneWidget);
+      expect(find.byKey(const Key('timeUpCaught_alex')), findsNothing);
+
+      // "Nobody" and players exclude each other.
+      await tester.tap(find.byKey(const Key('timeUpNobody')));
+      await tester.pump();
+      expect(confirm().onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('timeUpCaught_kim')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<CheckboxListTile>(find.byKey(const Key('timeUpNobody')))
+            .value,
+        isFalse,
+      );
+      await tester.tap(find.byKey(const Key('confirmTimeUp')));
+      // Encrypting the catch takes a moment.
+      await settle(tester);
+      await settle(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirmTimeUp')), findsNothing);
+      expect((await gameDoc(tester))['confirmedAt'], isNotNull);
+      expect(await caught(tester, 'kim'), isTrue);
+      expect(await caught(tester, 'sam'), isFalse);
+
+      await pumpAs(tester, 'sam', confirmedAt: now);
+      expect(find.text('Time is up – Sam has won!'), findsOneWidget);
+      expect(find.text('PLAYER WINS'), findsOneWidget);
+    });
+
+    testWidgets('the dialog closes when someone else confirmed (R-GAME-11)', (
+      tester,
+    ) async {
+      await seed(tester);
+      await pumpAs(tester, 'kim');
+      now = start.add(settings.duration);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirmTimeUp')), findsOneWidget);
+
+      await confirmByRepo(tester, 'alex', ['sam']);
+      await pumpAs(tester, 'kim', confirmedAt: now);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirmTimeUp')), findsNothing);
+      expect(find.text('Time is up – Kim has won!'), findsOneWidget);
+    });
+
+    testWidgets('nobody confirms: after 10 min "nobody else" (R-GAME-11)', (
+      tester,
+    ) async {
+      await seed(tester);
+      now = start.add(settings.duration + const Duration(minutes: 9));
+      await pumpAs(tester, 'alex');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirmTimeUp')), findsOneWidget);
+      now = start.add(settings.duration + const Duration(minutes: 10));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirmTimeUp')), findsNothing);
+      expect(find.text('PLAYERS WIN'), findsOneWidget);
     });
 
     testWidgets('no winner in the overview while the game is on '
@@ -2599,7 +2715,11 @@ void main() {
         'overview tells who won (R-GAME-09)', (tester) async {
       await seed(tester);
       now = start.add(settings.duration + const Duration(seconds: 30));
-      await pumpAs(tester, 'sam');
+      await pumpAs(
+        tester,
+        'sam',
+        confirmedAt: now.subtract(const Duration(seconds: 10)),
+      );
       await tester.pump(const Duration(seconds: 1));
       expect(find.textContaining('have won!'), findsNothing);
       await tester.tap(find.byKey(const Key('overviewButton')));
@@ -2854,6 +2974,10 @@ void main() {
       expect(find.byKey(const Key('live_kim')), findsNothing);
       expect(find.byKey(const Key('filter_live_kim')), findsNothing);
       expect(find.byKey(const Key('filter_player_kim')), findsOneWidget);
+      // Not asked who else was caught; until then only "time is up"
+      // (R-GAME-11).
+      expect(find.byKey(const Key('confirmTimeUp')), findsNothing);
+      expect(find.text('TIME IS UP'), findsOneWidget);
     });
   });
 }

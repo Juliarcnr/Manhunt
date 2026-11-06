@@ -906,6 +906,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catchSelfConfirm => 'Yes, caught';
 
   @override
+  String get timeUpTitle => 'Time is up';
+
+  @override
+  String get timeUpQuestion =>
+      'Was anyone else caught who has not been reported yet?';
+
+  @override
+  String get timeUpNobody => 'Nobody else was caught';
+
+  @override
+  String timeUpHint(int minutes) {
+    return 'One confirmation is enough – it counts for everyone. Without one, after $minutes min it counts as nobody else caught.';
+  }
+
+  @override
+  String get timeUpConfirm => 'Confirm';
+
+  @override
+  String get timeUpAlreadyConfirmed => 'Someone else has already confirmed.';
+
+  @override
+  String get noticeTimeUp => 'Time is up – was anyone else caught?';
+
+  @override
+  String get noticeTimeUpBody =>
+      'Please confirm in the app, then everyone sees who won.';
+
+  @override
   String get undoCatchAction => 'Undo catch';
 
   @override

@@ -918,6 +918,35 @@ class AppLocalizationsDe extends AppLocalizations {
   String get catchSelfConfirm => 'Ja, gefangen';
 
   @override
+  String get timeUpTitle => 'Zeit abgelaufen';
+
+  @override
+  String get timeUpQuestion =>
+      'Wurde noch jemand gefangen, der bisher nicht gemeldet ist?';
+
+  @override
+  String get timeUpNobody => 'Niemand wurde mehr gefangen';
+
+  @override
+  String timeUpHint(int minutes) {
+    return 'Eine Bestätigung reicht – sie gilt für alle. Ohne Bestätigung gilt nach $minutes min: niemand mehr gefangen.';
+  }
+
+  @override
+  String get timeUpConfirm => 'Bestätigen';
+
+  @override
+  String get timeUpAlreadyConfirmed =>
+      'Das hat schon jemand anderes bestätigt.';
+
+  @override
+  String get noticeTimeUp => 'Zeit abgelaufen – wurde noch jemand gefangen?';
+
+  @override
+  String get noticeTimeUpBody =>
+      'Bitte in der App bestätigen, dann sehen alle, wer gewonnen hat.';
+
+  @override
   String get undoCatchAction => 'Catch rückgängig machen';
 
   @override

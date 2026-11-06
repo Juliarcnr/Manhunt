@@ -6,6 +6,7 @@ import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/round/boundary_watch.dart';
 import 'package:manhunt/core/round/joker.dart';
 import 'package:manhunt/core/round/ping_schedule.dart';
+import 'package:manhunt/core/schedule/game_clock.dart';
 import 'package:manhunt/core/schedule/speedhunt.dart';
 import 'package:manhunt/data/firestore_round_repository.dart';
 import 'package:manhunt/data/game_repository.dart';
@@ -27,8 +28,16 @@ void main() {
   late List<PingSlot> sent;
 
   const game0 = GameSettings(duration: Duration(hours: 1));
-  GameInfo game({GameStatus status = GameStatus.running}) =>
-      GameInfo(adminId: 'h', status: status, settings: game0, startAt: start);
+  GameInfo game({
+    GameStatus status = GameStatus.running,
+    DateTime? confirmedAt,
+  }) => GameInfo(
+    adminId: 'h',
+    status: status,
+    settings: game0,
+    startAt: start,
+    confirmedAt: confirmedAt,
+  );
   const player = Member(id: 'kim', name: 'Kim', role: Role.player);
   const hunter = Member(id: 'h', name: 'Alex', role: Role.hunter);
 
@@ -632,12 +641,46 @@ void main() {
         for (final p in await rounds.watchAllPings(hunterSession).first)
           if (isEndPing(p)) p,
       ];
+      // Someone confirmed right at the end who else was caught (R-GAME-11).
+      final confirmed = game(confirmedAt: at(60));
+
+      test(
+        'only once someone confirmed who else was caught (R-GAME-11)',
+        () async {
+          engine = await engineFor('kim');
+          engine.update(game: game(), me: player, speedhuntsOnMe: []);
+          location.position = const GeoPoint(52.44, 13.4);
+          now = at(63);
+          await engine.tick();
+          expect(await endPings(), isEmpty);
+
+          engine.update(
+            game: game(confirmedAt: at(63)),
+            me: player,
+            speedhuntsOnMe: [],
+          );
+          await engine.tick();
+          final end = (await endPings()).single;
+          // Still the slot at the end of the time.
+          expect(end.slotId, endSlotId);
+          expect(end.fix.point.lat, 52.44);
+        },
+      );
+
+      test('nobody confirmed: after the timeout (R-GAME-11)', () async {
+        engine = await engineFor('kim');
+        engine.update(game: game(), me: player, speedhuntsOnMe: []);
+        location.position = const GeoPoint(52.44, 13.4);
+        now = at(60).add(GameClock.confirmTimeout);
+        await engine.tick();
+        expect(await endPings(), hasLength(1));
+      });
 
       test(
         'a player still in the game sends it once when time is up',
         () async {
           engine = await engineFor('kim');
-          engine.update(game: game(), me: player, speedhuntsOnMe: []);
+          engine.update(game: confirmed, me: player, speedhuntsOnMe: []);
           now = at(59);
           location.emit(fix(52.43));
           await flush();
@@ -659,7 +702,7 @@ void main() {
 
       test('without a recent position it asks the GPS', () async {
         engine = await engineFor('kim');
-        engine.update(game: game(), me: player, speedhuntsOnMe: []);
+        engine.update(game: confirmed, me: player, speedhuntsOnMe: []);
         location.position = const GeoPoint(52.44, 13.4);
         now = at(60);
         await engine.tick();
@@ -671,19 +714,33 @@ void main() {
         () async {
           for (final me in [player.copyWith(caught: true), hunter]) {
             engine = await engineFor(me.id);
-            engine.update(game: game(), me: me, speedhuntsOnMe: []);
+            engine.update(game: confirmed, me: me, speedhuntsOnMe: []);
             location.position = const GeoPoint(52.44, 13.4);
             now = at(60);
             await engine.tick();
           }
           engine = await engineFor('kim');
-          engine.update(game: game(), me: player, speedhuntsOnMe: []);
+          engine.update(game: confirmed, me: player, speedhuntsOnMe: []);
           location.position = const GeoPoint(52.44, 13.4);
           now = at(61);
           await engine.tick();
           expect(await endPings(), isEmpty);
         },
       );
+
+      test('until the round is saved, not after (R-GAME-10)', () async {
+        engine = await engineFor('kim');
+        engine.update(game: confirmed, me: player, speedhuntsOnMe: []);
+        location.position = const GeoPoint(52.44, 13.4);
+        now = at(60)
+            .add(RoundEngine.endPositionGrace + const Duration(seconds: 1));
+        await engine.tick();
+        expect(await endPings(), isEmpty);
+
+        now = at(60).add(RoundEngine.endPositionGrace);
+        await engine.tick();
+        expect((await endPings()).single.fix.point.lat, 52.44);
+      });
     });
 
     test('players keep none', () async {

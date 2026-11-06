@@ -145,6 +145,43 @@ void main() {
     });
   });
 
+  group('time up: who else was caught? (R-GAME-11)', () {
+    const player = Member(id: 'kim', name: 'Kim', role: Role.player);
+    const hunter = Member(id: 'h', name: 'Alex', role: Role.hunter);
+    const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
+
+    test('announced once when the waiting begins, then the result', () {
+      final tracker = NoticeTracker()..onRoundOver(null);
+      expect(tracker.onTimeUp(awaiting: false), isEmpty);
+      expect(tracker.onTimeUp(awaiting: true).single, isA<TimeUpNotice>());
+      expect(tracker.onTimeUp(awaiting: true), isEmpty);
+      expect(tracker.onTimeUp(awaiting: false), isEmpty);
+      expect(
+        tracker.onRoundOver(const PlayersWon(['kim'])).single,
+        isA<RoundOverNotice>(),
+      );
+    });
+
+    test(
+      'opened while waiting: announced too – the dialog needs an answer',
+      () {
+        expect(
+          NoticeTracker().onTimeUp(awaiting: true).single,
+          isA<TimeUpNotice>(),
+        );
+      },
+    );
+
+    test('only to hunters and players still in the game, no banner', () {
+      const notice = TimeUpNotice();
+      expect(isAnnouncedTo(notice, hunter), isTrue);
+      expect(isAnnouncedTo(notice, player), isTrue);
+      expect(isAnnouncedTo(notice, player.copyWith(caught: true)), isFalse);
+      expect(isAnnouncedTo(notice, gm), isFalse);
+      expect(showsBanner(notice), isFalse);
+    });
+  });
+
   test('other notices keep their banner', () {
     expect(showsBanner(SpeedhuntNotice(sh(10))), isTrue);
     expect(showsBanner(CatchNotice(c('kim', 5))), isTrue);

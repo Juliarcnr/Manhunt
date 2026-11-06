@@ -8,7 +8,12 @@ void main() {
   final start = DateTime.utc(2026, 10, 4, 14);
   DateTime at(int minutes) => start.add(Duration(minutes: minutes));
   const settings = GameSettings(); // 3 h
-  final clock = GameClock(startAt: start, settings: settings);
+  // Someone confirmed one minute after the time was up (R-GAME-11).
+  final clock = GameClock(
+    startAt: start,
+    settings: settings,
+    confirmedAt: at(181),
+  );
 
   const members = [
     Member(id: 'h', name: 'Alex', role: Role.hunter),
@@ -27,7 +32,7 @@ void main() {
     });
 
     test('time up: the players never caught won', () {
-      final r = roundResult(clock: clock, now: at(180), members: members);
+      final r = roundResult(clock: clock, now: at(181), members: members);
       expect((r! as PlayersWon).playerIds, ['s', 'l']);
       expect(winnerIds(r, members), {'s', 'l'});
     });
@@ -56,6 +61,43 @@ void main() {
         roundResult(clock: won, now: at(91), members: members),
         isA<HuntersWon>(),
       );
+    });
+  });
+
+  group('waiting for the confirmation after the time is up (R-GAME-11)', () {
+    final open = GameClock(startAt: start, settings: settings);
+
+    test('no result until someone confirmed', () {
+      expect(roundResult(clock: open, now: at(180), members: members), isNull);
+      expect(roundResult(clock: open, now: at(189), members: members), isNull);
+    });
+
+    test('players caught in the confirmation count: everyone caught, the '
+        'hunters won', () {
+      expect(
+        roundResult(clock: clock, now: at(181), members: allCaught),
+        isA<HuntersWon>(),
+      );
+    });
+
+    test('nobody confirmed for 10 min: the players still free won', () {
+      final r = roundResult(clock: open, now: at(190), members: members);
+      expect((r! as PlayersWon).playerIds, ['s', 'l']);
+    });
+
+    test('asked: hunters and players still in the game only', () {
+      expect(confirmsTimeUp(members[0]), isTrue);
+      expect(confirmsTimeUp(members[1]), isFalse); // caught
+      expect(confirmsTimeUp(members[2]), isTrue);
+      expect(
+        confirmsTimeUp(const Member(id: 'g', name: 'G', role: Role.gameMaster)),
+        isFalse,
+      );
+      expect(
+        confirmsTimeUp(const Member(id: 'u', name: 'U', role: Role.unassigned)),
+        isFalse,
+      );
+      expect(confirmsTimeUp(null), isFalse);
     });
   });
 }

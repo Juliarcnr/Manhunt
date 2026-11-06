@@ -1477,9 +1477,16 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
   const ENTRY = 'auto_123';
 
   // Round of 60 min started [startedMinutesAgo] ago, optionally won by the
-  // hunters [finishedMinutesAgo] ago; admin is hunter (or [hostRole]), kim
-  // and sam players, lou another hunter. Every round collection holds a doc.
-  const round = async ({ startedMinutesAgo, finishedMinutesAgo = null, hostRole = 'hunter' }) => {
+  // hunters [finishedMinutesAgo] ago or, after the time was up, confirmed
+  // [confirmedMinutesAgo] ago (R-GAME-11); admin is hunter (or [hostRole]),
+  // kim and sam players, lou another hunter. Every round collection holds a
+  // doc.
+  const round = async ({
+    startedMinutesAgo,
+    finishedMinutesAgo = null,
+    confirmedMinutesAgo = null,
+    hostRole = 'hunter',
+  }) => {
     await startRound();
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
@@ -1488,6 +1495,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
         durationSec: 3600,
         aliases: 'enc',
         ...(finishedMinutesAgo == null ? {} : { finishedAt: minutesAgo(finishedMinutesAgo) }),
+        ...(confirmedMinutesAgo == null ? {} : { confirmedAt: minutesAgo(confirmedMinutesAgo) }),
       });
       await updateDoc(doc(db, 'games', GID, 'members', 'admin'), { role: hostRole });
       await updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true, jokerUsed: true });
@@ -1533,6 +1541,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
       status: 'lobby',
       startAt: null,
       finishedAt: deleteField(),
+      confirmedAt: deleteField(),
       aliases: deleteField(),
       expiresAt: inDays(180),
     });
@@ -1556,6 +1565,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
       assert.equal(game.status, 'lobby');
       assert.equal(game.startAt, null);
       assert.equal(game.finishedAt, undefined);
+      assert.equal(game.confirmedAt, undefined);
       assert.equal(game.aliases, undefined);
       const kim = (await getDoc(doc(db, 'games', GID, 'members', 'kim'))).data();
       assert.equal(kim.caught, false);
@@ -1573,13 +1583,35 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
     ['a hunter', 'lou', 'hunter'],
   ];
   for (const [label, uid, hostRole] of cases) {
-    test(`${label} ends the round after the time is up (+15 s) and saves the map, end to end`, async () => {
-      await round({ startedMinutesAgo: 60 + 2, hostRole });
+    test(`${label} ends the round 15 s after the confirmation and saves the map, end to end`, async () => {
+      await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 1, hostRole });
       await assertSucceeds(autoEnd(uid));
       assert.equal(await roundDocsLeft(), 0);
       await expectEnded();
     });
+
+    test(`${label} ends the round 10 min + 15 s after the time without confirmation (R-GAME-11)`, async () => {
+      await round({ startedMinutesAgo: 60 + 11, hostRole });
+      await assertSucceeds(autoEnd(uid));
+      await expectEnded();
+    });
   }
+
+  test('time up but not confirmed yet: no end before the 10 min (R-GAME-11)', async () => {
+    await round({ startedMinutesAgo: 60 + 9 });
+    await assertFails(autoEnd('kim'));
+    await assertFails(getDocs(collection(as('lou'), 'games', GID, 'jokerAnswers')));
+  });
+
+  test('not within 15 s after the confirmation (R-GAME-11)', async () => {
+    await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 0.1 });
+    await assertFails(autoEnd('kim'));
+  });
+
+  test('a confirmedAt left over from an earlier round does not bring it forward', async () => {
+    await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 600 });
+    await assertFails(autoEnd('kim'));
+  });
 
   test('15 s after the hunters won, although the planned time is not up yet', async () => {
     await round({ startedMinutesAgo: 30, finishedMinutesAgo: 2 });
@@ -1611,12 +1643,12 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
   });
 
   test('strangers cannot end it', async () => {
-    await round({ startedMinutesAgo: 60 + 2 });
+    await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 1 });
     await assertFails(autoEnd('stranger'));
   });
 
   test('only the lobby reset: no other fields, no catches, no new admin', async () => {
-    await round({ startedMinutesAgo: 60 + 2 });
+    await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 1 });
     const db = as('kim');
     const lobby = { status: 'lobby', startAt: null, expiresAt: inDays(180) };
     await assertFails(updateDoc(doc(db, 'games', GID), { ...lobby, adminUid: 'kim' }));
@@ -1628,7 +1660,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
   });
 
   test('a second device after the first: history not overwritten or added, the lobby stays', async () => {
-    await round({ startedMinutesAgo: 60 + 2 });
+    await round({ startedMinutesAgo: 60 + 2, confirmedMinutesAgo: 1 });
     await assertSucceeds(autoEnd('kim'));
     const db = as('lou');
     await assertFails(setDoc(doc(db, 'games', GID, 'history', ENTRY), { endedAt: new Date(), data: 'x' }));
@@ -1638,6 +1670,159 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
     await assertFails(autoEnd('lou'));
     await assertFails(getDocs(collection(as('kim'), 'games', GID, 'jokerAnswers')));
     await expectEnded();
+  });
+});
+
+describe('time up: who else was caught is confirmed (R-GAME-11)', () => {
+  const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
+
+  // Round of 60 min started [startedMinutesAgo] ago: admin as [hostRole],
+  // kim and sam players still in the game, lou another hunter, gil game
+  // master, ben a caught player.
+  const round = async ({ startedMinutesAgo = 62, hostRole = 'hunter', extra = {} } = {}) => {
+    await startRound();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'games', GID), {
+        startAt: minutesAgo(startedMinutesAgo),
+        durationSec: 3600,
+        ...extra,
+      });
+      await updateDoc(doc(db, 'games', GID, 'members', 'admin'), { role: hostRole });
+      for (const [uid, role, caught] of [
+        ['lou', 'hunter', false],
+        ['gil', 'gameMaster', false],
+        ['ben', 'player', true],
+      ]) {
+        await setDoc(doc(db, 'games', GID, 'members', uid), {
+          name: 'enc', role, caught, jokerUsed: false, joinedAt: new Date(),
+        });
+      }
+    });
+  };
+
+  // As FirestoreGameRepository.confirmTimeUp: per catch an event and the
+  // member marked as caught, plus the confirmation, in one batch.
+  const confirm = (uid, caught = []) => {
+    const db = as(uid);
+    const batch = writeBatch(db);
+    for (const id of caught) {
+      batch.set(doc(collection(db, 'games', GID, 'events')), {
+        type: 'catch', createdAt: serverTimestamp(), data: 'enc',
+      });
+      batch.update(doc(db, 'games', GID, 'members', id), { caught: true });
+    }
+    batch.update(doc(db, 'games', GID), { confirmedAt: serverTimestamp() });
+    return batch.commit();
+  };
+
+  const state = async () => {
+    const result = { confirmed: false, caught: {} };
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const game = (await getDoc(doc(db, 'games', GID))).data();
+      result.confirmed = game.confirmedAt != null;
+      for (const uid of ['kim', 'sam']) {
+        result.caught[uid] = (await getDoc(doc(db, 'games', GID, 'members', uid))).data().caught;
+      }
+    });
+    return result;
+  };
+
+  const allowed = [
+    ['host as hunter', 'admin', 'hunter', ['kim']],
+    ['host as player still in the game, also reporting themself', 'admin', 'player', ['kim', 'admin']],
+    ['a hunter (not the host)', 'lou', 'hunter', ['kim', 'sam']],
+    ['a player still in the game, reporting another one', 'sam', 'hunter', ['kim']],
+    ['a player still in the game, reporting themself', 'sam', 'hunter', ['sam']],
+    ['a player still in the game: nobody else', 'kim', 'unassigned', []],
+  ];
+  for (const [label, uid, hostRole, caught] of allowed) {
+    test(`${label} confirms, end to end`, async () => {
+      await round({ hostRole });
+      await assertSucceeds(confirm(uid, caught));
+      const s = await state();
+      assert.equal(s.confirmed, true);
+      for (const id of ['kim', 'sam']) assert.equal(s.caught[id], caught.includes(id), id);
+    });
+  }
+
+  const denied = [
+    ['the host unassigned', 'admin', 'unassigned'],
+    ['the host as game master', 'admin', 'gameMaster'],
+    ['a game master', 'gil', 'hunter'],
+    ['a caught player', 'ben', 'hunter'],
+    ['a stranger', 'stranger', 'hunter'],
+  ];
+  for (const [label, uid, hostRole] of denied) {
+    test(`${label} is not asked and cannot confirm`, async () => {
+      await round({ hostRole });
+      await assertFails(confirm(uid, ['kim']));
+      await assertFails(confirm(uid));
+      assert.equal((await state()).confirmed, false);
+    });
+  }
+
+  test('not before the time is up', async () => {
+    await round({ startedMinutesAgo: 30 });
+    await assertFails(confirm('admin'));
+    await assertFails(confirm('sam', ['kim']));
+  });
+
+  test('only once: a second confirmation (with catches) is refused', async () => {
+    await round();
+    await assertSucceeds(confirm('sam'));
+    await assertFails(confirm('lou', ['kim']));
+    await assertFails(confirm('kim', ['sam']));
+    assert.equal((await state()).caught.kim, false);
+  });
+
+  test('not after the hunters won by the last catch (R-GAME-08)', async () => {
+    await round({ startedMinutesAgo: 30, extra: { finishedAt: minutesAgo(5) } });
+    await assertFails(confirm('admin'));
+  });
+
+  test('the host clears it with the round, but cannot set it otherwise', async () => {
+    await round({ hostRole: 'unassigned', extra: { confirmedAt: minutesAgo(1) } });
+    const db = as('admin');
+    await assertFails(updateDoc(doc(db, 'games', GID), { confirmedAt: new Date() }));
+    await assertSucceeds(
+      updateDoc(doc(db, 'games', GID), { status: 'lobby', startAt: null, confirmedAt: deleteField() }),
+    );
+    await assertSucceeds(updateDoc(doc(db, 'games', GID), { status: 'running', startAt: new Date() }));
+  });
+
+  test('a confirmedAt left over from an earlier round does not block it', async () => {
+    await round({ extra: { confirmedAt: minutesAgo(600) } });
+    await assertSucceeds(confirm('sam', ['kim']));
+  });
+
+  test('players report others only together with the confirmation', async () => {
+    await round();
+    const db = as('sam');
+    await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true }));
+    // Not even with a confirmation by someone else before.
+    await assertSucceeds(confirm('lou'));
+    await assertFails(updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true }));
+  });
+
+  test('server time only, nothing else changed', async () => {
+    await round();
+    const db = as('sam');
+    await assertFails(updateDoc(doc(db, 'games', GID), { confirmedAt: new Date() }));
+    await assertFails(
+      updateDoc(doc(db, 'games', GID), { confirmedAt: serverTimestamp(), status: 'lobby' }),
+    );
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'games', GID, 'members', 'kim'), { caught: true, role: 'hunter' });
+    batch.update(doc(db, 'games', GID), { confirmedAt: serverTimestamp() });
+    await assertFails(batch.commit());
+  });
+
+  test('after the confirmation, players read all positions and the round ends 15 s later', async () => {
+    await round({ extra: { confirmedAt: minutesAgo(1) } });
+    await assertSucceeds(getDocs(collection(as('kim'), 'games', GID, 'pings')));
+    await assertSucceeds(getDocs(collection(as('kim'), 'games', GID, 'jokerAnswers')));
   });
 });
 

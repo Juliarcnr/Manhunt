@@ -16,6 +16,7 @@ class GameInfo {
     required this.settings,
     this.startAt,
     this.finishedAt,
+    this.confirmedAt,
     this.name,
     this.aliases = const {},
     this.hunterLiveInterval = const Duration(seconds: 5),
@@ -31,6 +32,10 @@ class GameInfo {
   /// When the last player was caught and the hunters won (R-GAME-08); null
   /// otherwise and in the lobby.
   final DateTime? finishedAt;
+
+  /// When someone still in the game confirmed, after the time was up, who
+  /// else was caught (R-GAME-11); null before and in the lobby.
+  final DateTime? confirmedAt;
 
   /// Group name (R-GROUPS-04); null for groups created before names existed.
   final String? name;
@@ -114,6 +119,12 @@ abstract interface class GameRepository {
     CatchRecord record, {
     bool finishes = false,
   });
+
+  /// Hunter or player still in the game, once the time is up: confirms who
+  /// else was caught – [catches], possibly none (R-GAME-11). Catches and
+  /// confirmation are written together, so everyone sees the same result.
+  /// Only the first confirmation of a round counts; a later one is refused.
+  Future<void> confirmTimeUp(GroupSession session, List<CatchRecord> catches);
 
   /// Catches of the current round, for notifications (R-NOTIF-02).
   Stream<List<CatchRecord>> watchCatches(GroupSession session);

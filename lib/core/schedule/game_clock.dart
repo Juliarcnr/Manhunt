@@ -9,6 +9,7 @@ class GameClock {
     required this.startAt,
     required this.settings,
     this.finishedAt,
+    this.confirmedAt,
   });
 
   final DateTime startAt;
@@ -17,6 +18,14 @@ class GameClock {
   /// When the last player was caught and the hunters won (R-GAME-08); the
   /// round then counts as over as if the time were up.
   final DateTime? finishedAt;
+
+  /// When someone still in the game confirmed, after the time was up, who
+  /// else was caught (R-GAME-11). Only then is the result known.
+  final DateTime? confirmedAt;
+
+  /// Nobody confirmed for this long after the time was up: it counts as
+  /// "nobody else was caught" (R-GAME-11).
+  static const confirmTimeout = Duration(minutes: 10);
 
   /// Grace time after the round is over (time up or the hunters won) before
   /// a device ends it automatically (R-GAME-10): late pings and hunter
@@ -32,8 +41,30 @@ class GameClock {
   /// Actual end: the planned one, or earlier if the hunters won (R-GAME-08).
   DateTime get endAt => huntersWon ? finishedAt! : plannedEndAt;
 
+  /// The time is up and someone confirmed this round who else was caught
+  /// (R-GAME-11). A mark from before the end is a leftover of an earlier
+  /// round and is ignored.
+  bool get timeUpConfirmed =>
+      !huntersWon &&
+      confirmedAt != null &&
+      !confirmedAt!.isBefore(plannedEndAt);
+
+  /// From then on the result is known (R-GAME-09, R-GAME-11): the hunters'
+  /// win, the confirmation after the time was up, or [confirmTimeout] after
+  /// it without one.
+  DateTime get decidedAt => huntersWon
+      ? finishedAt!
+      : timeUpConfirmed
+      ? confirmedAt!
+      : plannedEndAt.add(confirmTimeout);
+
+  /// The time is up, but nobody has confirmed yet who else was caught
+  /// (R-GAME-11).
+  bool awaitingConfirmation(DateTime now) =>
+      phaseAt(now) == GamePhase.ended && now.isBefore(decidedAt);
+
   /// From then on any device ends the round as if the host had (R-GAME-10).
-  DateTime get autoEndAt => endAt.add(autoEndDelay);
+  DateTime get autoEndAt => decidedAt.add(autoEndDelay);
 
   /// The hunters caught everyone before the time was up (R-GAME-08). A mark
   /// from before the start is a leftover of an earlier round (ended by an

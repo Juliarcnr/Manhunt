@@ -500,7 +500,7 @@ void main() {
     test(
       'a second device or a retry adds no second history entry or map',
       () async {
-        now = start.add(const Duration(hours: 3, minutes: 1));
+        now = start.add(const Duration(hours: 3, minutes: 11));
         // Interrupted after the summary was saved.
         await gameDoc()
             .collection('history')
@@ -514,6 +514,72 @@ void main() {
         expect(await mapCount(), 1);
       },
     );
+
+    group('after the time is up: confirmation first (R-GAME-11)', () {
+      const end = Duration(hours: 3);
+
+      test('waits for it, then ends 15 s after it', () async {
+        now = start.add(end + const Duration(minutes: 2));
+        expect(await repo.autoEndRound(guest), isFalse);
+
+        // Kim was still caught; written together with the confirmation.
+        await repo.confirmTimeUp(guest, [
+          CatchRecord(playerId: 'guest', at: start.add(end)),
+        ]);
+        final confirmedAt = start.add(end + const Duration(minutes: 3));
+        // Fake Firestore stores serverTimestamp as real time; pin it.
+        await gameDoc().update({
+          'confirmedAt': Timestamp.fromDate(confirmedAt),
+        });
+        final game = (await repo.watchGame(admin).first)!;
+        expect(game.confirmedAt!.isAtSameMomentAs(confirmedAt), isTrue);
+        expect(
+          (await repo.watchMembers(admin).first)
+              .firstWhere((m) => m.id == 'guest')
+              .caught,
+          isTrue,
+        );
+        expect(
+          (await repo.watchCatches(admin).first).single.at,
+          start.add(end),
+        );
+
+        now = confirmedAt.add(const Duration(seconds: 14));
+        expect(await repo.autoEndRound(guest), isFalse);
+        now = confirmedAt.add(const Duration(seconds: 15));
+        expect(await repo.autoEndRound(guest), isTrue);
+        final round = (await repo.watchHistory(admin).first).single;
+        expect(round.catches.single.player, 'Kim');
+        expect(round.survivors, isEmpty);
+        // The round's time, not the confirmation.
+        expect(round.duration, end);
+        // Cleared with the round.
+        expect((await repo.watchGame(admin).first)!.confirmedAt, isNull);
+      });
+
+      test('"nobody else": only the confirmation', () async {
+        await repo.confirmTimeUp(guest, const []);
+        expect((await repo.watchGame(admin).first)!.confirmedAt, isNotNull);
+        expect(await repo.watchCatches(admin).first, isEmpty);
+      });
+
+      test('nobody confirms: ends 15 s after the 10 min timeout', () async {
+        now = start.add(end + const Duration(minutes: 10, seconds: 14));
+        expect(await repo.autoEndRound(guest), isFalse);
+        now = start.add(end + const Duration(minutes: 10, seconds: 15));
+        expect(await repo.autoEndRound(guest), isTrue);
+        expect((await repo.watchHistory(admin).first).single.survivors, [
+          'Kim',
+        ]);
+      });
+
+      test('a new round starts without the old confirmation', () async {
+        await repo.confirmTimeUp(guest, const []);
+        await repo.endRound(admin);
+        await repo.startGame(admin);
+        expect((await repo.watchGame(admin).first)!.confirmedAt, isNull);
+      });
+    });
 
     test('opening the group ends it, the group stays', () async {
       now = start.add(const Duration(hours: 7));
@@ -720,7 +786,7 @@ void main() {
 
     test('the automatic end saves everything the map showed (R-HIST-04, '
         'R-HIST-05)', () async {
-      now = at(181);
+      now = at(191);
       expect(await repo.autoEndRound(guest), isTrue);
 
       final map = await savedMap();
@@ -775,7 +841,7 @@ void main() {
     });
 
     test('the map is encrypted', () async {
-      now = at(181);
+      now = at(191);
       await repo.autoEndRound(guest);
       final docs = await gameDoc().collection('historyMaps').get();
       final raw = docs.docs.single.data().toString();
@@ -789,14 +855,14 @@ void main() {
 
     test('the host deletes a round for good; numbers do not repeat '
         '(R-HIST-06)', () async {
-      now = at(181);
+      now = at(191);
       await repo.autoEndRound(guest);
       final first = (await repo.watchHistory(admin).first).single;
       for (var i = 0; i < 2; i++) {
         final startAt = now;
         await repo.startGame(admin);
         await gameDoc().update({'startAt': Timestamp.fromDate(startAt)});
-        now = startAt.add(const Duration(hours: 3, minutes: 1));
+        now = startAt.add(const Duration(hours: 3, minutes: 11));
         await repo.autoEndRound(guest);
       }
       final second = (await repo.watchHistory(admin).first)[1];
@@ -813,7 +879,7 @@ void main() {
       final startAt = now;
       await repo.startGame(admin);
       await gameDoc().update({'startAt': Timestamp.fromDate(startAt)});
-      now = startAt.add(const Duration(hours: 3, minutes: 1));
+      now = startAt.add(const Duration(hours: 3, minutes: 11));
       await repo.autoEndRound(guest);
       expect((await repo.watchHistory(admin).first).map((r) => r.round), [
         4,
