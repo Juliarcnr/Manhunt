@@ -38,7 +38,7 @@ Computer-Mitglied ein zusätzliches **anonymes Firebase-Konto** an (höchstens 8
 bei Deinstallation). Sie erzeugen dieselben Daten wie ein echtes Mitglied (Name „🤖 …“ verschlüsselt, Rolle, Pings,
 Hunter-Live …) und werden genauso gelöscht. Ihre Standorte sind der Standort des betreibenden Handys ± 200 m – also
 ebenfalls verschlüsselt, aber sinngemäß ein weiterer Standort dieser Person. Die gewünschte Anzahl steht verschlüsselt
-in den Einstellungen.
+in den Einstellungen, ebenso der Test-Schalter „Countdown überspringen“ (R-BOT-09).
 
 ## Nur auf dem Gerät
 - **Gruppenliste** (R-GROUPS-01): bis zu 5 Einträge mit Code, Gruppen-ID, Gruppenname (Kopie) und „bin Host“, dazu

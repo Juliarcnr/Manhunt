@@ -275,6 +275,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Countdown to this time after \"Start\". Without a time, or if it has passed: 1 minute.';
 
   @override
+  String get settingsSkipCountdown => 'Skip countdown';
+
+  @override
+  String get settingsSkipCountdownHint =>
+      'Testing only: the round starts right after \"Start\", without a countdown and regardless of the start time.';
+
+  @override
   String get settingsStartTimeNone => 'none';
 
   @override

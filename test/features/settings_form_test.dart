@@ -311,6 +311,64 @@ void main() {
     });
   });
 
+  group('skip the countdown when testing (R-BOT-09)', () {
+    Future<GameSettings Function()> pump(
+      WidgetTester tester, {
+      required bool testing,
+    }) async {
+      var settings = const GameSettings();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (context, setState) => SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                  showBots: testing,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return () => settings;
+    }
+
+    const key = Key('skipCountdownSwitch');
+
+    testWidgets('hidden in normal builds', (tester) async {
+      await pump(tester, testing: false);
+      expect(find.byKey(key), findsNothing);
+    });
+
+    testWidgets('below the start time, off by default, can be switched on', (
+      tester,
+    ) async {
+      final settings = await pump(tester, testing: true);
+      expect(find.text('Countdown überspringen'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(key)).dy,
+        greaterThan(
+          tester.getTopLeft(find.byKey(const Key('startTimeTile'))).dy,
+        ),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(key)).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const Key('durationStepper'))).dy,
+        ),
+      );
+      expect(tester.widget<SwitchListTile>(find.byKey(key)).value, isFalse);
+      await tester.tap(find.byKey(key));
+      await tester.pump();
+      expect(settings().skipCountdown, isTrue);
+    });
+  });
+
   group('very short rounds when testing (R-BOT-08)', () {
     Future<GameSettings Function()> pump(
       WidgetTester tester, {

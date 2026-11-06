@@ -60,6 +60,16 @@ void main() {
     });
   });
 
+  group('skip the countdown when testing (R-BOT-09)', () {
+    test('starts right away, also with a start time ahead', () {
+      expect(plannedStartAt(now, skipCountdown: true), now);
+      expect(
+        plannedStartAt(now, startTime: time(14, 0), skipCountdown: true),
+        now,
+      );
+    });
+  });
+
   group('countdown overlay (R-START-05)', () {
     final startAt = DateTime.utc(2026, 11, 1, 14);
     int? left(int ms) =>

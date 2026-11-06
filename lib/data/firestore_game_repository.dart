@@ -264,7 +264,11 @@ class FirestoreGameRepository implements GameRepository {
       'status': GameStatus.running.name,
       // Official start after a countdown, by the host's clock (R-START-01).
       'startAt': Timestamp.fromDate(
-        plannedStartAt(_now(), startTime: settings.startTime),
+        plannedStartAt(
+          _now(),
+          startTime: settings.startTime,
+          skipCountdown: settings.skipCountdown,
+        ),
       ),
       // Also for groups created before the field existed (R-GAME-06).
       'durationSec': settings.duration.inSeconds,

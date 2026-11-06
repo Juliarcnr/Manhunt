@@ -201,6 +201,20 @@ void main() {
       );
     });
 
+    test('countdown skipped when testing: right away (R-BOT-09)', () async {
+      await repo.createGame(
+        admin,
+        name: 'Julia',
+        settings: GameSettings(
+          startTime: Duration(hours: now.hour + 1),
+          skipCountdown: true,
+        ),
+      );
+      await repo.startGame(admin);
+      final game = await repo.watchGame(admin).first;
+      expect(game!.startAt!.isAtSameMomentAs(now), isTrue);
+    });
+
     test('with a start time that has passed: one minute', () async {
       now = DateTime(2026, 10, 4, 14, 5);
       await repo.createGame(

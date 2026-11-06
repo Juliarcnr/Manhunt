@@ -566,6 +566,18 @@ abstract class AppLocalizations {
   /// **'Countdown to this time after \"Start\". Without a time, or if it has passed: 1 minute.'**
   String get settingsStartTimeHint;
 
+  /// No description provided for @settingsSkipCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip countdown'**
+  String get settingsSkipCountdown;
+
+  /// No description provided for @settingsSkipCountdownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing only: the round starts right after \"Start\", without a countdown and regardless of the start time.'**
+  String get settingsSkipCountdownHint;
+
   /// No description provided for @settingsStartTimeNone.
   ///
   /// In en, this message translates to:

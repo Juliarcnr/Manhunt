@@ -95,6 +95,8 @@
   "settingsDuration": "Game duration",
   "settingsStartTime": "Start time",
   "settingsStartTimeHint": "Countdown to this time after \"Start\". Without a time, or if it has passed: 1 minute.",
+  "settingsSkipCountdown": "Skip countdown",
+  "settingsSkipCountdownHint": "Testing only: the round starts right after \"Start\", without a countdown and regardless of the start time.",
   "settingsStartTimeNone": "none",
   "settingsStartTimeClear": "Remove start time",
   "settingsHeadStart": "Head start for players",

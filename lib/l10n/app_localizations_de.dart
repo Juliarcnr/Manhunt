@@ -276,6 +276,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nach „Start“ läuft ein Countdown bis zu dieser Uhrzeit. Ohne Uhrzeit oder wenn sie schon vorbei ist: 1 Minute.';
 
   @override
+  String get settingsSkipCountdown => 'Countdown überspringen';
+
+  @override
+  String get settingsSkipCountdownHint =>
+      'Nur zum Testen: Die Runde beginnt direkt nach „Start“, ohne Countdown und unabhängig von der Startzeit.';
+
+  @override
   String get settingsStartTimeNone => 'keine';
 
   @override

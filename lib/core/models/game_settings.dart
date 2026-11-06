@@ -2,7 +2,7 @@ import 'geo_point.dart';
 
 /// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
 /// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19,
-/// R-SET-21, R-BOT-02).
+/// R-SET-21, R-BOT-02, R-BOT-09).
 class GameSettings {
   const GameSettings({
     this.duration = const Duration(hours: 3),
@@ -26,6 +26,7 @@ class GameSettings {
     this.botPlayers = 0,
     this.area = const [],
     this.startTime,
+    this.skipCountdown = false,
   });
 
   static const _keep = Object();
@@ -83,6 +84,10 @@ class GameSettings {
   /// Time of day (since midnight, local) of the official start; null = a
   /// short countdown from pressing "start" (R-SET-21, R-START-01).
   final Duration? startTime;
+
+  /// Testing only: the round starts right away, without a countdown and
+  /// regardless of [startTime] (R-BOT-09).
+  final bool skipCountdown;
 
   /// The joker "player positions" is only offered without [sharedPings].
   bool get playerJokerAvailable => playerJokerEnabled && !sharedPings;
@@ -145,6 +150,7 @@ class GameSettings {
     int? botPlayers,
     List<GeoPoint>? area,
     Object? startTime = _keep,
+    bool? skipCountdown,
   }) => GameSettings(
     duration: duration ?? this.duration,
     headStart: headStart ?? this.headStart,
@@ -171,6 +177,7 @@ class GameSettings {
     startTime: identical(startTime, _keep)
         ? this.startTime
         : startTime as Duration?,
+    skipCountdown: skipCountdown ?? this.skipCountdown,
   );
 
   Map<String, Object?> toJson() => {
@@ -195,6 +202,7 @@ class GameSettings {
     'botPlayers': botPlayers,
     'area': [for (final p in area) p.toJson()],
     'startTimeMin': startTime?.inMinutes,
+    'skipCountdown': skipCountdown,
   };
 
   factory GameSettings.fromJson(Map<String, Object?> json) => GameSettings(
@@ -233,6 +241,7 @@ class GameSettings {
       final min? => Duration(minutes: min),
       null => null,
     },
+    skipCountdown: json['skipCountdown'] as bool? ?? false,
   );
 }
 

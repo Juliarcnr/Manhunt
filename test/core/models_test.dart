@@ -80,6 +80,19 @@ void main() {
       expect(GameSettings.fromJson(legacy).botPlayers, 0);
     });
 
+    test('countdown is not skipped by default, also for older groups '
+        '(R-BOT-09)', () {
+      const s = GameSettings();
+      expect(s.skipCountdown, isFalse);
+      expect(
+        GameSettings.fromJson(const GameSettings(skipCountdown: true).toJson())
+            .skipCountdown,
+        isTrue,
+      );
+      final legacy = s.toJson()..remove('skipCountdown');
+      expect(GameSettings.fromJson(legacy).skipCountdown, isFalse);
+    });
+
     test('anonymous players are on by default, also for older groups '
         '(R-SET-16)', () {
       const s = GameSettings();

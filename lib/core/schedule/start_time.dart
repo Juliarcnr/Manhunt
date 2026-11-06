@@ -9,7 +9,13 @@ const startTimeLookahead = Duration(hours: 12);
 /// When the official start of a round is, if the host starts it at [now]
 /// (R-START-01, R-START-02): the next [startTime] (time of day, local) if it
 /// is at most [startTimeLookahead] away, otherwise in [startCountdown].
-DateTime plannedStartAt(DateTime now, {Duration? startTime}) {
+/// With [skipCountdown] (testing only) right away (R-BOT-09).
+DateTime plannedStartAt(
+  DateTime now, {
+  Duration? startTime,
+  bool skipCountdown = false,
+}) {
+  if (skipCountdown) return now;
   final fallback = now.add(startCountdown);
   if (startTime == null) return fallback;
   final local = now.toLocal();

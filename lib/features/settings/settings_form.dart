@@ -103,6 +103,20 @@ class SettingsForm extends StatelessWidget {
                   ? null
                   : (v) => change(s.copyWith(startTime: v)),
             ),
+            if (showBots)
+              SwitchListTile(
+                key: const Key('skipCountdownSwitch'),
+                contentPadding: const EdgeInsets.only(right: 8),
+                title: Text(l10n.settingsSkipCountdown),
+                subtitle: Text(
+                  l10n.settingsSkipCountdownHint,
+                  style: const TextStyle(color: AppColors.textMuted),
+                ),
+                value: s.skipCountdown,
+                onChanged: readOnly
+                    ? null
+                    : (v) => change(s.copyWith(skipCountdown: v)),
+              ),
             minutes(
               key: const Key('durationStepper'),
               label: l10n.settingsDuration,

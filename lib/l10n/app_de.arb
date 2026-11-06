@@ -86,6 +86,8 @@
   "settingsDuration": "Spieldauer",
   "settingsStartTime": "Startzeit",
   "settingsStartTimeHint": "Nach „Start“ läuft ein Countdown bis zu dieser Uhrzeit. Ohne Uhrzeit oder wenn sie schon vorbei ist: 1 Minute.",
+  "settingsSkipCountdown": "Countdown überspringen",
+  "settingsSkipCountdownHint": "Nur zum Testen: Die Runde beginnt direkt nach „Start“, ohne Countdown und unabhängig von der Startzeit.",
   "settingsStartTimeNone": "keine",
   "settingsStartTimeClear": "Startzeit entfernen",
   "settingsHeadStart": "Vorlauf für Spieler:innen",
