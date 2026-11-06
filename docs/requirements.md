@@ -292,6 +292,7 @@ Zum Testen mit nur zwei Handys.
 | R-BOT-05 | Ein Computer-Mitglied verhält sich wie ein echtes Handy: reguläre Pings, Speedhunt-Pings als Ziel, Joker-Anfragen beantworten, Spielfeld verlassen, nach dem Catch stoppen; Computer-Hunter teilen ihren Live-Standort. Das läuft, solange auf seinem Handy der Spielbildschirm offen ist. Seine Protokollzeilen erscheinen im Debug-Log dieses Handys. |
 | R-BOT-06 | Jedes Computer-Mitglied hat ein eigenes anonymes Firebase-Konto und nutzt nur die normalen Abläufe – keine Änderung an den Sicherheitsregeln. |
 | R-BOT-07 | Gibt es keinen Menschen mit der Rolle der Computer-Mitglieder, laufen sie auf einem Handy, das mitspielt (Hunter oder Spieler) und damit einen Standort hat – nie auf dem der Spielleitung, deren Handy nicht trackt. Mit nur einem mitspielenden Handy laufen so alle Computer-Mitglieder um dieses herum. (2026-11-01) |
+| R-BOT-08 | Wo es Computer-Mitglieder gibt (R-BOT-01), lässt sich die Spieldauer zum Testen auch auf 1 oder 5 Minuten stellen (sonst ab 30 Minuten) und die Vorlaufzeit minutengenau unter 5 Minuten. Wird die Spieldauer kürzer als die Vorlaufzeit, wird die Vorlaufzeit auf 0 gesetzt. (2026-11-06) |
 
 ## 13. Technische Entscheidungen
 

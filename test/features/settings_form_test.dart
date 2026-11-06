@@ -311,6 +311,98 @@ void main() {
     });
   });
 
+  group('very short rounds when testing (R-BOT-08)', () {
+    Future<GameSettings Function()> pump(
+      WidgetTester tester, {
+      required bool testing,
+      GameSettings initial = const GameSettings(
+        duration: Duration(minutes: 30),
+      ),
+    }) async {
+      var settings = initial;
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (context, setState) => SettingsForm(
+                  settings: settings,
+                  onChanged: (s) => setState(() => settings = s),
+                  showBots: testing,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return () => settings;
+    }
+
+    Finder button(String stepper, String tooltip) => find.ancestor(
+      of: find.descendant(
+        of: find.byKey(Key(stepper)),
+        matching: find.byTooltip(tooltip),
+      ),
+      matching: find.byType(IconButton),
+    );
+
+    test('choices', () {
+      expect(durationChoices(testing: false).first, 30);
+      expect(durationChoices(testing: true).take(3), [1, 5, 30]);
+      expect(durationChoices(testing: true).last, 600);
+      expect(headStartChoices(testing: false).take(2), [0, 5]);
+      expect(headStartChoices(testing: true).take(6), [0, 1, 2, 3, 4, 5]);
+    });
+
+    testWidgets('not below 30 minutes in normal builds', (tester) async {
+      await pump(tester, testing: false);
+      expect(
+        tester.widget<IconButton>(button('durationStepper', '−')).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('5 and 1 minute, head start cut back', (tester) async {
+      final settings = await pump(tester, testing: true);
+      await tester.tap(button('durationStepper', '−'));
+      await tester.pump();
+      expect(settings().duration, const Duration(minutes: 5));
+      expect(settings().headStart, Duration.zero);
+      await tester.tap(button('headStartStepper', '+'));
+      await tester.pump();
+      expect(settings().headStart, const Duration(minutes: 1));
+      await tester.tap(button('durationStepper', '−'));
+      await tester.pump();
+      expect(settings().duration, const Duration(minutes: 1));
+      expect(settings().headStart, Duration.zero);
+      expect(
+        tester.widget<IconButton>(button('durationStepper', '−')).onPressed,
+        isNull,
+      );
+      expect(
+        settings().validate().contains(SettingsError.headStartInvalid),
+        isFalse,
+      );
+      await tester.tap(button('durationStepper', '+'));
+      await tester.pump();
+      expect(settings().duration, const Duration(minutes: 5));
+    });
+
+    testWidgets('a value between the choices still steps', (tester) async {
+      final settings = await pump(
+        tester,
+        testing: false,
+        initial: const GameSettings(duration: Duration(minutes: 37)),
+      );
+      await tester.tap(button('durationStepper', '+'));
+      await tester.pump();
+      expect(settings().duration, const Duration(minutes: 45));
+    });
+  });
+
   group('start time (R-SET-21)', () {
     Future<GameSettings Function()> pumpEditable(WidgetTester tester) async {
       var settings = const GameSettings();

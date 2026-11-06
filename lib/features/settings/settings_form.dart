@@ -19,7 +19,8 @@ class SettingsForm extends StatelessWidget {
   final GameSettings settings;
   final ValueChanged<GameSettings>? onChanged;
 
-  /// Debug builds: number of computer members (R-BOT-02).
+  /// Debug builds: number of computer members (R-BOT-02) and very short
+  /// rounds (R-BOT-08).
   final bool showBots;
 
   @override
@@ -30,38 +31,49 @@ class SettingsForm extends StatelessWidget {
     void change(GameSettings next) => onChanged?.call(next);
 
     /// Below [floor] (min ≤ floor) the − button stays active but only shows
-    /// [floorMessage] instead of changing the value.
+    /// [floorMessage] instead of changing the value. With [values] (minutes,
+    /// ascending) the value steps through these instead of [step].
     Widget minutes({
       Key? key,
       required String label,
       String? hint,
       required Duration value,
-      required int step,
-      required int min,
-      required int max,
+      int step = 1,
+      int min = 0,
+      int max = 0,
+      List<int>? values,
       required GameSettings Function(Duration) apply,
       Duration floor = Duration.zero,
       String? floorMessage,
-    }) => StepperTile(
-      key: key,
-      label: label,
-      hint: hint,
-      valueText: formatDuration(l10n, value),
-      canDecrease: value.inMinutes - step >= min,
-      canIncrease: value.inMinutes + step <= max,
-      onDecrease: () {
-        final next = value - Duration(minutes: step);
-        if (next < floor && floorMessage != null) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(floorMessage)));
-          return;
-        }
-        change(apply(next));
-      },
-      onIncrease: () => change(apply(value + Duration(minutes: step))),
-      readOnly: readOnly,
-    );
+    }) {
+      final current = value.inMinutes;
+      final lower = values == null
+          ? (current - step >= min ? current - step : null)
+          : values.where((v) => v < current).lastOrNull;
+      final higher = values == null
+          ? (current + step <= max ? current + step : null)
+          : values.where((v) => v > current).firstOrNull;
+      return StepperTile(
+        key: key,
+        label: label,
+        hint: hint,
+        valueText: formatDuration(l10n, value),
+        canDecrease: lower != null,
+        canIncrease: higher != null,
+        onDecrease: () {
+          final next = Duration(minutes: lower!);
+          if (next < floor && floorMessage != null) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(floorMessage)));
+            return;
+          }
+          change(apply(next));
+        },
+        onIncrease: () => change(apply(Duration(minutes: higher!))),
+        readOnly: readOnly,
+      );
+    }
 
     Widget count({
       required String label,
@@ -92,19 +104,21 @@ class SettingsForm extends StatelessWidget {
                   : (v) => change(s.copyWith(startTime: v)),
             ),
             minutes(
+              key: const Key('durationStepper'),
               label: l10n.settingsDuration,
               value: s.duration,
-              step: 15,
-              min: 30,
-              max: 600,
-              apply: (v) => s.copyWith(duration: v),
+              values: durationChoices(testing: showBots),
+              // A head start as long as the round is cut back (R-BOT-08).
+              apply: (v) => s.copyWith(
+                duration: v,
+                headStart: s.headStart >= v ? Duration.zero : null,
+              ),
             ),
             minutes(
+              key: const Key('headStartStepper'),
               label: l10n.settingsHeadStart,
               value: s.headStart,
-              step: 5,
-              min: 0,
-              max: 60,
+              values: headStartChoices(testing: showBots),
               apply: (v) => s.copyWith(headStart: v),
             ),
           ],
@@ -328,6 +342,21 @@ class SettingsForm extends StatelessWidget {
     );
   }
 }
+
+/// Selectable round lengths in minutes (R-SET-02); when testing also 1 and
+/// 5 minutes (R-BOT-08).
+List<int> durationChoices({required bool testing}) => [
+  if (testing) ...[1, 5],
+  for (var m = 30; m <= 600; m += 15) m,
+];
+
+/// Selectable head starts in minutes (R-SET-03); when testing also every
+/// minute below 5, to fit very short rounds (R-BOT-08).
+List<int> headStartChoices({required bool testing}) => [
+  0,
+  if (testing) ...[1, 2, 3, 4],
+  for (var m = 5; m <= 60; m += 5) m,
+];
 
 String formatDuration(AppLocalizations l10n, Duration d) {
   final h = d.inHours;
