@@ -92,7 +92,6 @@ class LobbyScreen extends ConsumerWidget {
     Widget memberTile(Member m) => _MemberTile(
       member: m,
       isAdmin: m.id == game.adminId,
-      isMe: m.id == session.userId,
       onRename: m.id == session.userId
           ? () async {
               final newName = await _askMyName(context, m.name);
@@ -725,7 +724,6 @@ class _MemberTile extends StatelessWidget {
   const _MemberTile({
     required this.member,
     required this.isAdmin,
-    required this.isMe,
     this.onRename,
     this.onTap,
     this.onRemove,
@@ -733,7 +731,6 @@ class _MemberTile extends StatelessWidget {
 
   final Member member;
   final bool isAdmin;
-  final bool isMe;
 
   /// Only for oneself: change the own display name (R-LOBBY-10).
   final VoidCallback? onRename;
@@ -782,7 +779,7 @@ class _MemberTile extends StatelessWidget {
               ),
             ),
           if (isAdmin) _Badge(l10n.lobbyAdminBadge),
-          if (isMe) _Badge(l10n.lobbyYouBadge),
+          // No "You" badge: the pencil marks the own name (R-LOBBY-10).
           if (onTap != null)
             const Padding(
               padding: EdgeInsets.only(left: 6),

@@ -448,6 +448,8 @@ void main() {
 
     // Only one pencil: next to the own name, not next to the host.
     expect(find.byKey(const Key('renameMeButton')), findsOneWidget);
+    // The pencil marks the own name, no extra "You" badge.
+    expect(find.text('You'), findsNothing);
     await tester.ensureVisible(find.byKey(const Key('renameMeButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('renameMeButton')));

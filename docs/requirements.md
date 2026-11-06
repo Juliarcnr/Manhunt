@@ -64,7 +64,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
 | R-LOBBY-09 | Der Host kann Mitglieder in der Lobby aus der Gruppe entfernen (Symbol neben der Person, mit Rückfrage). Während einer Runde nicht mehr – dort gibt es stattdessen „Catch rückgängig“ (R-CATCH-04, geändert am 2026-10-10). Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
-| R-LOBBY-10 | Jede Person kann ihren eigenen Anzeigenamen in der Lobby nachträglich ändern (Stift-Symbol neben dem eigenen Namen). Der Name bleibt verschlüsselt gespeichert. |
+| R-LOBBY-10 | Jede Person kann ihren eigenen Anzeigenamen in der Lobby nachträglich ändern (Stift-Symbol neben dem eigenen Namen). Der Name bleibt verschlüsselt gespeichert. Der Stift kennzeichnet zugleich den eigenen Eintrag; ein zusätzliches „Du“ gibt es in der Lobby nicht (2026-11-06). |
 
 ### Start-Countdown (2026-11-01)
 
