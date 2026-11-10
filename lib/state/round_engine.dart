@@ -10,6 +10,7 @@ import '../core/round/boundary_watch.dart';
 import '../core/round/joker.dart';
 import '../core/round/observer.dart';
 import '../core/round/ping_schedule.dart';
+import '../core/round/read_budget.dart';
 import '../core/schedule/game_clock.dart';
 import '../core/schedule/speedhunt.dart';
 import '../data/game_repository.dart';
@@ -84,7 +85,7 @@ class RoundEngine {
     this.tickInterval = const Duration(seconds: 5),
     this.hunterUploadInterval,
     this.outsideUploadInterval = const Duration(seconds: 5),
-    this.playerLiveUploadInterval = playerLiveInterval,
+    this.playerLiveUploadInterval,
     this.onLog,
   }) : _now = now ?? DateTime.now;
 
@@ -107,7 +108,15 @@ class RoundEngine {
       _game?.hunterLiveInterval ??
       const Duration(seconds: 5);
   final Duration outsideUploadInterval;
-  final Duration playerLiveUploadInterval;
+
+  /// Overrides the round's [GameInfo.watcherLiveInterval] (15 s, or 30 s to
+  /// save reads, R-GM-05, R-QUOTA-01).
+  final Duration? playerLiveUploadInterval;
+
+  Duration get _playerLiveInterval =>
+      playerLiveUploadInterval ??
+      _game?.watcherLiveInterval ??
+      watcherLiveNormal;
   final DateTime Function() _now;
 
   /// Gets every [log] message too – computer members report into their
@@ -246,13 +255,19 @@ class RoundEngine {
     List<Speedhunt> speedhunts = const [],
     List<Member> members = const [],
   }) {
-    if ((me?.isHunter ?? false) &&
-        (game?.hunterLiveThrottled ?? false) &&
+    if ((game?.hunterLiveThrottled ?? false) &&
         !(_game?.hunterLiveThrottled ?? false)) {
-      _log(
-        'hunter live every ${game!.hunterLiveInterval.inSeconds} s '
-        '(read budget)',
-      );
+      if (me?.isHunter ?? false) {
+        _log(
+          'hunter live every ${game!.hunterLiveInterval.inSeconds} s '
+          '(read budget)',
+        );
+      } else if (me?.isPlayer ?? false) {
+        _log(
+          'player live every ${game!.watcherLiveInterval.inSeconds} s '
+          '(read budget)',
+        );
+      }
     }
     _game = game;
     _me = me;
@@ -469,7 +484,7 @@ class RoundEngine {
   bool get _sharesLive =>
       _shouldTrack && (_me?.isPlayer ?? false) && hasLiveAudience(_members);
 
-  /// Uploads the own live position every [playerLiveUploadInterval] while
+  /// Uploads the own live position as often as watchers see it while
   /// someone may watch, deletes it as soon as nobody may (R-GM-05, R-GM-06).
   Future<void> _syncLiveLocation() async {
     if (_liveBusy) return;
@@ -479,8 +494,7 @@ class RoundEngine {
         final fix = _lastFix;
         if (!_isFresh(fix)) return;
         final last = _lastLiveUpload;
-        if (last != null &&
-            _now().difference(last) < playerLiveUploadInterval) {
+        if (last != null && _now().difference(last) < _playerLiveInterval) {
           return;
         }
         _liveMaybeShared = true;

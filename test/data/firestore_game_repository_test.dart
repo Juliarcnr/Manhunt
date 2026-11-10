@@ -330,12 +330,15 @@ void main() {
       );
     });
 
-    test('a round over the budget gets 15 s for everyone', () async {
+    test('a round over the budget gets 15 s for everyone, 30 s for '
+        'watchers', () async {
       await start(players: 20, hours: 5);
       expect(await stored(), 15);
       final game = (await repo.watchGame(guest).first)!;
       expect(game.hunterLiveInterval, const Duration(seconds: 15));
       expect(game.hunterLiveThrottled, isTrue);
+      // Watchers see everyone less often too (R-GM-05).
+      expect(game.watcherLiveInterval, const Duration(seconds: 30));
     });
 
     test('older rounds without the field: 5 s', () async {
@@ -343,6 +346,10 @@ void main() {
       expect(
         (await repo.watchGame(admin).first)!.hunterLiveInterval,
         const Duration(seconds: 5),
+      );
+      expect(
+        (await repo.watchGame(admin).first)!.watcherLiveInterval,
+        const Duration(seconds: 15),
       );
     });
   });

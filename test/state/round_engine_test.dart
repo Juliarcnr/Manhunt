@@ -998,6 +998,35 @@ void main() {
       expect((await online())['kim']!.point.lat, 52.42);
     });
 
+    test('throttled round: shared every 30 s (R-QUOTA-01)', () async {
+      engine = await engineFor(player.id);
+      engine.update(
+        game: GameInfo(
+          adminId: 'h',
+          status: GameStatus.running,
+          settings: game0,
+          startAt: start,
+          hunterLiveInterval: const Duration(seconds: 15),
+        ),
+        me: player,
+        speedhuntsOnMe: [],
+        members: [hunter, player, gm],
+      );
+      await step(const Duration(seconds: 1), 52.4);
+      expect((await online())['kim']!.point.lat, 52.4);
+
+      await step(const Duration(seconds: 15), 52.41);
+      await step(const Duration(seconds: 10), 52.42);
+      expect((await online())['kim']!.point.lat, 52.4); // throttled
+
+      await step(const Duration(seconds: 5), 52.43);
+      expect((await online())['kim']!.point.lat, 52.43);
+      expect(
+        engine.log.value.any((l) => l.contains('player live every 30 s')),
+        isTrue,
+      );
+    });
+
     test('nothing shared without anyone watching', () async {
       await startAs(player, [hunter, player, other]);
       await step(const Duration(seconds: 1), 52.4);

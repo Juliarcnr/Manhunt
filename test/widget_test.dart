@@ -358,7 +358,9 @@ void main() {
   });
 
   testWidgets('host is told before the start when hunters will see each '
-      'other only every 15 s (R-QUOTA-02)', (tester) async {
+      'other only every 15 s and watchers every 30 s (R-QUOTA-02)', (
+    tester,
+  ) async {
     final db = FakeFirebaseFirestore();
     final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
     // 3 h, 3 hunters, 6 players, 1 game master: ≈ 45k reads with 5 s.
@@ -388,7 +390,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -3000));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('hunterLiveThrottledHint')), findsOneWidget);
-    expect(find.textContaining('estimated 66 %'), findsOneWidget);
+    expect(find.textContaining('estimated 40 %'), findsOneWidget);
 
     // With only the hunters assigned so far it fits.
     await assign({

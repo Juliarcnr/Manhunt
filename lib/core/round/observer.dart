@@ -1,9 +1,8 @@
 import '../models/member.dart';
 import '../schedule/game_clock.dart';
 
-/// Players share their live position every this often while someone watches
-/// (R-GM-05) – more often would get close to the free Firebase quota.
-const playerLiveInterval = Duration(seconds: 15);
+// Players share their live position while someone watches, as often as the
+// watchers see it: `watcherLiveIntervalFor` in read_budget.dart (R-GM-05).
 
 /// Whether [me] watches everyone live right now (R-GM-03, R-GM-07): game
 /// masters always while the round runs, caught players only after they

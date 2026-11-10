@@ -2911,6 +2911,29 @@ void main() {
       expect(find.text('Gil (You)'), findsOneWidget);
     });
 
+    testWidgets('game master in a throttled round: every 30 s '
+        '(R-GM-03, R-QUOTA-01)', (tester) async {
+      await seedWithGameMaster(tester);
+      await pumpAs(
+        tester,
+        'gil',
+        gameSettings: settings.copyWith(anonymousPlayers: true),
+        hunterLive: const Duration(seconds: 15),
+      );
+      expect(
+        find.text('Game master – you see everyone live (every 30 s).'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'You are game master – you don\'t play and see everyone live '
+          '(every 30 s).',
+        ),
+        findsOneWidget,
+      );
+    });
     testWidgets('others see the game master in the overview, without the '
         'own-role line (R-GM-11)', (tester) async {
       await seedWithGameMaster(tester);

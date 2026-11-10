@@ -13,7 +13,7 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Spielfeld & Einstellungen (inkl. optionaler Startzeit, R-SET-21) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Anonyme Spielernummern der Runde (R-ANON-01): Zuordnung UID → „Spieler n“ | Firestore `games/{id}.aliases` | nein (verschlüsselt) | beim Beenden der Runde |
 | Schalter „Reguläre Pings an alle Spieler“ (R-SET-15) | Firestore `games/{id}.sharedPings` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; verrät nur die Spielvariante) | mit Gruppe |
-| Takt der Hunter-Live-Standorte der Runde, 5 oder 15 s (R-QUOTA-01) | Firestore `games/{id}.hunterLiveSec` | ja (nur eine Zahl, verrät nur, dass die Runde groß ist) | bleibt bis zum nächsten Start, mit Gruppe |
+| Takt der Hunter-Live-Standorte der Runde, 5 oder 15 s; daraus abgeleitet der Takt der Live-Ansicht für Spielleitung und Gefangene, 15 oder 30 s (R-QUOTA-01) | Firestore `games/{id}.hunterLiveSec` | ja (nur eine Zahl, verrät nur, dass die Runde groß ist) | bleibt bis zum nächsten Start, mit Gruppe |
 | Spieldauer (R-GAME-06) | Firestore `games/{id}.durationSec` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig, damit die Sicherheitsregeln das Spielende kennen; verrät nur die Spieldauer) | mit Gruppe |
 | Zeitpunkt „Hunter haben gewonnen“ (R-GAME-08) | Firestore `games/{id}.finishedAt` | ja (nur ein Zeitpunkt, kein Name) | beim Beenden der Runde |
 | Zeitpunkt der Bestätigung nach Zeitablauf, wer noch gefangen wurde (R-GAME-11) | Firestore `games/{id}.confirmedAt` | ja (nur ein Zeitpunkt; wer bestätigt hat, wird nicht gespeichert, die nachgemeldeten Catches sind normale verschlüsselte Catch-Ereignisse) | beim Beenden der Runde |

@@ -207,20 +207,22 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   `seesEveryoneLive` (Spielleitung bzw. gefangener Spieler nach „OK“, nur Vorlauf/Jagd), `mustAcceptLiveView`,
   `hasLiveAudience`. Würfeln (`assignRandomRoles`) lässt die Spielleitung aus; `toggleRole` macht sie zum Spieler.
 - Senden: `RoundEngine._syncLiveLocation` (wie `_syncOutsideLocation`) lädt bei nicht gefangenen Spielern alle 15 s
-  (`playerLiveInterval`) nach `playerLocs` hoch, solange `hasLiveAudience(members)`; sonst, beim Fangen, Spielende
+  (bzw. 30 s, `GameInfo.watcherLiveInterval`, R-QUOTA-01) nach `playerLocs` hoch, solange `hasLiveAudience(members)`; sonst, beim Fangen, Spielende
   und `_stop` wird gelöscht (einmal auch beim Start, falls nach Neustart etwas übrig ist). Die Engine bekommt dafür
   die Mitgliederliste (`update(members: …)`, auch in `BotRunner`). Die Spielleitung trackt nicht.
 - Lesen: `playerLocationsProvider` (Listener) und `observedHunterLocationsProvider` (`pollHunterLocations`, `get`
-  alle 15 s statt Listener – Hunter schreiben alle 5 s, jeder Listener zahlt jede Änderung). In der Spielansicht ein
+  alle 15 s bzw. 30 s statt Listener – Hunter schreiben alle 5 s, jeder Listener zahlt jede Änderung). In der Spielansicht ein
   eigener Zweig vor dem Hunter-Zweig; nach Spielende die normale Ende-Ansicht.
 - Regeln: `watchesLive(gid)` = Runde läuft und (Spielleitung oder gefangener Spieler) → darf `pings`, `hunterLocs`
   lesen, `playerLocs` nur solange `!roundOver`. Keine Zeichnungen, Außerhalb-Standorte, Joker-Daten.
 - Warnung (R-GM-08): nicht wegklickbarer Dialog; Bestätigung in `SavedJokers.liveViewAccepted` (pro Runde, nur
   Gerät). Gefragt wird erst, wenn die gespeicherten Daten geladen sind (sonst nach Neustart doppelt).
-- **Drosselung der Hunter** (R-QUOTA-01/02): `lib/core/round/read_budget.dart` schätzt die Lesevorgänge der Runde
-  (`estimateRoundReads`); ab 70 % von 50k gibt `hunterLiveIntervalFor` 15 s statt 5 s. `startGame` schreibt das
+- **Drosselung der Live-Standorte** (R-QUOTA-01/02): `lib/core/round/read_budget.dart` schätzt die Lesevorgänge der Runde
+  (`estimateRoundReads`); ab 70 % von 50k (`liveThrottledFor`) gibt `hunterLiveIntervalFor` 15 s statt 5 s. `startGame` schreibt das
   Ergebnis als `hunterLiveSec` ans Spiel (`GameInfo.hunterLiveInterval`, ohne Feld 5 s), die `RoundEngine` lädt im
-  Takt hoch. Den echten Verbrauch kann die App nicht abfragen (keine Client-API, keine Functions im Spark-Tarif).
+  Takt hoch. Aus demselben Feld leitet jedes Gerät den Zuschauer-Takt ab (`watcherLiveIntervalFor`: 15 s bzw. 30 s;
+  Spieler-Upload in der Engine und Hunter-Abfrage im Provider) – kein weiteres Feld, keine Regeländerung. Den echten
+  Verbrauch kann die App nicht abfragen (keine Client-API, keine Functions im Spark-Tarif).
 - **Firebase-Kontingent** (Spark: 50k Lesen, 20k Schreiben pro Tag), Beispiel 3 h, 3 Hunter, 6 Spieler: Spieler alle
   5 s wären ≈ 13k Schreibvorgänge (+ 6,5k Hunter) → zu viel; alle 15 s ≈ 4,3k. Größter Posten beim Lesen sind die
   Hunter alle 5 s (≈ 3 × 6,5k für die Hunter selbst); Spielleitung/Gefangene kosten je ≤ 4,3k (Spieler) + 2,2k (Hunter).

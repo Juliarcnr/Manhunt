@@ -1605,7 +1605,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       // overview says it afterwards, R-GM-03). Caught players were warned
       // by the dialog, no extra line (R-GM-08).
       if (observer && isGameMaster && now.isBefore(gameMasterInfoUntil))
-        l10n.gameMasterInfo,
+        l10n.gameMasterInfo(widget.game.watcherLiveInterval.inSeconds),
       // Hunters know why their colleagues move in bigger steps (R-QUOTA-02).
       if (isHunter &&
           widget.game.hunterLiveThrottled &&
@@ -1688,6 +1688,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
                   ? l10n.playerAlias(aliases[widget.session.userId]!)
                   : null,
               speedhuntRunning: running != null,
+              watcherLiveInterval: widget.game.watcherLiveInterval,
               // Whom it is on – hunters only (R-OVER-04).
               speedhuntTarget: switch (activeSpeedhunt(targeted, now)) {
                 final s? when isHunter =>

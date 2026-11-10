@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/member.dart';
+import '../../core/round/read_budget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 
@@ -18,6 +19,7 @@ Future<void> showOverviewSheet(
   String? winner,
   Set<String> winnerIds = const {},
   void Function(Member member)? onUndoCatch,
+  Duration watcherLiveInterval = watcherLiveNormal,
 }) => showModalBottomSheet<void>(
   context: context,
   showDragHandle: true,
@@ -31,6 +33,7 @@ Future<void> showOverviewSheet(
     winner: winner,
     winnerIds: winnerIds,
     onUndoCatch: onUndoCatch,
+    watcherLiveInterval: watcherLiveInterval,
   ),
 );
 
@@ -45,6 +48,7 @@ class OverviewSheet extends StatelessWidget {
     this.winner,
     this.winnerIds = const {},
     this.onUndoCatch,
+    this.watcherLiveInterval = watcherLiveNormal,
   });
 
   final List<Member> members;
@@ -66,6 +70,10 @@ class OverviewSheet extends StatelessWidget {
 
   /// Host only: take back a wrongly reported catch (R-CATCH-04).
   final void Function(Member member)? onUndoCatch;
+
+  /// How often game masters see everyone live this round (R-GM-05,
+  /// R-QUOTA-01).
+  final Duration watcherLiveInterval;
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +208,9 @@ class OverviewSheet extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        l10n.overviewYouAreGameMaster,
+                        l10n.overviewYouAreGameMaster(
+                          watcherLiveInterval.inSeconds,
+                        ),
                         key: const Key('overviewGameMaster'),
                         style: const TextStyle(color: AppColors.textMuted),
                       ),

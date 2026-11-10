@@ -4,6 +4,7 @@ import '../core/history/round_summary.dart';
 import '../core/models/game_settings.dart';
 import '../core/models/geo_point.dart';
 import '../core/models/member.dart';
+import '../core/round/read_budget.dart';
 
 /// A group lives across many rounds: lobby → running → (host ends) → lobby …
 enum GameStatus { lobby, running }
@@ -49,8 +50,16 @@ class GameInfo {
   /// (R-QUOTA-01). Set at the start; 5 s for older rounds.
   final Duration hunterLiveInterval;
 
-  /// Hunters see each other less often this round (R-QUOTA-01).
+  /// Live positions are shared less often this round: hunters see each
+  /// other every 15 s, game masters and caught players everyone every 30 s
+  /// (R-QUOTA-01).
   bool get hunterLiveThrottled => hunterLiveInterval.inSeconds > 5;
+
+  /// How often game masters and caught players see everyone live this round,
+  /// and how often players share their live position for them: 15 s, or
+  /// 30 s in a throttled round (R-GM-05, R-QUOTA-01).
+  Duration get watcherLiveInterval =>
+      watcherLiveIntervalFor(hunterLiveInterval);
 }
 
 /// What a device needs to talk to its group: the derived crypto and its own id.

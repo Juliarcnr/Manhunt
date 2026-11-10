@@ -86,12 +86,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleUnassigned => 'Not assigned yet';
 
   @override
-  String get overviewYouAreGameMaster =>
-      'You are game master – you don\'t play and see everyone live (every 15 s).';
+  String overviewYouAreGameMaster(int seconds) {
+    return 'You are game master – you don\'t play and see everyone live (every $seconds s).';
+  }
 
   @override
   String lobbyHunterLiveThrottled(int percent) {
-    return 'Big round: hunters see each other only every 15 s instead of every 5 s this round, so the free Firebase quota lasts (estimated $percent % of it).';
+    return 'Big round: this round, hunters see each other only every 15 s instead of every 5 s, and game master and caught players see everyone live only every 30 s instead of every 15 s, so the free Firebase quota lasts (estimated $percent % of it).';
   }
 
   @override
@@ -115,8 +116,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lobbyNobodyToPick => 'Everyone is game master already.';
 
   @override
-  String get gameMasterInfo =>
-      'Game master – you see everyone live (every 15 s).';
+  String gameMasterInfo(int seconds) {
+    return 'Game master – you see everyone live (every $seconds s).';
+  }
 
   @override
   String get liveViewTitle => 'Careful: live locations';

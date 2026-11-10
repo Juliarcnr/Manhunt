@@ -86,12 +86,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get roleUnassigned => 'Noch nicht eingeteilt';
 
   @override
-  String get overviewYouAreGameMaster =>
-      'Du bist Spielleitung – du spielst nicht mit und siehst alle live (alle 15 s).';
+  String overviewYouAreGameMaster(int seconds) {
+    return 'Du bist Spielleitung – du spielst nicht mit und siehst alle live (alle $seconds s).';
+  }
 
   @override
   String lobbyHunterLiveThrottled(int percent) {
-    return 'Große Runde: Hunter:innen sehen einander diese Runde nur alle 15 s statt alle 5 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt $percent % davon).';
+    return 'Große Runde: Hunter:innen sehen einander diese Runde nur alle 15 s statt alle 5 s, Spielleitung und Gefangene sehen alle live nur alle 30 s statt alle 15 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt $percent % davon).';
   }
 
   @override
@@ -115,8 +116,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyNobodyToPick => 'Alle sind schon Spielleitung.';
 
   @override
-  String get gameMasterInfo =>
-      'Spielleitung – du siehst alle live (alle 15 s).';
+  String gameMasterInfo(int seconds) {
+    return 'Spielleitung – du siehst alle live (alle $seconds s).';
+  }
 
   @override
   String get liveViewTitle => 'Achtung: Live-Standorte';
