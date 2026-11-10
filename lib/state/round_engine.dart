@@ -93,6 +93,16 @@ class RoundEngine {
   /// requested directly from the GPS instead.
   static const maxFixAge = Duration(minutes: 2);
 
+  /// A timer tick may come this much early and still upload. Uploads are
+  /// timed from when they were started, not from when the server confirmed
+  /// them; otherwise every other 5 s tick was skipped (field test
+  /// 2026-11-10: hunters every ~8 s).
+  static const uploadSlack = Duration(milliseconds: 500);
+
+  /// Whether an upload last started at [last] is due again after [every].
+  bool _due(DateTime? last, Duration every) =>
+      last == null || _now().difference(last) >= every - uploadSlack;
+
   final GroupSession session;
   final RoundRepository rounds;
   final LocationService location;
@@ -459,13 +469,11 @@ class RoundEngine {
       if (boundary.value.sharing) {
         final fix = _lastFix;
         if (!_isFresh(fix)) return;
-        final last = _lastOutsideUpload;
-        if (last != null && _now().difference(last) < outsideUploadInterval) {
-          return;
-        }
+        if (!_due(_lastOutsideUpload, outsideUploadInterval)) return;
         _outsideMaybeShared = true;
+        final started = _now();
         await rounds.updateOutsideLocation(session, fix!);
-        _lastOutsideUpload = _now();
+        _lastOutsideUpload = started;
       } else if (_outsideMaybeShared) {
         await rounds.clearOutsideLocation(session);
         _outsideMaybeShared = false;
@@ -493,13 +501,11 @@ class RoundEngine {
       if (_sharesLive) {
         final fix = _lastFix;
         if (!_isFresh(fix)) return;
-        final last = _lastLiveUpload;
-        if (last != null && _now().difference(last) < _playerLiveInterval) {
-          return;
-        }
+        if (!_due(_lastLiveUpload, _playerLiveInterval)) return;
         _liveMaybeShared = true;
+        final started = _now();
         await rounds.updatePlayerLocation(session, fix!);
-        _lastLiveUpload = _now();
+        _lastLiveUpload = started;
       } else if (_liveMaybeShared) {
         await rounds.clearPlayerLocation(session);
         _liveMaybeShared = false;
@@ -778,11 +784,11 @@ class RoundEngine {
   }
 
   Future<void> _uploadHunterLocation(LocationFix fix) async {
-    final last = _lastUpload;
-    if (last != null && _now().difference(last) < _hunterInterval) return;
+    if (!_due(_lastUpload, _hunterInterval)) return;
     try {
+      final started = _now();
       await rounds.updateHunterLocation(session, fix);
-      _lastUpload = _now();
+      _lastUpload = started;
     } on Exception catch (e) {
       _setStatus((s) => s.copyWith(lastError: 'Upload: $e'));
     }

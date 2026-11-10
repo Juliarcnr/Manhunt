@@ -579,6 +579,71 @@ void main() {
     });
   });
 
+  group('upload pace despite slow writes (R-HUNT-02, R-GM-05, field test '
+      '2026-11-10: hunters every ~8 s instead of 5 s)', () {
+    // Every write takes 300 ms until the server confirms it.
+    void slowWrites() => rounds = _SlowRounds(
+      db,
+      () => now = now.add(const Duration(milliseconds: 300)),
+    );
+
+    test('hunters upload on every 5 s tick', () async {
+      slowWrites();
+      engine = await engineFor('h');
+      engine.update(game: game(), me: hunter, speedhuntsOnMe: []);
+      location.emit(fix(52.4));
+      await flush();
+      await flush();
+      final tickAt = now;
+      for (var i = 1; i <= 3; i++) {
+        now = tickAt.add(Duration(seconds: 5 * i));
+        location.emit(fix(52.4 + i / 100));
+        await flush();
+        await engine.tick();
+        await flush();
+        final locs = await rounds.watchHunterLocations(hunterSession).first;
+        expect(locs['h']!.point.lat, 52.4 + i / 100, reason: 'tick $i');
+      }
+    });
+
+    test('a timer tick a little early still counts', () async {
+      engine = await engineFor('h');
+      engine.update(game: game(), me: hunter, speedhuntsOnMe: []);
+      location.emit(fix(52.4));
+      await flush();
+      await flush();
+      now = now.add(const Duration(milliseconds: 4900));
+      location.emit(fix(52.41));
+      await flush();
+      await engine.tick();
+      await flush();
+      final locs = await rounds.watchHunterLocations(hunterSession).first;
+      expect(locs['h']!.point.lat, 52.41);
+    });
+
+    test('players share their live position on every 15 s tick', () async {
+      slowWrites();
+      const gm = Member(id: 'g', name: 'Sam', role: Role.gameMaster);
+      engine = await engineFor(player.id);
+      engine.update(
+        game: game(),
+        me: player,
+        speedhuntsOnMe: [],
+        members: [hunter, player, gm],
+      );
+      final t0 = now;
+      for (var i = 0; i <= 2; i++) {
+        now = t0.add(Duration(seconds: 15 * i));
+        location.emit(fix(52.4 + i / 100));
+        await flush();
+        await engine.tick();
+        await pumpEventQueue();
+        final locs = await rounds.watchPlayerLocations(hunterSession).first;
+        expect(locs['kim']!.point.lat, 52.4 + i / 100, reason: 'tick $i');
+      }
+    });
+  });
+
   group('hunter positions at ping times for the history map (R-HIST-05)', () {
     final speedhunt = Speedhunt(
       targetId: '',
@@ -1095,4 +1160,29 @@ void main() {
       expect(await online(), isEmpty);
     });
   });
+}
+
+/// Firestore whose writes take a moment until the server confirms them.
+class _SlowRounds extends FirestoreRoundRepository {
+  _SlowRounds(super.db, this.onWrite);
+
+  final void Function() onWrite;
+
+  @override
+  Future<void> updateHunterLocation(
+    GroupSession session,
+    LocationFix fix,
+  ) async {
+    await super.updateHunterLocation(session, fix);
+    onWrite();
+  }
+
+  @override
+  Future<void> updatePlayerLocation(
+    GroupSession session,
+    LocationFix fix,
+  ) async {
+    await super.updatePlayerLocation(session, fix);
+    onWrite();
+  }
 }
