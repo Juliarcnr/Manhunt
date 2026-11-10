@@ -1606,11 +1606,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
       // by the dialog, no extra line (R-GM-08).
       if (observer && isGameMaster && now.isBefore(gameMasterInfoUntil))
         l10n.gameMasterInfo(widget.game.watcherLiveInterval.inSeconds),
-      // Hunters know why their colleagues move in bigger steps (R-QUOTA-02).
-      if (isHunter &&
-          widget.game.hunterLiveThrottled &&
-          phase != GamePhase.ended)
-        l10n.gameHunterLiveThrottled,
       // Once it is over: the banner says who won and that the map is saved
       // to the history (R-GAME-09), no extra line.
     ];

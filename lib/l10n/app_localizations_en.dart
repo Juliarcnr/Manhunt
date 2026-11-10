@@ -96,10 +96,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get gameHunterLiveThrottled =>
-      'Hunter positions every 15 s this round (Firebase quota)';
-
-  @override
   String get roleGameMaster => 'Game master';
 
   @override

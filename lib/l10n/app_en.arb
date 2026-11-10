@@ -30,7 +30,6 @@
   "@overviewYouAreGameMaster": {"placeholders":{"seconds":{"type":"int"}}},
   "lobbyHunterLiveThrottled": "Big round: this round, hunters see each other only every 15 s instead of every 5 s, and game master and caught players see everyone live only every 30 s instead of every 15 s, so the free Firebase quota lasts (estimated {percent} % of it).",
   "@lobbyHunterLiveThrottled": {"placeholders":{"percent":{"type":"int"}}},
-  "gameHunterLiveThrottled": "Hunter positions every 15 s this round (Firebase quota)",
   "roleGameMaster": "Game master",
   "lobbyGameMasterHint": "Optional – doesn't play and sees all hunters and players live. Not included when assigning randomly.",
   "lobbyAddGameMaster": "Add game master",

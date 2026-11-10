@@ -781,18 +781,13 @@ void main() {
     });
   });
 
-  testWidgets('hunters are told when they see each other only every 15 s '
-      '(R-QUOTA-02)', (tester) async {
+  testWidgets('hunters get no info line in a throttled round (R-QUOTA-02)', (
+    tester,
+  ) async {
     await seed(tester);
     await pumpAs(tester, 'alex', hunterLive: const Duration(seconds: 15));
-    expect(
-      find.text('Hunter positions every 15 s this round (Firebase quota)'),
-      findsOneWidget,
-    );
-    await pumpAs(tester, 'alex');
-    expect(find.textContaining('every 15 s this round'), findsNothing);
-    await pumpAs(tester, 'kim', hunterLive: const Duration(seconds: 15));
-    expect(find.textContaining('every 15 s this round'), findsNothing);
+    expect(find.textContaining('every 15 s'), findsNothing);
+    expect(find.textContaining('Firebase'), findsNothing);
   });
 
   group('player (R-PLAY-*, R-PING-*)', () {

@@ -248,12 +248,6 @@ abstract class AppLocalizations {
   /// **'Big round: this round, hunters see each other only every 15 s instead of every 5 s, and game master and caught players see everyone live only every 30 s instead of every 15 s, so the free Firebase quota lasts (estimated {percent} % of it).'**
   String lobbyHunterLiveThrottled(int percent);
 
-  /// No description provided for @gameHunterLiveThrottled.
-  ///
-  /// In en, this message translates to:
-  /// **'Hunter positions every 15 s this round (Firebase quota)'**
-  String get gameHunterLiveThrottled;
-
   /// No description provided for @roleGameMaster.
   ///
   /// In en, this message translates to:

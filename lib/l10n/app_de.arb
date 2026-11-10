@@ -28,7 +28,6 @@
   "roleUnassigned": "Noch nicht eingeteilt",
   "overviewYouAreGameMaster": "Du bist Spielleitung – du spielst nicht mit und siehst alle live (alle {seconds} s).",
   "lobbyHunterLiveThrottled": "Große Runde: Hunter:innen sehen einander diese Runde nur alle 15 s statt alle 5 s, Spielleitung und Gefangene sehen alle live nur alle 30 s statt alle 15 s, damit das kostenlose Firebase-Kontingent reicht (geschätzt {percent} % davon).",
-  "gameHunterLiveThrottled": "Hunter:innen-Standorte diese Runde alle 15 s (Firebase-Kontingent)",
   "roleGameMaster": "Spielleitung",
   "lobbyGameMasterHint": "Optional – spielt nicht mit und sieht alle Hunter:innen und Spieler:innen live. Wird nicht mit ausgewürfelt.",
   "lobbyAddGameMaster": "Spielleitung hinzufügen",

@@ -96,10 +96,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get gameHunterLiveThrottled =>
-      'Hunter:innen-Standorte diese Runde alle 15 s (Firebase-Kontingent)';
-
-  @override
   String get roleGameMaster => 'Spielleitung';
 
   @override
