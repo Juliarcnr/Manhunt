@@ -65,7 +65,7 @@ void main() {
     });
   });
 
-  group('live positions are throttled from 70 % of the daily reads '
+  group('live positions are throttled from 80 % of the daily reads '
       '(R-QUOTA-01)', () {
     test('a small group stays at 5 s and 15 s', () {
       final members = team(hunters: 2, players: 4);
@@ -90,14 +90,14 @@ void main() {
       );
     });
 
-    test('the limit is exactly 70 %', () {
+    test('the limit is exactly 80 %', () {
       // 5 hunters, nobody else: 5 × (D / 5 s) × 5 = 5 × D reads.
       final members = team(hunters: 5, players: 0);
       final atLimit = threeHours.copyWith(
-        duration: const Duration(seconds: 7000),
+        duration: const Duration(seconds: 8000),
       );
       final below = threeHours.copyWith(
-        duration: const Duration(seconds: 6995),
+        duration: const Duration(seconds: 7995),
       );
       expect(liveThrottledFor(atLimit, members), isTrue);
       expect(hunterLiveIntervalFor(atLimit, members), hunterLiveThrottled);

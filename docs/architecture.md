@@ -218,7 +218,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 - Warnung (R-GM-08): nicht wegklickbarer Dialog; Bestätigung in `SavedJokers.liveViewAccepted` (pro Runde, nur
   Gerät). Gefragt wird erst, wenn die gespeicherten Daten geladen sind (sonst nach Neustart doppelt).
 - **Drosselung der Live-Standorte** (R-QUOTA-01/02): `lib/core/round/read_budget.dart` schätzt die Lesevorgänge der Runde
-  (`estimateRoundReads`); ab 70 % von 50k (`liveThrottledFor`) gibt `hunterLiveIntervalFor` 15 s statt 5 s. `startGame` schreibt das
+  (`estimateRoundReads`); ab 80 % von 50k (`liveThrottledFor`) gibt `hunterLiveIntervalFor` 15 s statt 5 s. `startGame` schreibt das
   Ergebnis als `hunterLiveSec` ans Spiel (`GameInfo.hunterLiveInterval`, ohne Feld 5 s), die `RoundEngine` lädt im
   Takt hoch. Aus demselben Feld leitet jedes Gerät den Zuschauer-Takt ab (`watcherLiveIntervalFor`: 15 s bzw. 30 s;
   Spieler-Upload in der Engine und Hunter-Abfrage im Provider) – kein weiteres Feld, keine Regeländerung. Den echten

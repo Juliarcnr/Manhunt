@@ -6,7 +6,7 @@ const dailyReadQuota = 50000;
 
 /// From this share of [dailyReadQuota] for one round, the live positions are
 /// shared less often (R-QUOTA-01).
-const throttleShare = 0.7;
+const throttleShare = 0.8;
 
 /// Hunters' live position normally and when throttled (R-HUNT-02, R-QUOTA-01).
 const hunterLiveNormal = Duration(seconds: 5);
