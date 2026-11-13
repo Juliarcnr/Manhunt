@@ -21,8 +21,7 @@ class GameSettings {
     this.sharedPings = false,
     this.anonymousPlayers = true,
     this.outsideLiveLocation = true,
-    this.botHunters = 0,
-    this.botPlayers = 0,
+    this.botCount = 0,
     this.area = const [],
     this.startTime,
     this.skipCountdown = false,
@@ -79,10 +78,9 @@ class GameSettings {
   /// (R-SET-17, R-OUT-01).
   final bool outsideLiveLocation;
 
-  /// Computer hunters and players for testing with few phones (R-BOT-02);
-  /// only offered in debug builds.
-  final int botHunters;
-  final int botPlayers;
+  /// Computer members for testing with few phones (R-BOT-02); only offered
+  /// in debug builds. Older groups had hunters and players separately.
+  final int botCount;
 
   /// Time of day (since midnight, local) of the official start; null = a
   /// short countdown from pressing "start" (R-SET-21, R-START-01).
@@ -144,8 +142,7 @@ class GameSettings {
     bool? sharedPings,
     bool? anonymousPlayers,
     bool? outsideLiveLocation,
-    int? botHunters,
-    int? botPlayers,
+    int? botCount,
     List<GeoPoint>? area,
     Object? startTime = _keep,
     bool? skipCountdown,
@@ -167,8 +164,7 @@ class GameSettings {
     sharedPings: sharedPings ?? this.sharedPings,
     anonymousPlayers: anonymousPlayers ?? this.anonymousPlayers,
     outsideLiveLocation: outsideLiveLocation ?? this.outsideLiveLocation,
-    botHunters: botHunters ?? this.botHunters,
-    botPlayers: botPlayers ?? this.botPlayers,
+    botCount: botCount ?? this.botCount,
     area: area ?? this.area,
     // Pass null to clear it.
     startTime: identical(startTime, _keep)
@@ -199,8 +195,7 @@ class GameSettings {
     'sharedPings': sharedPings,
     'anonymousPlayers': anonymousPlayers,
     'outsideLiveLocation': outsideLiveLocation,
-    'botHunters': botHunters,
-    'botPlayers': botPlayers,
+    'botCount': botCount,
     'area': [for (final p in area) p.toJson()],
     'startTimeMin': startTime?.inMinutes,
     'skipCountdown': skipCountdown,
@@ -233,8 +228,9 @@ class GameSettings {
     sharedPings: json['sharedPings'] as bool? ?? false,
     anonymousPlayers: json['anonymousPlayers'] as bool? ?? true,
     outsideLiveLocation: json['outsideLiveLocation'] as bool? ?? true,
-    botHunters: json['botHunters'] as int? ?? 0,
-    botPlayers: json['botPlayers'] as int? ?? 0,
+    botCount:
+        json['botCount'] as int? ??
+        (json['botHunters'] as int? ?? 0) + (json['botPlayers'] as int? ?? 0),
     area: [
       for (final p in json['area']! as List<Object?>)
         GeoPoint.fromJson(p! as Map<String, Object?>),

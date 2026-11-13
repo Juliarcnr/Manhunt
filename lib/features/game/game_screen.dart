@@ -126,12 +126,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
     _engine = engine;
     engine.log.value = ['screen opened'];
-    // Computer members carried by this phone walk around it (R-BOT-05).
+    // Computer members run on the host's phone and walk around it, also when
+    // it does not track itself (game master, caught) (R-BOT-03, R-BOT-05).
     if (ref.read(botsEnabledProvider)) {
+      final location = ref.read(locationServiceProvider);
       _bots = BotSquad(
         session: widget.session,
         backend: ref.read(botBackendProvider),
         anchor: () => _engine?.position.value,
+        hostPosition: location.currentFix,
         notice: engine.notice,
         now: widget.now,
         onLog: engine.note,

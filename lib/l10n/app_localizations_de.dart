@@ -405,13 +405,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer-Mitglieder sind direkt als Hunter:innen bzw. Spieler:innen eingeteilt und laufen zufällig in max. 200 m um ein echtes Handy: Computer-Spieler:innen um das der ersten Spieler:in, Computer-Hunter:innen um das der ersten Hunter:in – gibt es keins, um das erste Handy der Gruppe. Sie pingen wie echte Handys, solange dort der Spielbildschirm offen ist.';
+      'Computer-Mitspieler:innen kommen als „Nicht zugewiesen“ in die Lobby; du teilst sie ein wie alle anderen, auch beim Würfeln. Sie laufen alle auf deinem Handy (dem des Hosts) und bewegen sich zufällig in max. 500 m darum. Sie pingen wie echte Handys, solange bei dir der Spielbildschirm offen ist.';
 
   @override
-  String get settingsBotHunters => 'Computer-Hunter:innen';
-
-  @override
-  String get settingsBotPlayers => 'Computer-Spieler:innen';
+  String get settingsBotCount => 'Computer-Mitspieler:innen';
 
   @override
   String get settingsArea => 'Spielfeld';

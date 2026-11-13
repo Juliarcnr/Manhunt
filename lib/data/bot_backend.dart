@@ -26,7 +26,7 @@ class BotDevice {
 
 abstract interface class BotBackend {
   /// Bot slots per phone (enough for the settings' maximum).
-  static const slots = 2 * maxBotsPerKind;
+  static const slots = maxBots;
 
   /// Ids of the slots this phone used before, by slot (1 … [slots]) –
   /// without signing in.

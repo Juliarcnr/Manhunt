@@ -622,26 +622,20 @@ void main() {
     expect(find.text('Julia'), findsOneWidget);
   });
 
-  testWidgets('computer members keep their role in the lobby (R-BOT-03)', (
-    tester,
-  ) async {
+  testWidgets('computer players join unassigned, keep their role and are '
+      'rolled like people (R-BOT-02, R-BOT-03, R-LOBBY-04)', (tester) async {
     final db = FakeFirebaseFirestore();
     final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
     final guest = await tester.runAsync(
       () => testSession('ABCDE-FGHJK', 'guest'),
     );
-    final bot = await tester.runAsync(
-      () => testSession('ABCDE-FGHJK', 'bot-x'),
-    );
     await tester.runAsync(() async {
       await deviceRepo(db).createGame(
         me!,
         name: 'Julia',
-        settings: defaultSettings.copyWith(botHunters: 1, botPlayers: 1),
+        settings: defaultSettings.copyWith(botCount: 2),
       );
       await deviceRepo(db).joinGame(guest!, name: 'Kim');
-      // Carried by another phone; the host gives it its role.
-      await deviceRepo(db).joinGame(bot!, name: '🤖 Adelgunde');
     });
     await pumpAppWithSession(
       tester,
@@ -661,32 +655,39 @@ void main() {
             ))!.data()?['role']
             as String?;
 
-    expect(await role('bot-x'), 'player');
-    // Nobody has a role yet: this first phone adds the computer hunter at
-    // once, already assigned (R-BOT-03).
-    expect(await role('bot-1-me'), 'hunter');
+    // The host's phone adds them, unassigned.
+    expect(await role('bot-1-me'), 'unassigned');
+    expect(await role('bot-2-me'), 'unassigned');
 
-    // Not switchable by tapping, untouched by the random assignment.
+    // The host moves one like a person; game master is not offered.
     await tester.scrollUntilVisible(
       find.text('🤖 Adelgunde'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    // Clear of the start button at the bottom.
+    await tester.ensureVisible(find.text('🤖 Adelgunde'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('🤖 Adelgunde'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('roleOption_gameMaster')), findsNothing);
+    await tester.tap(find.byKey(const Key('roleOption_hunter')));
     await settleAsync(tester);
-    expect(await role('bot-x'), 'player');
+    expect(await role('bot-1-me'), 'hunter');
+    // It stays a hunter, nothing changes it back.
+    await settleAsync(tester);
+    expect(await role('bot-1-me'), 'hunter');
+
+    // Random teams: 4 members → 1 hunter, 3 players, bots included.
     await tester.drag(find.byType(ListView), const Offset(0, 3000));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('randomButton')));
     await settleAsync(tester);
-    expect(await role('bot-x'), 'player');
-    expect({await role('me'), await role('guest')}, {'hunter', 'player'});
-    // The computer hunter moves to the first human hunter's phone: it stays
-    // here only if this phone drew the hunter role.
-    expect(
-      await role('bot-1-me'),
-      await role('me') == 'hunter' ? 'hunter' : isNull,
-    );
+    final roles = [
+      for (final id in ['me', 'guest', 'bot-1-me', 'bot-2-me']) await role(id),
+    ];
+    expect(roles.where((r) => r == 'hunter'), hasLength(1));
+    expect(roles.where((r) => r == 'player'), hasLength(3));
   });
 
   testWidgets('removed member is told and can go back home (R-LOBBY-09)', (

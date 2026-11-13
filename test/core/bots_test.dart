@@ -16,10 +16,10 @@ double metres(GeoPoint a, GeoPoint b) {
 }
 
 void main() {
-  group('computer members walk around their carrier (R-BOT-04)', () {
+  group('computer members walk around the host (R-BOT-04)', () {
     const anchor = GeoPoint(52.52, 13.405);
 
-    test('never more than 200 m away over a long walk', () {
+    test('never more than 500 m away over a long walk', () {
       final random = Random(7);
       var walk = BotWalk.random(random);
       for (var i = 0; i < 10000; i++) {
@@ -62,178 +62,98 @@ void main() {
       const moved = GeoPoint(52.53, 13.41);
       expect(metres(moved, walk.at(moved)), closeTo(sqrt(125), 0.1));
     });
+
+    test('radius is 500 m (R-BOT-04)', () {
+      expect(botRadiusM, 500);
+    });
   });
 
-  group('bot names carry the kind (R-BOT-03)', () {
+  group('bot names (R-BOT-03)', () {
     test('round trip', () {
-      expect(botName(BotKind.hunter, 2), '🤖 Knorbert');
-      expect(botKindOf(botName(BotKind.hunter, 2)), BotKind.hunter);
-      expect(botKindOf(botName(BotKind.player, 8)), BotKind.player);
-      expect(botKindOf('Kim'), isNull);
-      expect(botKindOf('🤖 Hunter'), isNull);
-      expect(botKindOf('Stromius'), isNull); // a human may be called that
-      expect(isBot(Member(id: 'b', name: botName(BotKind.player, 1))), isTrue);
+      expect(botName(2), '🤖 Stromius');
+      expect(isBot(Member(id: 'b', name: botName(1))), isTrue);
+      expect(isBot(const Member(id: 'k', name: 'Kim')), isFalse);
+      expect(isBot(const Member(id: 'b', name: '🤖 Hunter')), isFalse);
+      // A human may be called that.
+      expect(isBot(const Member(id: 's', name: 'Stromius')), isFalse);
     });
 
-    test('enough distinct names for each kind', () {
-      final names = {
-        for (final kind in BotKind.values)
-          for (var n = 1; n <= maxBotsPerKind; n++) botName(kind, n),
-      };
-      expect(names, hasLength(2 * maxBotsPerKind));
-      for (final kind in BotKind.values) {
-        for (var n = 1; n <= maxBotsPerKind; n++) {
-          expect(botKindOf(botName(kind, n)), kind);
-        }
-      }
+    test('enough distinct names', () {
+      final names = {for (var n = 1; n <= maxBots; n++) botName(n)};
+      expect(names, hasLength(maxBots));
     });
   });
 
-  group('which phone runs which bot (R-BOT-02, R-BOT-03)', () {
-    const host = Member(id: 'h', name: 'Alex', role: Role.hunter);
+  group('the host runs all bots; they join unassigned and keep any role '
+      '(R-BOT-02, R-BOT-03)', () {
+    const host = Member(id: 'h', name: 'Alex', role: Role.gameMaster);
     const kim = Member(id: 'k', name: 'Kim', role: Role.player);
-    const sam = Member(id: 's', name: 'Sam', role: Role.player);
-    const settings = GameSettings(botHunters: 1, botPlayers: 2);
-    Member bot(String id, BotKind kind, int n, {Role? role}) =>
-        Member(id: id, name: botName(kind, n), role: role ?? kind.role);
+    const settings = GameSettings(botCount: 3);
+    Member bot(String id, int n, {Role role = Role.unassigned}) =>
+        Member(id: id, name: botName(n), role: role);
 
     BotActions plan(
-      List<Member> members,
-      String me, {
+      List<Member> members, {
+      bool isHost = true,
       GameSettings s = settings,
       Set<String> mine = const {},
     }) => botActions(
       settings: s,
       members: members,
-      myId: me,
       myBotIds: mine,
-      isHost: me == 'h',
+      isHost: isHost,
     );
 
-    test('the first human of a role carries its bots', () {
-      final members = [host, kim, sam];
-      expect(botCarrier(BotKind.hunter, members), 'h');
-      expect(botCarrier(BotKind.player, members), 'k');
-      expect(
-        botCarrier(BotKind.player, [host, bot('b', BotKind.player, 1), kim]),
-        'k',
-      );
-    });
-
-    test('without a human of that role, the first human carries them', () {
-      // A single phone carries all bots, whatever its role.
-      expect(botCarrier(BotKind.player, [host]), 'h');
-      expect(botCarrier(BotKind.hunter, [kim]), 'k');
-      const unassigned = Member(id: 'u', name: 'Uli');
-      expect(botCarrier(BotKind.hunter, [unassigned]), 'u');
-      expect(botCarrier(BotKind.hunter, [bot('b', BotKind.hunter, 1)]), isNull);
-    });
-
-    test('a playing phone goes before one that does not track: all bots '
-        'walk around the one phone that plays (R-BOT-07)', () {
-      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
-      const unassigned = Member(id: 'u', name: 'Uli');
-      // The game master joined first (e.g. as host): the hunter carries the
-      // computer players too.
-      expect(botCarrier(BotKind.player, [gm, host]), 'h');
-      expect(botCarrier(BotKind.hunter, [gm, unassigned, kim]), 'k');
-      // Nobody plays yet (lobby): the first human, as before.
-      expect(botCarrier(BotKind.player, [gm, unassigned]), 'g');
-    });
-
-    test('an unassigned phone carries bots only if nobody else can: it sees '
-        'the lobby during a round (R-LOBBY-11)', () {
-      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
-      const unassigned = Member(id: 'u', name: 'Uli');
-      expect(botCarrier(BotKind.player, [unassigned, gm]), 'g');
-      expect(botCarrier(BotKind.hunter, [unassigned, kim]), 'k');
-      expect(botCarrier(BotKind.hunter, [unassigned]), 'u');
-    });
-
-    test('making the first phone game master moves its bots to the playing '
-        'phone (R-BOT-07)', () {
-      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
-      final mine = bot('b', BotKind.player, 1);
-      final members = [gm, host, mine];
-      expect(plan(members, 'g', mine: {'b'}).remove, ['b']);
-      // The old bot leaves; its name stays taken until it is gone.
-      expect(plan(members, 'h').create, [
-        (kind: BotKind.hunter, name: '🤖 Stromius'),
-        (kind: BotKind.player, name: '🤖 Pankratius'),
-        (kind: BotKind.player, name: '🤖 Notburga'),
+    test('the host creates the missing bots, numbered uniquely – whatever '
+        'the roles of the people', () {
+      expect(plan([host, kim]).create, [
+        '🤖 Adelgunde',
+        '🤖 Stromius',
+        '🤖 Pankratius',
       ]);
+      final members = [host, kim, bot('b1', 1)];
+      expect(plan(members, mine: {'b1'}).create, [
+        '🤖 Stromius',
+        '🤖 Pankratius',
+      ]);
+      expect(plan(members, isHost: false).isEmpty, isTrue);
     });
 
-    test('carriers create the missing bots, numbered uniquely', () {
-      expect(plan([host, kim, sam], 'h').create, [
-        (kind: BotKind.hunter, name: '🤖 Stromius'),
-      ]);
-      final members = [host, kim, sam, bot('b1', BotKind.player, 1)];
-      expect(plan(members, 'k', mine: {'b1'}).create, [
-        (kind: BotKind.player, name: '🤖 Pankratius'),
-      ]);
-      expect(plan(members, 's').isEmpty, isTrue);
-    });
-
-    test('fewer wanted → the carrier removes its extra bots', () {
-      final members = [
-        host,
-        kim,
-        bot('b1', BotKind.player, 1),
-        bot('b2', BotKind.player, 2),
-      ];
+    test('fewer wanted → the host removes its newest bots', () {
+      final members = [host, bot('b1', 1), bot('b2', 2), bot('b3', 3)];
       final actions = plan(
         members,
-        'k',
-        s: const GameSettings(botPlayers: 1),
-        mine: {'b1', 'b2'},
+        s: const GameSettings(botCount: 1),
+        mine: {'b1', 'b2', 'b3'},
       );
-      expect(actions.remove, ['b2']);
+      expect(actions.remove, ['b2', 'b3']);
       expect(actions.create, isEmpty);
     });
 
-    test('a phone that no longer carries removes its bots', () {
-      // Kim became a hunter: Sam carries the player bots now.
-      final members = [
-        host,
-        kim.copyWith(role: Role.hunter),
-        sam,
-        bot('b1', BotKind.player, 1),
-      ];
-      expect(plan(members, 'k', mine: {'b1'}).remove, ['b1']);
-      expect(plan(members, 's').create, [
-        (kind: BotKind.player, name: '🤖 Pankratius'),
-        (kind: BotKind.player, name: '🤖 Notburga'),
-      ]);
-    });
-
-    test('no roles yet → the first phone adds all bots right away', () {
-      const nobody = [
-        Member(id: 'h', name: 'Alex'),
-        Member(id: 'k', name: 'Kim'),
-      ];
-      expect(plan(nobody, 'h').create, [
-        (kind: BotKind.hunter, name: '🤖 Stromius'),
-        (kind: BotKind.player, name: '🤖 Adelgunde'),
-        (kind: BotKind.player, name: '🤖 Pankratius'),
-      ]);
-      expect(plan(nobody, 'k').isEmpty, isTrue);
-    });
-
-    test('the host gives every bot the role of its kind', () {
+    test('roles never matter: assigned bots stay as they are', () {
       final members = [
         host,
         kim,
-        bot('b1', BotKind.player, 1, role: Role.unassigned),
-        bot('b2', BotKind.hunter, 1, role: Role.player),
-        bot('b3', BotKind.player, 2),
+        bot('b1', 1, role: Role.hunter),
+        bot('b2', 2, role: Role.player),
+        bot('b3', 3),
       ];
-      final assigned = plan(members, 'h', mine: {'b2'}).assign;
-      expect(
-        {for (final m in assigned) m.id: m.role},
-        {'b1': Role.player, 'b2': Role.hunter},
-      );
-      expect(plan(members, 'k').assign, isEmpty);
+      expect(plan(members, mine: {'b1', 'b2', 'b3'}).isEmpty, isTrue);
+    });
+
+    test('a phone other than the host removes its bots (older versions)', () {
+      final members = [host, kim, bot('b1', 1, role: Role.player)];
+      expect(plan(members, isHost: false, mine: {'b1'}).remove, ['b1']);
+    });
+
+    test('bots from both old name lists count as bots', () {
+      for (final name in ['🤖 Knorbert', '🤖 Ottokar', '🤖 Radegundis']) {
+        expect(
+          isBot(Member(id: 'x', name: name)),
+          isTrue,
+          reason: name,
+        );
+      }
     });
   });
 }

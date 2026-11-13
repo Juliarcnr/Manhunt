@@ -331,23 +331,24 @@ void main() {
     testWidgets('hidden unless enabled', (tester) async {
       await pump(tester, showBots: false);
       expect(find.byKey(const Key('botSettings')), findsNothing);
-      expect(find.text('Computer-Spieler:innen'), findsNothing);
+      expect(find.text('Computer-Mitspieler:innen'), findsNothing);
     });
 
-    testWidgets('hunters and players are set separately', (tester) async {
+    testWidgets('only one setting: the number of computer players', (
+      tester,
+    ) async {
       final settings = await pump(tester, showBots: true);
+      expect(find.text('Computer-Hunter:innen'), findsNothing);
       Finder plus(String label) => find.descendant(
         of: find.ancestor(of: find.text(label), matching: find.byType(Row)),
         matching: find.byTooltip('+'),
       );
-      await tester.ensureVisible(find.text('Computer-Spieler:innen'));
-      await tester.tap(plus('Computer-Spieler:innen'));
+      await tester.ensureVisible(find.text('Computer-Mitspieler:innen'));
+      await tester.tap(plus('Computer-Mitspieler:innen'));
       await tester.pump();
-      await tester.tap(plus('Computer-Spieler:innen'));
+      await tester.tap(plus('Computer-Mitspieler:innen'));
       await tester.pump();
-      await tester.tap(plus('Computer-Hunter:innen'));
-      await tester.pump();
-      expect((settings().botHunters, settings().botPlayers), (1, 2));
+      expect(settings().botCount, 2);
     });
   });
 

@@ -74,6 +74,14 @@ void main() {
       }
     });
 
+    test('changedRoles keeps only the members whose role differs, so a '
+        'stale member cannot fail the whole write', () {
+      final before = people(3);
+      final after = setRole(before, 'm1', Role.hunter);
+      expect(changedRoles(before, after).map((m) => m.id), ['m1']);
+      expect(changedRoles(before, before), isEmpty);
+    });
+
     test('back to unassigned', () {
       const hunter = Member(id: 'h', name: 'H', role: Role.hunter);
       expect(

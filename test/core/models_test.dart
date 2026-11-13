@@ -80,15 +80,16 @@ void main() {
     test('computer members: none by default, also for older groups '
         '(R-BOT-02)', () {
       const s = GameSettings();
-      expect((s.botHunters, s.botPlayers), (0, 0));
+      expect(s.botCount, 0);
       final back = GameSettings.fromJson(
-        const GameSettings(botHunters: 2, botPlayers: 3).toJson(),
+        const GameSettings(botCount: 5).toJson(),
       );
-      expect((back.botHunters, back.botPlayers), (2, 3));
-      final legacy = s.toJson()
-        ..remove('botHunters')
-        ..remove('botPlayers');
-      expect(GameSettings.fromJson(legacy).botPlayers, 0);
+      expect(back.botCount, 5);
+      final none = s.toJson()..remove('botCount');
+      expect(GameSettings.fromJson(none).botCount, 0);
+      // Older groups had hunters and players separately.
+      final legacy = {...none, 'botHunters': 1, 'botPlayers': 2};
+      expect(GameSettings.fromJson(legacy).botCount, 3);
     });
 
     test('countdown is not skipped by default, also for older groups '

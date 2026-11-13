@@ -53,8 +53,8 @@ class _Latest<T> {
 }
 
 /// Keeps this phone's bots in line with the settings while the group is in
-/// the lobby (R-BOT-02, R-BOT-03): the carrier joins or removes its bots, the
-/// host gives every bot the role of its kind.
+/// the lobby (R-BOT-02, R-BOT-03): the host's phone joins or removes its
+/// bots; other phones remove any of theirs. Roles are left to the host.
 class BotLobbySync {
   BotLobbySync({
     required this.session,
@@ -96,16 +96,11 @@ class BotLobbySync {
     }
     _waitingSince = null;
     final settings = game.settings;
-    if (settings.botHunters == 0 &&
-        settings.botPlayers == 0 &&
-        !members.any(isBot)) {
-      return;
-    }
+    if (settings.botCount == 0 && !members.any(isBot)) return;
     final known = await backend.knownIds();
     final actions = botActions(
       settings: settings,
       members: members,
-      myId: session.userId,
       myBotIds: {
         for (final id in known.values)
           if (ids.contains(id)) id,
@@ -124,17 +119,11 @@ class BotLobbySync {
       for (var slot = 1; slot <= BotBackend.slots; slot++)
         if (!ids.contains(known[slot])) slot,
     ];
-    for (final (i, bot) in actions.create.indexed) {
+    for (final (i, name) in actions.create.indexed) {
       if (i >= free.length) break;
       final device = await backend.open(free[i]);
       _joining.add(device.id);
-      await device.games.joinGame(
-        _botSession(session, device.id),
-        name: bot.name,
-      );
-    }
-    if (actions.assign.isNotEmpty) {
-      await games.setRoles(session, actions.assign);
+      await device.games.joinGame(_botSession(session, device.id), name: name);
     }
   }
 }
@@ -151,6 +140,8 @@ class BotSquad {
     required this.backend,
     required this.anchor,
     required this.notice,
+    this.hostPosition,
+    this.hostPositionEvery = const Duration(seconds: 15),
     this.now,
     this.onLog,
   });
@@ -158,8 +149,14 @@ class BotSquad {
   final GroupSession session;
   final BotBackend backend;
 
-  /// The carrier's current position (R-BOT-04).
+  /// The host's tracked position (R-BOT-04).
   final LocationFix? Function() anchor;
+
+  /// Asks the host's phone for its position while [anchor] has none, e.g.
+  /// as game master or once caught – the bots still walk around the host
+  /// (R-BOT-04).
+  final Future<LocationFix?> Function()? hostPosition;
+  final Duration hostPositionEvery;
   final TrackingNotice notice;
   final DateTime Function()? now;
   final void Function(String message)? onLog;
@@ -167,6 +164,31 @@ class BotSquad {
   final _runners = <String, BotRunner>{};
   late final _latest = _Latest<List<Member>>(_sync);
   var _disposed = false;
+  LocationFix? _asked;
+  Timer? _askTimer;
+
+  LocationFix? _anchor() => anchor() ?? _asked;
+
+  Future<void> _ask() async {
+    final ask = hostPosition;
+    if (ask == null || _disposed || anchor() != null) return;
+    try {
+      _asked = await ask() ?? _asked;
+    } on Exception catch (e) {
+      onLog?.call('bots: no host position ($e)');
+    }
+  }
+
+  void _askWhileRunning() {
+    if (_runners.isEmpty || hostPosition == null) {
+      _askTimer?.cancel();
+      _askTimer = null;
+      return;
+    }
+    if (_askTimer != null) return;
+    unawaited(_ask());
+    _askTimer = Timer.periodic(hostPositionEvery, (_) => unawaited(_ask()));
+  }
 
   /// Running bots by id – for tests.
   Map<String, BotRunner> get runners => Map.unmodifiable(_runners);
@@ -182,7 +204,10 @@ class BotSquad {
     for (final id in [..._runners.keys]) {
       if (!bots.containsKey(id)) await _runners.remove(id)!.dispose();
     }
-    if (bots.isEmpty || _disposed) return;
+    if (bots.isEmpty || _disposed) {
+      _askWhileRunning();
+      return;
+    }
     final known = await backend.knownIds();
     for (final MapEntry(key: slot, value: id) in known.entries) {
       final name = bots[id];
@@ -192,16 +217,19 @@ class BotSquad {
       _runners[id] = BotRunner(
         session: _botSession(session, id),
         device: device,
-        location: BotLocationService(anchor: anchor),
+        location: BotLocationService(anchor: _anchor),
         notice: notice,
         now: now,
         onLog: (m) => onLog?.call('$name: $m'),
       )..start();
     }
+    _askWhileRunning();
   }
 
   Future<void> dispose() async {
     _disposed = true;
+    _askTimer?.cancel();
+    _askTimer = null;
     for (final runner in _runners.values) {
       await runner.dispose();
     }

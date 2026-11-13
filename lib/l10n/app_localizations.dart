@@ -773,20 +773,14 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBotsHint.
   ///
   /// In en, this message translates to:
-  /// **'Computer members are assigned as hunters or players right away and walk randomly within 200 m of a real phone: computer players around the first player\'s, computer hunters around the first hunter\'s – without one, around the group\'s first phone. They ping like real phones while the game screen is open there.'**
+  /// **'Computer players join the lobby as unassigned; you assign them like everyone else, also with random teams. They all run on your phone (the host\'s) and walk randomly within 500 m of it. They ping like real phones while your game screen is open.'**
   String get settingsBotsHint;
 
-  /// No description provided for @settingsBotHunters.
-  ///
-  /// In en, this message translates to:
-  /// **'Computer hunters'**
-  String get settingsBotHunters;
-
-  /// No description provided for @settingsBotPlayers.
+  /// No description provided for @settingsBotCount.
   ///
   /// In en, this message translates to:
   /// **'Computer players'**
-  String get settingsBotPlayers;
+  String get settingsBotCount;
 
   /// No description provided for @settingsArea.
   ///

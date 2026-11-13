@@ -24,6 +24,16 @@ List<Member> assignRandomRoles(List<Member> members, {Random? random}) {
   ];
 }
 
+/// The members of [after] whose role differs from [before] – only these are
+/// written, so someone who just left cannot fail the whole batch.
+List<Member> changedRoles(List<Member> before, List<Member> after) {
+  final old = {for (final m in before) m.id: m.role};
+  return [
+    for (final m in after)
+      if (old[m.id] != m.role) m,
+  ];
+}
+
 /// Gives one member [role]: drag and drop, the role menu and the button back
 /// to "unassigned" (R-LOBBY-05, R-LOBBY-12, R-GM-02).
 List<Member> setRole(List<Member> members, String id, Role role) => [

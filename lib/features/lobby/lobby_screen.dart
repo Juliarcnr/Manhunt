@@ -90,17 +90,20 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       }
     }
 
-    // Computer members keep the role of their kind (R-BOT-03).
-    final humans = members.where((m) => !isBot(m)).toList();
-
-    // Everybody is rolled anew, 30/70, whatever their role (R-LOBBY-04).
+    // Everybody is rolled anew, 30/70, whatever their role – computer
+    // members just like people (R-LOBBY-04, R-BOT-03).
     void assignRandom() {
-      if (humans.length < 2) {
+      if (members.length < 2) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l10n.errorNotEnoughPlayers)));
         return;
       }
-      run(() => repo.setRoles(session, assignRandomRoles(humans)));
+      run(
+        () => repo.setRoles(
+          session,
+          changedRoles(members, assignRandomRoles(members)),
+        ),
+      );
     }
 
     final hunters = members.where((m) => m.isHunter).toList();
@@ -108,19 +111,21 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final unassigned = members.where((m) => m.role == Role.unassigned).toList();
     final gameMasters = members.where((m) => m.isGameMaster).toList();
 
+    // Writes only this one member: a batch over everyone failed as a whole
+    // whenever the local list still held someone who had just left.
     void moveTo(Member m, Role role) {
       if (m.role == role) return;
-      run(() => repo.setRoles(session, setRole(members, m.id, role)));
+      run(() => repo.setRoles(session, [m.copyWith(role: role)]));
     }
 
-    // Computer members keep their kind's role (R-BOT-03).
-    bool movable(Member m) => editRoles && !isBot(m);
+    // Computer members move like people, but never to game master
+    // (R-BOT-03, R-GM-02).
+    bool allowed(Member m, Role role) => !(isBot(m) && role == Role.gameMaster);
 
     Widget memberTile(Member m) {
       final tile = _MemberTile(
         member: m,
         isAdmin: m.id == game.adminId,
-        draggable: movable(m),
         onRename: m.id == session.userId
             ? () async {
                 final newName = await _askMyName(context, m.name);
@@ -130,15 +135,18 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               }
             : null,
         // Alternative to drag and drop (R-LOBBY-05).
-        onTap: movable(m)
+        onTap: editRoles
             ? () async {
-                final role = await _pickRole(context, m);
+                final role = await _pickRole(context, m, [
+                  for (final r in _roleOrder)
+                    if (allowed(m, r)) r,
+                ]);
                 if (role != null) moveTo(m, role);
               }
             : null,
         // Not for the host themself: they must have a role (R-LOBBY-13).
         onUnassign:
-            movable(m) && m.role != Role.unassigned && m.id != game.adminId
+            editRoles && m.role != Role.unassigned && m.id != game.adminId
             ? () => moveTo(m, Role.unassigned)
             : null,
         onRemove: _isAdmin && !running && m.id != session.userId
@@ -152,7 +160,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               }
             : null,
       );
-      if (!movable(m)) return tile;
+      if (!editRoles) return tile;
       return LongPressDraggable<Member>(
         key: Key('drag_${m.id}'),
         data: m,
@@ -178,7 +186,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       icon: icon,
       footer: footer,
       onDrop: editRoles ? (m) => moveTo(m, role) : null,
-      acceptsFrom: (m) => m.role != role,
+      acceptsFrom: (m) => m.role != role && allowed(m, role),
       children: list.map(memberTile).toList(),
     );
 
@@ -698,38 +706,41 @@ class _CodeCard extends StatelessWidget {
 
 /// Role menu of one person, the alternative to drag and drop (R-LOBBY-05).
 /// Returns null if cancelled.
-Future<Role?> _pickRole(BuildContext context, Member member) =>
-    showModalBottomSheet<Role>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) {
-        final l10n = AppLocalizations.of(ctx);
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  l10n.lobbyRoleMenuTitle(member.name),
-                  style: Theme.of(ctx).textTheme.titleMedium,
-                ),
-              ),
-              for (final role in _roleOrder)
-                ListTile(
-                  key: Key('roleOption_${role.name}'),
-                  leading: Icon(_roleIcon(role), color: _roleColor(role)),
-                  title: Text(_roleTitle(l10n, role)),
-                  trailing: role == member.role
-                      ? const Icon(Icons.check, color: AppColors.textMuted)
-                      : null,
-                  onTap: () => Navigator.pop(ctx, role),
-                ),
-            ],
+Future<Role?> _pickRole(
+  BuildContext context,
+  Member member,
+  List<Role> roles,
+) => showModalBottomSheet<Role>(
+  context: context,
+  showDragHandle: true,
+  builder: (ctx) {
+    final l10n = AppLocalizations.of(ctx);
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              l10n.lobbyRoleMenuTitle(member.name),
+              style: Theme.of(ctx).textTheme.titleMedium,
+            ),
           ),
-        );
-      },
+          for (final role in roles)
+            ListTile(
+              key: Key('roleOption_${role.name}'),
+              leading: Icon(_roleIcon(role), color: _roleColor(role)),
+              title: Text(_roleTitle(l10n, role)),
+              trailing: role == member.role
+                  ? const Icon(Icons.check, color: AppColors.textMuted)
+                  : null,
+              onTap: () => Navigator.pop(ctx, role),
+            ),
+        ],
+      ),
     );
+  },
+);
 
 /// The order of the lobby sections (R-LOBBY-05).
 const _roleOrder = [Role.unassigned, Role.player, Role.hunter, Role.gameMaster];
@@ -954,7 +965,6 @@ class _MemberTile extends StatelessWidget {
   const _MemberTile({
     required this.member,
     required this.isAdmin,
-    this.draggable = false,
     this.onRename,
     this.onTap,
     this.onUnassign,
@@ -963,9 +973,6 @@ class _MemberTile extends StatelessWidget {
 
   final Member member;
   final bool isAdmin;
-
-  /// Host only: can be moved to another role by drag and drop (R-LOBBY-05).
-  final bool draggable;
 
   /// Only for oneself: change the own display name (R-LOBBY-10).
   final VoidCallback? onRename;
@@ -1033,11 +1040,6 @@ class _MemberTile extends StatelessWidget {
                 Icons.person_remove_outlined,
                 color: AppColors.textMuted,
               ),
-            ),
-          if (draggable)
-            const Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: Icon(Icons.drag_indicator, color: AppColors.textMuted),
             ),
         ],
       ),

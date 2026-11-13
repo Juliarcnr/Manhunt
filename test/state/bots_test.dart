@@ -18,8 +18,8 @@ import '../helpers.dart';
 
 void main() {
   const code = 'ABCDE-FGHJK';
-  const hunterPhone = GeoPoint(52.520, 13.405);
-  const playerPhone = GeoPoint(52.522, 13.410);
+  const hostPhone = GeoPoint(52.520, 13.405);
+  const kimPhone = GeoPoint(52.522, 13.410);
   const area = [
     GeoPoint(52.50, 13.38),
     GeoPoint(52.50, 13.43),
@@ -29,8 +29,8 @@ void main() {
 
   late FakeFirebaseFirestore db;
   late FirestoreGameRepository games;
-  late GroupSession host; // human hunter
-  late GroupSession kim; // human player
+  late GroupSession host;
+  late GroupSession kim;
   late BotLobbySync hostSync;
   late BotLobbySync kimSync;
   late FakeBotBackend hostBots;
@@ -68,7 +68,7 @@ void main() {
     await games.createGame(
       host,
       name: 'Alex',
-      settings: const GameSettings(botHunters: 1, botPlayers: 2, area: area),
+      settings: const GameSettings(botCount: 3, area: area),
     );
     await games.joinGame(kim, name: 'Kim');
     hostBots = FakeBotBackend(db, owner: 'h');
@@ -78,107 +78,85 @@ void main() {
   });
 
   group('bots follow the settings in the lobby (R-BOT-02, R-BOT-03)', () {
-    test('a single phone gets all bots, assigned right away', () async {
-      await games.removeMember(kim, 'k');
+    test('the host phone gets all bots, unassigned – whatever the roles of '
+        'the people', () async {
       await settle();
       final all = await members();
       expect(bots(all), {
-        '🤖 Stromius': Role.hunter,
-        '🤖 Adelgunde': Role.player,
-        '🤖 Pankratius': Role.player,
+        '🤖 Adelgunde': Role.unassigned,
+        '🤖 Stromius': Role.unassigned,
+        '🤖 Pankratius': Role.unassigned,
       });
       expect(all.where(isBot).map((m) => m.id), everyElement(endsWith('-h')));
-      // The person still assigns themself.
-      expect(all.firstWhere((m) => m.id == 'h').role, Role.unassigned);
-    });
+      expect(kimBots.opened, 0);
 
-    test(
-      'without roles the first phone carries them, then they move',
-      () async {
-        await settle();
-        expect(bots(await members()), hasLength(3));
-        expect(kimBots.opened, 0);
-
-        await games.setRoles(host, [
-          const Member(id: 'h', name: 'Alex', role: Role.hunter),
-          const Member(id: 'k', name: 'Kim', role: Role.player),
-        ]);
-        await settle();
-        final all = await members();
-        expect(
-          bots(all).values,
-          unorderedEquals([Role.hunter, Role.player, Role.player]),
-        );
-        for (final m in all.where(isBot)) {
-          expect(
-            m.id,
-            endsWith(botKindOf(m.name) == BotKind.hunter ? '-h' : '-k'),
-          );
-        }
-      },
-    );
-
-    test('carriers add their bots, the host assigns the roles', () async {
+      // Kim plays, Alex leads: still all on the host's phone.
       await games.setRoles(host, [
-        const Member(id: 'h', name: 'Alex', role: Role.hunter),
+        const Member(id: 'h', name: 'Alex', role: Role.gameMaster),
         const Member(id: 'k', name: 'Kim', role: Role.player),
       ]);
       await settle();
-      final all = await members();
-      expect(bots(all), {
-        '🤖 Stromius': Role.hunter,
-        '🤖 Adelgunde': Role.player,
-        '🤖 Pankratius': Role.player,
-      });
-      final ids = {for (final m in all) m.name: m.id};
-      expect(ids['🤖 Stromius'], endsWith('-h'));
-      expect(ids['🤖 Adelgunde'], endsWith('-k'));
-      expect(ids['🤖 Pankratius'], endsWith('-k'));
-
-      // Fewer computer players: the carrier removes one.
-      await games.updateSettings(
-        host,
-        const GameSettings(botHunters: 1, botPlayers: 1, area: area),
+      expect(
+        (await members()).where(isBot).map((m) => m.id),
+        everyElement(endsWith('-h')),
       );
-      await settle();
-      expect(bots(await members()), {
-        '🤖 Stromius': Role.hunter,
-        '🤖 Adelgunde': Role.player,
-      });
+      expect(kimBots.opened, 0);
+    });
 
-      // Roles swapped: the bots move to the other phone.
+    test('bots keep the roles the host gives them', () async {
+      await settle();
+      final all = await members();
+      final ids = [for (final m in all.where(isBot)) m.id];
+      await games.setRoles(host, [
+        for (final (i, id) in ids.indexed)
+          Member(id: id, name: '', role: i == 0 ? Role.hunter : Role.player),
+      ]);
       await games.setRoles(host, [
         const Member(id: 'h', name: 'Alex', role: Role.player),
-        const Member(id: 'k', name: 'Kim', role: Role.hunter),
       ]);
       await settle();
-      final swapped = await members();
-      expect(bots(swapped).values, unorderedEquals([Role.hunter, Role.player]));
-      for (final m in swapped.where(isBot)) {
-        expect(
-          m.id,
-          endsWith(botKindOf(m.name) == BotKind.hunter ? '-k' : '-h'),
-        );
-      }
+      expect(
+        bots(await members()).values,
+        unorderedEquals([Role.hunter, Role.player, Role.player]),
+      );
+    });
 
-      // Off again: all bots leave.
+    test('fewer wanted: the host removes some; off: all leave', () async {
+      await settle();
+      await games.updateSettings(
+        host,
+        const GameSettings(botCount: 1, area: area),
+      );
+      await settle();
+      expect(bots(await members()), {'🤖 Adelgunde': Role.unassigned});
+
       await games.updateSettings(host, const GameSettings(area: area));
       await settle();
       expect(bots(await members()), isEmpty);
     });
   });
 
-  group('bots play like phones of their own (R-BOT-04, R-BOT-05)', () {
+  group('bots play like phones of their own, around the host '
+      '(R-BOT-04, R-BOT-05)', () {
     late DateTime now;
     late DateTime startAt;
-    late BotSquad hunterSquad;
-    late BotSquad playerSquad;
+    late BotSquad squad;
+    late String hunterBot;
+    late List<String> playerBots;
 
-    BotSquad squad(GroupSession carrier, FakeBotBackend backend, GeoPoint at) {
+    BotSquad squadOf(
+      GroupSession carrier,
+      FakeBotBackend backend, {
+      GeoPoint? tracked,
+      GeoPoint? asked,
+    }) {
       final s = BotSquad(
         session: carrier,
         backend: backend,
-        anchor: () => LocationFix(point: at, at: now),
+        anchor: () =>
+            tracked == null ? null : LocationFix(point: tracked, at: now),
+        hostPosition: () async =>
+            asked == null ? null : LocationFix(point: asked, at: now),
         notice: const TrackingNotice(title: 't', text: 'x'),
         now: () => now,
       );
@@ -187,93 +165,137 @@ void main() {
     }
 
     Future<void> tickAll() async {
-      for (final s in [hunterSquad, playerSquad]) {
-        for (final r in s.runners.values) {
-          await r.engine.tick();
-        }
+      for (final r in squad.runners.values) {
+        await r.engine.tick();
       }
       await flush();
     }
 
-    setUp(() async {
-      await games.setRoles(host, [
-        const Member(id: 'h', name: 'Alex', role: Role.hunter),
-        const Member(id: 'k', name: 'Kim', role: Role.player),
-      ]);
+    /// Bots: one hunter, two players; the host plays with [hostRole].
+    Future<void> start({Role hostRole = Role.hunter}) async {
       await settle();
+      final ids = [
+        for (final m in await members())
+          if (isBot(m)) m.id,
+      ];
+      hunterBot = ids.first;
+      playerBots = ids.skip(1).toList();
+      await games.setRoles(host, [
+        Member(id: 'h', name: 'Alex', role: hostRole),
+        const Member(id: 'k', name: 'Kim', role: Role.player),
+        Member(id: hunterBot, name: '', role: Role.hunter),
+        for (final id in playerBots)
+          Member(id: id, name: '', role: Role.player),
+      ]);
       await games.startGame(host);
       startAt = (await game()).startAt!;
       now = startAt.add(const Duration(minutes: 1));
-      hunterSquad = squad(host, hostBots, hunterPhone);
-      playerSquad = squad(kim, kimBots, playerPhone);
-      final m = await members();
-      await hunterSquad.update(m);
-      await playerSquad.update(m);
+    }
+
+    Future<void> run(BotSquad s) async {
+      squad = s;
+      await s.update(await members());
       await flush();
+    }
+
+    test('the host runs all bots; other phones none', () async {
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
+      final other = squadOf(kim, kimBots, tracked: kimPhone);
+      await other.update(await members());
+      await flush();
+      expect(squad.runners.keys, unorderedEquals([hunterBot, ...playerBots]));
+      expect(other.runners, isEmpty);
     });
 
-    test('each phone runs only its own bots', () {
-      expect(hunterSquad.runners.keys, everyElement(endsWith('-h')));
-      expect(hunterSquad.runners, hasLength(1));
-      expect(playerSquad.runners.keys, everyElement(endsWith('-k')));
-      expect(playerSquad.runners, hasLength(2));
-    });
-
-    test('computer players ping near the player phone', () async {
+    test('computer players ping near the host', () async {
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
       now = startAt.add(const Duration(minutes: 20));
       await tickAll();
       final pings = await FirestoreRoundRepository(db)
           .watchAllPings(host)
           .first;
-      expect({for (final p in pings) p.playerId}, playerSquad.runners.keys);
+      expect({for (final p in pings) p.playerId}, playerBots.toSet());
       for (final p in pings) {
         expect(p.slotId, 'regular_1');
         expect(
-          metres(playerPhone, p.fix.point),
+          metres(hostPhone, p.fix.point),
           lessThanOrEqualTo(botRadiusM + 0.5),
         );
       }
     });
 
-    test(
-      'computer hunters share their live position near the hunter phone',
-      () async {
-        await tickAll();
-        final live = await FirestoreRoundRepository(db)
-            .watchHunterLocations(host)
-            .first;
-        expect(live.keys, hunterSquad.runners.keys);
-        expect(
-          metres(hunterPhone, live.values.single.point),
-          lessThanOrEqualTo(botRadiusM + 0.5),
-        );
-      },
-    );
+    test('computer hunters share their live position near the host', () async {
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
+      await tickAll();
+      final live = await FirestoreRoundRepository(db)
+          .watchHunterLocations(host)
+          .first;
+      expect(live.keys, [hunterBot]);
+      expect(
+        metres(hostPhone, live.values.single.point),
+        lessThanOrEqualTo(botRadiusM + 0.5),
+      );
+    });
+
+    test('a host who does not track (game master) still anchors the bots: '
+        'its phone is asked for its position', () async {
+      await start(hostRole: Role.gameMaster);
+      await run(squadOf(host, hostBots, asked: hostPhone));
+      await tickAll();
+      final live = await FirestoreRoundRepository(db)
+          .watchHunterLocations(host)
+          .first;
+      expect(live.keys, [hunterBot]);
+      expect(
+        metres(hostPhone, live.values.single.point),
+        lessThanOrEqualTo(botRadiusM + 0.5),
+      );
+    });
+
+    test('unassigned bots sit out', () async {
+      await start();
+      await games.setRoles(host, [
+        Member(id: hunterBot, name: '', role: Role.unassigned),
+      ]);
+      await run(squadOf(host, hostBots, tracked: hostPhone));
+      await tickAll();
+      expect(squad.runners[hunterBot]!.engine.isTracking, isFalse);
+      expect(squad.runners[playerBots.first]!.engine.isTracking, isTrue);
+    });
 
     test('a caught computer player stops', () async {
-      final id = playerSquad.runners.keys.first;
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
+      final id = playerBots.first;
       await games.recordCatch(host, CatchRecord(playerId: id, at: now));
       await flush();
       await tickAll();
-      expect(playerSquad.runners[id]!.engine.isTracking, isFalse);
-      expect(playerSquad.runners.values.last.engine.isTracking, isTrue);
+      expect(squad.runners[id]!.engine.isTracking, isFalse);
+      expect(squad.runners[playerBots.last]!.engine.isTracking, isTrue);
     });
 
     test('computer players answer the joker "player positions"', () async {
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
       await tickAll(); // first position
       final rounds = FirestoreRoundRepository(db);
       final request = await rounds.requestPlayerPositions(kim);
       await flush();
       await tickAll();
       final answers = await rounds.watchJokerAnswers(kim, request).first;
-      expect(answers.keys, unorderedEquals(playerSquad.runners.keys));
+      expect(answers.keys, unorderedEquals(playerBots));
     });
 
     test('bots that left stop running', () async {
-      final id = playerSquad.runners.keys.first;
+      await start();
+      await run(squadOf(host, hostBots, tracked: hostPhone));
+      final id = playerBots.first;
       await games.removeMember(host, id);
-      await playerSquad.update(await members());
-      expect(playerSquad.runners.keys, isNot(contains(id)));
+      await squad.update(await members());
+      expect(squad.runners.keys, isNot(contains(id)));
     });
   });
 }

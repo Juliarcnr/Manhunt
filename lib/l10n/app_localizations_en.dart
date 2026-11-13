@@ -403,13 +403,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBotsHint =>
-      'Computer members are assigned as hunters or players right away and walk randomly within 200 m of a real phone: computer players around the first player\'s, computer hunters around the first hunter\'s – without one, around the group\'s first phone. They ping like real phones while the game screen is open there.';
+      'Computer players join the lobby as unassigned; you assign them like everyone else, also with random teams. They all run on your phone (the host\'s) and walk randomly within 500 m of it. They ping like real phones while your game screen is open.';
 
   @override
-  String get settingsBotHunters => 'Computer hunters';
-
-  @override
-  String get settingsBotPlayers => 'Computer players';
+  String get settingsBotCount => 'Computer players';
 
   @override
   String get settingsArea => 'Play area';

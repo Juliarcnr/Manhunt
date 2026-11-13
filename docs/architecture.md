@@ -240,17 +240,21 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
 
 ## Computer-Mitglieder zum Testen (R-BOT-01 … R-BOT-06)
 - Aktiv über `botsEnabledProvider` (`kDebugMode` oder `--dart-define=MANHUNT_BOTS=true`); Anzahl in
-  `GameSettings.botHunters/botPlayers`.
+  `GameSettings.botCount` (ältere Gruppen: `botHunters + botPlayers`).
 - Jedes Computer-Mitglied ist ein eigenes „Gerät“: `FirebaseBotBackend` öffnet pro Slot eine zweite FirebaseApp
   `bot-<n>` (n = 1 … 8) mit eigener anonymer UID und eigener Firestore-Instanz; die UID bleibt pro App-Name erhalten.
   Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
   gehören: Slot-UID ∈ Mitgliederliste.
-- Art steht im Namen (je Art eine eigene Namensliste, z.B. `🤖 Stromius` = Hunter, `🤖 Adelgunde` = Spieler; `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
-  Mensch mit dieser Rolle, sonst erster mitspielende Mensch (Hunter/Spieler – die Spielleitung trackt nicht, R-BOT-07), sonst erste Spielleitung, sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy; Nicht-Zugewiesene zuletzt, weil sie während der Runde nur die Lobby sehen, R-LOBBY-11). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
-  aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
+- Bot erkennbar am Namen (`🤖 ` + eine Liste seltener Namen, `lib/core/bots/bot_plan.dart`). Träger aller Bots ist
+  das Host-Handy (2026-11-13). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der
+  Lobby aus (eingebunden über `BotLobbyKeeper`): der Host fügt hinzu/entfernt (Bot entfernt sich selbst), andere
+  Handys entfernen eigene Bots. Bots treten als `unassigned` bei; Rollen setzt nur der Host per Hand oder Würfel –
+  nie automatisch. Rollenänderungen schreiben nur die geänderten Mitglieder (`changedRoles`), damit ein gerade
+  ausgetretener Bot nicht den ganzen Batch scheitern lässt.
 - Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
   `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:
-  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 200 m) um `engine.position` des Handys. Bot-Logs gehen per
+  `BotLocationService` = `BotWalk` (Zufallsweg ≤ 500 m) um `engine.position` des Host-Handys; trackt es nicht
+  (Spielleitung, gefangen), fragt `BotSquad.hostPosition` alle 15 s `LocationService.currentFix` ab. Bot-Logs gehen per
   `RoundEngine.onLog` → `note` ins Debug-Log des Handys.
 - Grenze: Verlässt das Träger-Handy die Gruppe oder ist offline, bleiben seine Bots als verwaiste Mitglieder stehen;
   der Host kann sie wie jedes Mitglied entfernen.
