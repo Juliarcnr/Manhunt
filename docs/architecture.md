@@ -54,6 +54,12 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
   Benachrichtigungen können lokal ausgelöst werden.
 - **Neu beitreten erlaubt**: Auch in ein laufendes Spiel (verlorenes Handy, R-LOBBY-07) – neue anonyme ID,
   Host teilt die Rolle neu zu.
+- **Nicht zugewiesen = spielt nicht mit** (R-LOBBY-11): `SessionGate` zeigt bei `running` allen mit Rolle
+  `unassigned` die `LobbyScreen` statt des `GameScreen` (wartet dafür auf die Mitgliederliste, damit nie Tracking
+  startet). Die Lobby ist dann nur lesbar (Spielfeld nicht änderbar). `StartCheck` sperrt nur, wenn der Host selbst
+  nicht zugewiesen ist (R-LOBBY-13). Rollen ändert der Host per Drag & Drop (`LongPressDraggable`/`DragTarget`) oder
+  Rollenmenü, beides über `setRole`; Würfeln: `assignRandomRoles` (30/70, `hunterCountFor`). `hunterCount` gibt es
+  nicht mehr; `GameSettings.toJson` schreibt für ältere App-Versionen weiter `hunterCount: 1`. Keine Regeländerung.
 - **Mehrere Gruppen** (R-GROUPS-01 … 04): `SessionStore` hält eine `GroupList` (core/groups, max. 5) und den Code
   der offenen Gruppe; `null` = Übersicht. Dieselbe anonyme UID ist Mitglied in allen Gruppen. Es ist immer nur
   **eine** Gruppe offen (Schlüssel abgeleitet, Listener, Tracking); die Übersicht liest den Status der anderen per
@@ -64,8 +70,8 @@ config/maptiler.json      MapTiler-Key (nicht im Git; Vorlage: maptiler.example.
 ## Firestore-Modell
 | Pfad | Inhalt | verschlüsselt | Stand |
 |---|---|---|---|
-| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), confirmedAt (Bestätigung nach Zeitablauf, R-GAME-11), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
-| `games/{groupId}/members/{uid}` | `name`, role, caught, jokerUsed, joinedAt | Name | ✔ |
+| `games/{groupId}` | adminUid, status, `name` (optional), `settings`, `area`, sharedPings + durationSec + hunterJokers (Klartext-Kopien aus den Einstellungen für die Regeln, R-SET-15, R-GAME-06, R-SET-09), `aliases` (anonyme Spielernummern der Runde, R-ANON-01), startAt, finishedAt (Hunter-Sieg, R-GAME-08), confirmedAt (Bestätigung nach Zeitablauf, R-GAME-11), createdAt, expiresAt | name, settings, aliases; area separat (von allen Mitgliedern in der Lobby änderbar) | ✔ |
+| `games/{groupId}/members/{uid}` | `name`, role, caught, jokersUsed + jokerAt (Hunter-Joker, Zähler; `jokerUsed` nur noch für ältere App-Versionen), playerJokerUsed + playerJokerAt, joinedAt | Name | ✔ |
 | `games/{groupId}/pings/{uid}_{slotId}` | uid, kind, slot, createdAt, `data` (LocationFix) – Hunter lesen alle, Spieler nur eigene; mit `sharedPings` zusätzlich alle regulären (Query `kind == regular`); nach Spielende alle (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/hunterLocs/{uid}` | updatedAt, `data` (live, alle 5 s bzw. 15 s laut `games.hunterLiveSec`, R-QUOTA-01) – nur Hunter; Spieler 2 min nach Joker und alle nach Spielende (R-GAME-06) | Standort | ✔ |
 | `games/{groupId}/outsideLocs/{uid}` | updatedAt, `data` (live, alle 5 s) – nur solange der Spieler außerhalb des Spielfelds ist + 60 s (R-OUT-03/04); nur Hunter lesen, nur der Spieler selbst schreibt/löscht | Standort | ✔ |
@@ -88,7 +94,7 @@ Umbenennen nur sich selbst. Deploy: `firebase deploy --only firestore:rules`.
 Übersicht (`history`) und Rundenkarte (`historyMaps`, `RoundMap.build` aus Pings, `hunterSnaps`, `hunterLocs`, Catches,
 Speedhunt-Events) und löscht dann alle Rundendaten (`FirestoreGameRepository.roundCollections`: `pings`, `hunterLocs`,
 `outsideLocs`, `playerLocs`, `events`, `speedhuntTargets`, `jokerRequests`, `jokerAnswers`, `drawings`, `hunterSnaps`),
-setzt caught/jokerUsed zurück und geht in die Lobby. **Abbruch** durch den Host (`endRound`, R-GAME-07): Übersicht,
+setzt caught/jokerUsed/jokersUsed/playerJokerUsed zurück und geht in die Lobby. **Abbruch** durch den Host (`endRound`, R-GAME-07): Übersicht,
 Lobby, dann erst Karte (vorher darf ein Host, der kein Hunter ist, nicht alle Positionen lesen), dann löschen.
 **Bestätigung nach Zeitablauf** (R-GAME-11): `GameClock.decidedAt` ist der Zeitpunkt, ab dem das Ergebnis feststeht –
 `finishedAt` beim Hunter-Sieg, sonst `confirmedAt` (nur ab dem geplanten Ende gültig) oder ohne Bestätigung
@@ -123,7 +129,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Geräte setzen daraus `Speedhunt.endedAt` (`applyCatches` in den Providern) → keine weiteren Pings/⚡-Pings, Banner aus.
 - Catch rückgängig (R-CATCH-04): der Host löscht die Catch-Events des Spielers und setzt `caught` zurück (`undoCatch`) →
   alle Geräte leiten Gefangen-Status, Speedhunt-Ende und Historie wieder aus den verbleibenden Daten ab.
-- Joker: einmal pro Spieler und Spiel; per Einstellung abschaltbar (`jokerEnabled`).
+- Hunter-Joker: 0–5 pro Spieler und Runde (`hunterJokers`, Standard 1; 0 = aus). Die Regeln erlauben nur `jokersUsed + 1 ≤ games.hunterJokers`. Jeder Einsatz bekommt einen eigenen Filter-Chip; ab 2 Jokern zeigt das Auswahl-Sheet „Noch X von Y“.
 - Reguläre Pings: bei `n × pingInterval` nach Start, kein Ping exakt bei Spielende.
 
 ## Umsetzungsstand
@@ -156,6 +162,8 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
       Apps ihn lesen können; `regularPings` lässt ihn aus), Hunter über `hunterLocs`; in der Karte `RoundMap.endPlayers`. Regeländerung (`hunterSnaps`, `historyMaps`, inzwischen 15 s).
 - [x] Bestätigung nach Zeitablauf 2026-11-06 (R-GAME-11): Dialog „Wurde noch jemand gefangen?“ für Hunter und freie
       Spieler, eine Bestätigung reicht, 10-min-Frist; Regeländerung (`confirmedAt`, Nachmelden durch Spieler).
+- [x] Rollen per Drag & Drop 2026-11-13 (R-LOBBY-04 … 06, R-LOBBY-11 … 13, R-SET-07 entfallen): siehe Kernideen
+      „Nicht zugewiesen = spielt nicht mit“; Start-Bestätigung mit Teilnehmerliste.
 - [ ] Phase 7: Feldtest (Android + iOS/TestFlight)
 
 ## Karten-Hinweise
@@ -238,7 +246,7 @@ beim App-Start `checkIn` auf: abgelaufen → alles löschen, sonst Frist verlän
   Dadurch treten Bots normal bei und schreiben mit eigener UID → **keine Regeländerung**. Welche Bots einem Handy
   gehören: Slot-UID ∈ Mitgliederliste.
 - Art steht im Namen (je Art eine eigene Namensliste, z.B. `🤖 Stromius` = Hunter, `🤖 Adelgunde` = Spieler; `lib/core/bots/bot_plan.dart`). „Träger“ einer Art = erster
-  Mensch mit dieser Rolle, sonst erster mitspielende Mensch (Hunter/Spieler – die Spielleitung trackt nicht, R-BOT-07), sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
+  Mensch mit dieser Rolle, sonst erster mitspielende Mensch (Hunter/Spieler – die Spielleitung trackt nicht, R-BOT-07), sonst erste Spielleitung, sonst erster Mensch überhaupt (Bots sind so sofort da, auch mit einem Handy; Nicht-Zugewiesene zuletzt, weil sie während der Runde nur die Lobby sehen, R-LOBBY-11). `botActions` (rein) berechnet, was ein Handy tun muss; `BotLobbySync` führt es in der Lobby
   aus (eingebunden über `BotLobbyKeeper`): Träger fügen hinzu/entfernen (Bot entfernt sich selbst), Host setzt Rollen.
 - Im Spiel startet der `GameScreen` einen `BotSquad`: pro eigenem Bot ein `BotRunner` mit eigenem, unverändertem
   `RoundEngine`, gefüttert aus den Bot-eigenen Streams (Spieler-only-Streams nur als Spieler). Standort:

@@ -154,13 +154,15 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(
-             ['adminUid', 'status', 'name', 'settings', 'area', 'sharedPings', 'durationSec', 'startAt', 'createdAt', 'expiresAt'])
+             ['adminUid', 'status', 'name', 'settings', 'area', 'sharedPings', 'durationSec', 'hunterJokers', 'startAt', 'createdAt', 'expiresAt'])
         // Group name (R-GROUPS-04) is optional and encrypted.
         && request.resource.data.get('name', '') is string
         // "Regular pings to all players" (R-SET-15), plain for the ping rules.
         && request.resource.data.get('sharedPings', false) is bool
         // Plain round duration for roundOver().
         && request.resource.data.get('durationSec', 0) is int
+        // Plain number of hunter jokers per player (R-SET-09).
+        && request.resource.data.get('hunterJokers', 1) is int
         && request.resource.data.adminUid == request.auth.uid
         && request.resource.data.status == 'lobby'
         && request.resource.data.settings is string
@@ -171,6 +173,7 @@ service cloud.firestore {
           && request.resource.data.status in ['lobby', 'running']
           && request.resource.data.get('name', '') is string
           && request.resource.data.get('sharedPings', false) is bool
+          && request.resource.data.get('hunterJokers', 1) is int
           // The confirmation after the time is up only like everyone else
           // (below, R-GAME-11); the host may only clear it.
           && (request.resource.data.get('confirmedAt', null) == resource.data.get('confirmedAt', null)
@@ -230,13 +233,14 @@ service cloud.firestore {
 
         // Host: roles + reset of caught/joker at round end. Self: own name.
         allow update: if
-          (isAdmin(gid) && onlyChanges(['role', 'caught', 'jokerUsed', 'playerJokerUsed'])
+          (isAdmin(gid) && onlyChanges(['role', 'caught', 'jokerUsed', 'jokersUsed', 'playerJokerUsed'])
             && request.resource.data.role in ['unassigned', 'hunter', 'player', 'gameMaster'])
           || (signedIn() && request.auth.uid == uid && onlyChanges(['name']))
           // Automatic end (R-GAME-10): any member resets like the host.
-          || (canAutoEnd(gid) && onlyChanges(['caught', 'jokerUsed', 'playerJokerUsed'])
+          || (canAutoEnd(gid) && onlyChanges(['caught', 'jokerUsed', 'jokersUsed', 'playerJokerUsed'])
             && request.resource.data.caught == false
             && request.resource.data.jokerUsed == false
+            && request.resource.data.get('jokersUsed', 0) == 0
             && request.resource.data.get('playerJokerUsed', false) == false)
           // Catch (R-CATCH-01): a hunter marks a player, or the player themself.
           || (isRunning(gid) && onlyChanges(['caught'])
@@ -251,10 +255,19 @@ service cloud.firestore {
             && request.resource.data.caught == true
             && confirmsTimeUp(gid)
             && getAfter(gamePath(gid)).data.get('confirmedAt', null) == request.time)
-          // Joker (R-PLAY-02): once per round, timestamped by the server.
+          // Hunter joker (R-PLAY-02): as often per round as the settings allow
+          // (R-SET-09), one at a time, timestamped by the server.
+          || (isRunning(gid) && signedIn() && request.auth.uid == uid
+            && onlyChanges(['jokersUsed', 'jokerAt'])
+            && resource.data.role == 'player'
+            && request.resource.data.jokersUsed == resource.data.get('jokersUsed', 0) + 1
+            && request.resource.data.jokersUsed <= game(gid).get('hunterJokers', 1)
+            && request.resource.data.jokerAt == request.time)
+          // Same for app versions before R-SET-09 allowed several: once.
           || (isRunning(gid) && signedIn() && request.auth.uid == uid
             && onlyChanges(['jokerUsed', 'jokerAt'])
             && resource.data.role == 'player'
+            && game(gid).get('hunterJokers', 1) >= 1
             && resource.data.jokerUsed == false
             && request.resource.data.jokerUsed == true
             && request.resource.data.jokerAt == request.time)

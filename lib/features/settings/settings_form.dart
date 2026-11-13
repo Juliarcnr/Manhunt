@@ -76,13 +76,17 @@ class SettingsForm extends StatelessWidget {
     }
 
     Widget count({
+      Key? key,
       required String label,
+      String? hint,
       required int value,
       required int min,
       required int max,
       required GameSettings Function(int) apply,
     }) => StepperTile(
+      key: key,
       label: label,
+      hint: hint,
       valueText: '$value',
       canDecrease: value > min,
       canIncrease: value < max,
@@ -242,25 +246,15 @@ class SettingsForm extends StatelessWidget {
         SectionCard(
           title: l10n.settingsSectionTeams,
           children: [
+            // No hunter count: the roles are set in the lobby (R-LOBBY-04).
             count(
-              label: l10n.settingsHunterCount,
-              value: s.hunterCount,
-              min: 1,
-              max: 14,
-              apply: (v) => s.copyWith(hunterCount: v),
-            ),
-            SwitchListTile(
-              key: const Key('jokerSwitch'),
-              contentPadding: const EdgeInsets.only(right: 8),
-              title: Text(l10n.settingsJoker),
-              subtitle: Text(
-                l10n.settingsJokerHint,
-                style: const TextStyle(color: AppColors.textMuted),
-              ),
-              value: s.jokerEnabled,
-              onChanged: readOnly
-                  ? null
-                  : (v) => change(s.copyWith(jokerEnabled: v)),
+              key: const Key('hunterJokersStepper'),
+              label: l10n.settingsJoker,
+              hint: l10n.settingsJokerHint,
+              value: s.hunterJokers,
+              min: 0,
+              max: GameSettings.maxHunterJokers,
+              apply: (v) => s.copyWith(hunterJokers: v),
             ),
             SwitchListTile(
               key: const Key('playerJokerSwitch'),
@@ -387,8 +381,6 @@ String settingsErrorText(AppLocalizations l10n, SettingsError e) => switch (e) {
   SettingsError.speedhuntPingsInvalid ||
   SettingsError.speedhuntIntervalTooShort ||
   SettingsError.speedhuntRepeatCooldownTooShort => l10n.errorSpeedhuntInvalid,
-  SettingsError.hunterCountInvalid => l10n.errorHunterCountInvalid,
-  SettingsError.notEnoughPlayers => l10n.errorNotEnoughPlayers,
   SettingsError.areaMissing => l10n.errorAreaMissing,
 };
 

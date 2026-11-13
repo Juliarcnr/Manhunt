@@ -9,10 +9,11 @@ Ziel: so wenig Daten wie möglich (R-PRIV-01 … R-PRIV-05). **Jede Änderung an
 | Gruppen-ID (aus Code abgeleitet) | Firestore | ja, aber ohne Rückschluss auf den Code | mit Gruppe |
 | Anzeigename (in der Lobby änderbar, R-LOBBY-10) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Gruppenname (R-GROUPS-04) | Firestore | nein (verschlüsselt) | mit Gruppe |
-| Rolle, gefangen, Joker benutzt | Firestore | ja (nötig für Regeln) | Rolle mit Gruppe; gefangen/Joker bei Rundenende zurückgesetzt |
+| Rolle, gefangen, Joker benutzt (Hunter-Joker: Anzahl `jokersUsed`, R-SET-09) | Firestore | ja (nötig für Regeln) | Rolle mit Gruppe; gefangen/Joker bei Rundenende zurückgesetzt |
 | Spielfeld & Einstellungen (inkl. optionaler Startzeit, R-SET-21) | Firestore | nein (verschlüsselt) | mit Gruppe |
 | Anonyme Spielernummern der Runde (R-ANON-01): Zuordnung UID → „Spieler n“ | Firestore `games/{id}.aliases` | nein (verschlüsselt) | beim Beenden der Runde |
 | Schalter „Reguläre Pings an alle Spieler“ (R-SET-15) | Firestore `games/{id}.sharedPings` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; verrät nur die Spielvariante) | mit Gruppe |
+| Anzahl der Hunter-Joker pro Spieler (R-SET-09) | Firestore `games/{id}.hunterJokers` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig für die Sicherheitsregeln; nur eine Zahl 0–5) | mit Gruppe |
 | Takt der Hunter-Live-Standorte der Runde, 5 oder 15 s; daraus abgeleitet der Takt der Live-Ansicht für Spielleitung und Gefangene, 15 oder 30 s (R-QUOTA-01) | Firestore `games/{id}.hunterLiveSec` | ja (nur eine Zahl, verrät nur, dass die Runde groß ist) | bleibt bis zum nächsten Start, mit Gruppe |
 | Spieldauer (R-GAME-06) | Firestore `games/{id}.durationSec` | ja (Klartext-Kopie aus den verschlüsselten Einstellungen, nötig, damit die Sicherheitsregeln das Spielende kennen; verrät nur die Spieldauer) | mit Gruppe |
 | Zeitpunkt „Hunter haben gewonnen“ (R-GAME-08) | Firestore `games/{id}.finishedAt` | ja (nur ein Zeitpunkt, kein Name) | beim Beenden der Runde |
@@ -75,10 +76,11 @@ Ob man das Spielfeld verlassen hat, prüft nur das eigene Handy (R-OUT-01). Die 
 nach 30 s eindeutig draußen geht ein Live-Standort an die Hunter (R-OUT-03), und das zeigt die App dem Spieler die
 ganze Zeit über an (R-OUT-06).
 
-Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt des Jokers bzw. die Kennung der Spieler-Joker-Anfrage) werden nur
+Joker-Ergebnisse (Hunter-Standorte vom Zeitpunkt jedes eingesetzten Hunter-Jokers bzw. die Kennung der Spieler-Joker-Anfrage) werden nur
 **auf dem eigenen Gerät** im Schlüsselspeicher des Betriebssystems abgelegt, damit man sie in der laufenden Runde
 wieder einblenden kann (R-PLAY-04). Sie gehören zu genau einer Runde, werden in der nächsten Runde nicht mehr
-angezeigt und beim nächsten Joker überschrieben; sie verlassen das Gerät nicht.
+angezeigt; sie verlassen das Gerät nicht. Mehrere Hunter-Joker einer Runde (R-SET-09) werden nebeneinander
+gespeichert.
 
 Dass ein gefangener Spieler die Warnung zur Live-Ansicht bestätigt hat (R-GM-08), merkt sich nur das eigene Gerät
 (Schlüsselspeicher, pro Runde, zusammen mit den Joker-Ergebnissen).

@@ -2,59 +2,30 @@ import 'dart:math';
 
 import '../models/member.dart';
 
-/// Randomly assigns exactly [hunterCount] hunters, everyone else becomes a player (R-LOBBY-04).
-/// Game masters keep their role and do not count (R-GM-02).
-List<Member> assignRandomRoles(
-  List<Member> members,
-  int hunterCount, {
-  Random? random,
-}) {
-  final playing = members.where((m) => !m.isGameMaster).toList();
-  if (hunterCount < 0 || hunterCount > playing.length) {
-    throw ArgumentError.value(hunterCount, 'hunterCount');
-  }
-  final shuffled = playing..shuffle(random ?? Random.secure());
-  final hunterIds = {for (final m in shuffled.take(hunterCount)) m.id};
+/// Share of hunters when rolling the roles (R-LOBBY-04).
+const hunterShare = 0.3;
+
+/// How many of [count] people become hunters: 30 % (rounded), but at least
+/// one hunter and at least one player (R-LOBBY-04).
+int hunterCountFor(int count) {
+  if (count < 2) throw ArgumentError.value(count, 'count');
+  return (count * hunterShare).round().clamp(1, count - 1);
+}
+
+/// Rolls everybody in [members] anew – whatever their role, also game masters
+/// and unassigned members – into hunters and players, 30/70 (R-LOBBY-04).
+List<Member> assignRandomRoles(List<Member> members, {Random? random}) {
+  final hunters = hunterCountFor(members.length);
+  final shuffled = [...members]..shuffle(random ?? Random.secure());
+  final hunterIds = {for (final m in shuffled.take(hunters)) m.id};
   return [
     for (final m in members)
-      if (m.isGameMaster)
-        m
-      else
-        m.copyWith(role: hunterIds.contains(m.id) ? Role.hunter : Role.player),
+      m.copyWith(role: hunterIds.contains(m.id) ? Role.hunter : Role.player),
   ];
 }
 
-/// Swaps the roles of two members (R-LOBBY-05).
-List<Member> swapRoles(List<Member> members, String idA, String idB) {
-  final a = members.firstWhere((m) => m.id == idA);
-  final b = members.firstWhere((m) => m.id == idB);
-  return [
-    for (final m in members)
-      if (m.id == idA)
-        m.copyWith(role: b.role)
-      else if (m.id == idB)
-        m.copyWith(role: a.role)
-      else
-        m,
-  ];
-}
-
-/// Flips a single member between hunter and player; a game master becomes a
-/// player again (R-GM-02).
-List<Member> toggleRole(List<Member> members, String id) => [
-  for (final m in members)
-    if (m.id == id)
-      m.copyWith(
-        role: switch (m.role) {
-          Role.hunter || Role.gameMaster => Role.player,
-          Role.player || Role.unassigned => Role.hunter,
-        },
-      )
-    else
-      m,
-];
-
-/// Gives one member [role], e.g. makes them game master (R-GM-02).
+/// Gives one member [role]: drag and drop, the role menu and the button back
+/// to "unassigned" (R-LOBBY-05, R-LOBBY-12, R-GM-02).
 List<Member> setRole(List<Member> members, String id, Role role) => [
   for (final m in members)
     if (m.id == id) m.copyWith(role: role) else m,

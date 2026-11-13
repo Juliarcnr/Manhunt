@@ -34,9 +34,9 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-SET-04 | Einstellbar: Abstand der regulären Pings (Standard: 20 min). |
 | R-SET-05 | Einstellbar: Anzahl Speedhunts (Standard: 2), Pings pro Speedhunt (Standard: 3), Abstand der Speedhunt-Pings (Standard: 5 min). |
 | R-SET-06 | Einstellbar: Spielgebiet über einen Karten-Editor auf OpenStreetMap-Basis (Polygon zeichnen, ähnlich Google My Maps): Punkte setzen, verschieben, einfügen, löschen, rückgängig; Anzeige von Fläche und Ausdehnung; sich überkreuzende Ränder werden verhindert. |
-| R-SET-07 | Einstellbar: Anzahl Hunter; die Anzahl Spieler ergibt sich aus dem Rest. |
+| R-SET-07 | ~~Einstellbar: Anzahl Hunter.~~ Entfallen am 2026-11-13: Die Rollen werden in der Lobby eingeteilt (R-LOBBY-04, R-LOBBY-05). |
 | R-SET-08 | Alle Einstellungen sind nach der Gruppenerstellung weiterhin bearbeitbar. |
-| R-SET-09 | Einstellbar: ob es den Joker „Hunter-Standorte“ gibt (Standard: ja). |
+| R-SET-09 | Einstellbar: wie oft jeder Spieler den Joker „Hunter-Standorte“ pro Runde einsetzen darf, 0–5 (Standard: 1; 0 = kein solcher Joker). Ab 2 zeigt das Joker-Auswahlfenster neben dem Hunter-Joker „Noch X von Y“, und der Bestätigungsdialog nennt, wie viele danach übrig sind; bei 1 bleibt die Anzeige wie bisher. (Anzahl seit 2026-11-13) |
 | R-SET-10 | Das Spielfeld kann von allen Mitgliedern der Gruppe eingezeichnet und bearbeitet werden (nur in der Lobby, nicht während einer laufenden Runde). Alle anderen Einstellungen ändert nur der Host. |
 | R-SET-11 | Einstellbar: ab wann (Minuten nach Spielstart) der erste Speedhunt erlaubt ist (Standard: 60 min). |
 | R-SET-12 | Einstellbar: ob es den Joker „Spieler-Standorte“ gibt (Standard: ja). Der Joker „Hunter-Standorte“ ist über R-SET-09 einzeln abschaltbar. |
@@ -57,14 +57,17 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | R-LOBBY-01 | Keine Konten, keine E-Mail-Adressen. App installieren → mit Code einer Gruppe beitreten. |
 | R-LOBBY-02 | Beim Erstellen einer Gruppe wird ein Beitrittscode erzeugt, den andere eingeben. |
 | R-LOBBY-03 | Teilnehmende treten nach und nach per Code bei und geben einen Anzeigenamen an. |
-| R-LOBBY-04 | Ein Zufallsgenerator teilt alle Teilnehmenden gemäß Hunter-Anzahl in Hunter und Spieler ein. |
-| R-LOBBY-05 | Nach der Einteilung können Personen getauscht werden (Hunter ↔ Spieler). |
-| R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle – zuerst mit dem Start-Countdown (R-START-01 … 05). |
+| R-LOBBY-04 | „Zufällig einteilen“ (Würfel) teilt **alle** Menschen neu ein – egal, ob sie gerade nicht zugewiesen, Spieler, Hunter oder Spielleitung sind –, im Verhältnis 30 % Hunter zu 70 % Spieler (gerundet, mindestens ein Hunter und ein Spieler). Computer-Mitglieder behalten ihre Rolle. (2026-11-13) |
+| R-LOBBY-05 | Die Lobby hat vier Abschnitte: Nicht zugewiesen, Spieler:innen, Hunter:innen, Spielleitung (für den Host immer alle sichtbar). Der Host verschiebt Personen per Drag & Drop (lange drücken, ziehen) zwischen den Abschnitten; ein Hinweis darüber erklärt das. Alternativ öffnet Antippen einer Person ein Menü mit den vier Rollen. Computer-Mitglieder lassen sich nicht verschieben. (2026-11-13) |
+| R-LOBBY-06 | Mit „Start“ beginnt das Spiel für alle – zuerst mit dem Start-Countdown (R-START-01 … 05). Vorher zeigt ein Dialog dem Host, wer als Spieler:in, Hunter:in und Spielleitung teilnimmt und wer nicht mitspielt; erst „Spiel starten“ darin startet die Runde. (Bestätigung seit 2026-11-13) |
 | R-LOBBY-07 | Geht ein Handy verloren, tritt man der Gruppe einfach neu bei (keine Wiederherstellung nötig). |
 | R-LOBBY-08 | Eine Gruppe bleibt über mehrere Runden bestehen (gleicher Code, gleiche Mitglieder, gleiche Einstellungen). Nach einer Runde geht es zurück in die Lobby; „gefangen“ und Joker werden zurückgesetzt, Rollen bleiben und können neu eingeteilt werden. |
 | R-PERM-01 | Direkt beim Öffnen der App fragt sie nach Standort- und Benachrichtigungs-Berechtigung – nicht erst in der Lobby oder beim Spielstart. So lässt sich alles vor dem Spiel einstellen (iOS zeigt „Standort“ in den App-Einstellungen erst nach der ersten Anfrage). |
 | R-LOBBY-09 | Der Host kann Mitglieder in der Lobby aus der Gruppe entfernen (Symbol neben der Person, mit Rückfrage). Während einer Runde nicht mehr – dort gibt es stattdessen „Catch rückgängig“ (R-CATCH-04, geändert am 2026-10-10). Die entfernte Person sieht „Du wurdest vom Host aus der Gruppe entfernt“ und kann mit dem Code wieder beitreten. |
 | R-LOBBY-10 | Jede Person kann ihren eigenen Anzeigenamen in der Lobby nachträglich ändern (Stift-Symbol neben dem eigenen Namen). Der Name bleibt verschlüsselt gespeichert. Der Stift kennzeichnet zugleich den eigenen Eintrag; ein zusätzliches „Du“ gibt es in der Lobby nicht (2026-11-06). |
+| R-LOBBY-11 | Wer neu beitritt, steht unter „Nicht zugewiesen“. Alle dort spielen nicht mit; das steht für alle sichtbar im Abschnitt. Läuft eine Runde, sehen sie die normale Lobby, als liefe kein Spiel (kein Tracking, nichts änderbar), und spielen ab der nächsten Runde wieder mit, wenn der Host sie einteilt. (2026-11-13) |
+| R-LOBBY-12 | Neben jeder zugewiesenen Person hat der Host einen Knopf „Nicht mitspielen lassen“, der sie zurück unter „Nicht zugewiesen“ schiebt (nicht für sich selbst, nicht für Computer-Mitglieder). (2026-11-13) |
+| R-LOBBY-13 | Der Host muss eine Rolle haben, weil nur er die Runde steuert (beenden, Catch rückgängig): Steht er unter „Nicht zugewiesen“, ist „Start“ gesperrt, mit dem Hinweis, sich zur Spielleitung zu ziehen, wenn er nicht mitspielt. (2026-11-13) |
 
 ### Start-Countdown (2026-11-01)
 
@@ -153,9 +156,9 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | ID | Anforderung |
 |---|---|
 | R-PLAY-01 | Eigene Standort-Historie (gesendete Pings) kann angezeigt werden. |
-| R-PLAY-02 | Joker „Hunter-Standorte“: einmal pro Spieler und Runde die aktuellen Hunter-Standorte abfragen, angezeigt als Pins wie bei R-HUNT-02, aber mit Uhrzeit der Position („Alex · 14:32“) (nur wenn R-SET-09 aktiv). |
+| R-PLAY-02 | Joker „Hunter-Standorte“: pro Joker (Anzahl laut R-SET-09) einmal die aktuellen Hunter-Standorte abfragen, angezeigt als Pins wie bei R-HUNT-02, aber mit Uhrzeit der Position („Alex · 14:32“) (nur wenn R-SET-09 aktiv). |
 | R-PLAY-03 | Joker „Spieler-Standorte“: einmal pro Spieler und Runde die aktuellen Standorte aller anderen (nicht gefangenen) Spieler abfragen, angezeigt als Pins, jeder Spieler in eigener Farbe, klar unterscheidbar vom Hunter-Orange-Rot (nur wenn R-SET-12 aktiv). Die anderen Handys antworten automatisch; nur der fragende Spieler sieht die Antworten, Hunter nie. Nicht zusammen mit R-SET-15. |
-| R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter einheitlich im Hunter-Orange-Rot, Spieler in ihren Spielerfarben). Dazu ein Filter-Button je Joker: nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
+| R-PLAY-04 | Joker-Ergebnisse werden als farbige Pins mit Uhrzeit angezeigt (Hunter einheitlich im Hunter-Orange-Rot, Spieler in ihren Spielerfarben). Dazu ein Filter-Button je eingesetztem Joker (bei mehreren Hunter-Jokern einer pro Einsatz): nach dem Einlösen automatisch an, aus- und jederzeit wieder einschaltbar (zeigt dann wieder die Standorte von damals mit Uhrzeit). |
 | R-PLAY-05 | Mit R-SET-15 haben Spieler den Chip „Letzte Spieler-Pings“: jeweils nur den letzten regulären Ping jedes anderen Spielers (eigene unter „Meine Pings“), keine Historie, keine Speedhunt-Pings. Gefangene Spieler grau, bis es neuere reguläre Pings gibt – dann verschwindet ihr Pin. Neue Pings schalten den Chip wieder ein (wie R-HUNT-08). (2026-10-08) |
 
 ## 6a. Anonyme Spieler
@@ -192,7 +195,7 @@ Die Hunter versuchen, bis Spielende alle Spieler zu fangen. Vorbild ist die YouT
 | ID | Anforderung |
 |---|---|
 | R-GM-01 | Optionale Rolle **Spielleitung**: 0 bis beliebig viele Mitglieder (auch der Host). Die Spielleitung spielt nicht mit: kein Tracking, keine Pings, keine Catches, Speedhunts, Joker oder Zeichnungen; für den Start zählt sie weder als Hunter noch als Spieler. |
-| R-GM-02 | Der Host vergibt sie in der Lobby: eigener Abschnitt „Spielleitung“ unter den Spielern (für den Host immer sichtbar, mit Hinweis und Knopf „Spielleitung hinzufügen“ → Auswahl eines Mitglieds; für andere nur, wenn besetzt). Tippen auf eine Person der Spielleitung macht sie wieder zum Spieler. „Zufällig einteilen“ lässt die Spielleitung aus und zählt sie nicht mit. Computer-Mitglieder werden nie Spielleitung. |
+| R-GM-02 | Der Host vergibt sie in der Lobby: eigener Abschnitt „Spielleitung“ (für den Host immer sichtbar, mit Hinweis; für andere nur, wenn besetzt). Personen kommen per Drag & Drop oder Rollenmenü hinein und heraus (R-LOBBY-05); einen eigenen Knopf „Spielleitung hinzufügen“ gibt es nicht mehr. „Zufällig einteilen“ würfelt auch die Spielleitung neu (R-LOBBY-04). Computer-Mitglieder werden nie Spielleitung. (geändert 2026-11-13) |
 | R-GM-03 | Die Spielleitung sieht während Vorlauf und Jagd alle Hunter und alle noch nicht gefangenen Spieler live, mit echten Namen (keine anonymen Nummern, R-ANON-01). Hinweiszeile „Spielleitung – du siehst alle live (alle 15 s)“ (in gedrosselten Runden 30 s, R-QUOTA-01) nur 15 s lang, sobald die Live-Ansicht beginnt (Spielstart bzw. Öffnen der App); danach steht es in der Übersicht (R-GM-11). (2026-11-01) |
 | R-GM-04 | Filter-Chips der Spielleitung: „Hunter“, „Letzte Pings“ (letzte reguläre Pings der Spieler an die Hunter), je ein Chip pro nicht gefangenem Spieler für dessen Live-Standort (in der Spielerfarbe, an = sichtbar), „Gefangen“ (Ping-Historie und ⚡-Pings der Gefangenen wie bei den Huntern, R-HUNT-09). Dazu die Speedhunt-Chips wie bei den Huntern (R-GM-10). Keine Zeichnungen der Hunter, kein Zeichenmodus-Knopf, keine Außerhalb-Standorte. |
 | R-GM-05 | Live-Standorte für Spielleitung und Gefangene werden **alle 15 s** aktualisiert (in großen Runden alle 30 s, R-QUOTA-01; 2026-11-10) (öfter würde das kostenlose Firebase-Kontingent gefährden). Spieler senden ihren Live-Standort nur, solange es eine Spielleitung oder einen gefangenen Spieler gibt; die Hunter-Standorte fragen Spielleitung und Gefangene im selben Takt ab. |

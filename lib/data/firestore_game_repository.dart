@@ -16,8 +16,8 @@ import '../core/schedule/start_time.dart';
 import 'game_repository.dart';
 
 /// Firestore layout (see docs/architecture.md):
-/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), sharedPings + durationSec (plain, for the rules), aliases (encrypted, per round), startAt, finishedAt (per round), createdAt, expiresAt
-/// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed, joinedAt
+/// - `games/{groupId}`: adminUid, status, name (encrypted), settings + area (encrypted, separate), sharedPings + durationSec + hunterJokers (plain, for the rules), aliases (encrypted, per round), startAt, finishedAt (per round), createdAt, expiresAt
+/// - `games/{groupId}/members/{uid}`: name (encrypted), role, caught, jokerUsed (legacy), jokersUsed + jokerAt, playerJokerUsed + playerJokerAt, joinedAt
 /// - `games/{groupId}/{pings,hunterLocs,hunterSnaps,outsideLocs,playerLocs,events,speedhuntTargets,jokerRequests,jokerAnswers,drawings}/…`: per-round data, deleted when the round ends
 /// - `games/{groupId}/history/{id}`: endedAt, data (encrypted RoundSummary, no locations)
 /// - `games/{groupId}/historyMaps/{id}`: endedAt, data (encrypted RoundMap, same id as its history entry)
@@ -192,7 +192,10 @@ class FirestoreGameRepository implements GameRepository {
       name: await session.crypto.decryptJson(data['name'] as String) as String,
       role: Role.values.byName(data['role'] as String),
       caught: data['caught'] as bool? ?? false,
-      jokerUsed: data['jokerUsed'] as bool? ?? false,
+      // `jokerUsed` (bool) is what older app versions write.
+      jokersUsed:
+          data['jokersUsed'] as int? ??
+          (data['jokerUsed'] as bool? ?? false ? 1 : 0),
       playerJokerUsed: data['playerJokerUsed'] as bool? ?? false,
     );
   }
@@ -201,7 +204,8 @@ class FirestoreGameRepository implements GameRepository {
   /// member may edit it (R-SET-10) while the rest stays host-only.
   /// `sharedPings` is also kept in plain text: the security rules need it to
   /// let players read the regular pings (R-SET-15). So is `durationSec`: once
-  /// the time is up, players may read all positions too (R-GAME-06).
+  /// the time is up, players may read all positions too (R-GAME-06). And
+  /// `hunterJokers`: how often a player may use the hunter joker (R-SET-09).
   Future<Map<String, Object?>> _encodeSettings(
     GroupSession session,
     GameSettings settings, {
@@ -212,6 +216,7 @@ class FirestoreGameRepository implements GameRepository {
     ),
     'sharedPings': settings.sharedPings,
     'durationSec': settings.duration.inSeconds,
+    'hunterJokers': settings.hunterJokers,
     if (withArea) 'area': await _encodeArea(session, settings.area),
   };
 
@@ -437,6 +442,7 @@ class FirestoreGameRepository implements GameRepository {
       batch.update(doc.reference, {
         'caught': false,
         'jokerUsed': false,
+        'jokersUsed': 0,
         'playerJokerUsed': false,
       });
     }

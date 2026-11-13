@@ -233,8 +233,44 @@ abstract class AppLocalizations {
   /// No description provided for @roleUnassigned.
   ///
   /// In en, this message translates to:
-  /// **'Not assigned yet'**
+  /// **'Not assigned'**
   String get roleUnassigned;
+
+  /// No description provided for @lobbyUnassignedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone here does not play.'**
+  String get lobbyUnassignedHint;
+
+  /// No description provided for @lobbyUnassign.
+  ///
+  /// In en, this message translates to:
+  /// **'Sit out'**
+  String get lobbyUnassign;
+
+  /// No description provided for @lobbyRoleMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Role of {name}'**
+  String lobbyRoleMenuTitle(String name);
+
+  /// No description provided for @lobbyDragHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold a person and drag them to another section to change their role – or tap them.'**
+  String get lobbyDragHint;
+
+  /// No description provided for @lobbyStartConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Who is playing?'**
+  String get lobbyStartConfirmTitle;
+
+  /// No description provided for @lobbyStartConfirmSitOut.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 person does not play} other{{count} people do not play}}'**
+  String lobbyStartConfirmSitOut(int count);
 
   /// No description provided for @overviewYouAreGameMaster.
   ///
@@ -257,26 +293,8 @@ abstract class AppLocalizations {
   /// No description provided for @lobbyGameMasterHint.
   ///
   /// In en, this message translates to:
-  /// **'Optional – doesn\'t play and sees all hunters and players live. Not included when assigning randomly.'**
+  /// **'Does not play and sees all hunters and players live.'**
   String get lobbyGameMasterHint;
-
-  /// No description provided for @lobbyAddGameMaster.
-  ///
-  /// In en, this message translates to:
-  /// **'Add game master'**
-  String get lobbyAddGameMaster;
-
-  /// No description provided for @lobbyPickGameMaster.
-  ///
-  /// In en, this message translates to:
-  /// **'Who will be game master?'**
-  String get lobbyPickGameMaster;
-
-  /// No description provided for @lobbyNobodyToPick.
-  ///
-  /// In en, this message translates to:
-  /// **'Everyone is game master already.'**
-  String get lobbyNobodyToPick;
 
   /// No description provided for @gameMasterInfo.
   ///
@@ -686,12 +704,6 @@ abstract class AppLocalizations {
   /// **'The pause for the same player cannot be shorter than the pause between speedhunts. Shorten that one first.'**
   String get settingsSpeedhuntRepeatCooldownMin;
 
-  /// No description provided for @settingsHunterCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Number of hunters'**
-  String get settingsHunterCount;
-
   /// No description provided for @settingsJoker.
   ///
   /// In en, this message translates to:
@@ -701,7 +713,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsJokerHint.
   ///
   /// In en, this message translates to:
-  /// **'Each player may see where the hunters are once.'**
+  /// **'How often each player may see where the hunters are (0 = off).'**
   String get settingsJokerHint;
 
   /// No description provided for @settingsPlayerJoker.
@@ -932,11 +944,11 @@ abstract class AppLocalizations {
   /// **'Draw the play area first'**
   String get errorAreaMissing;
 
-  /// No description provided for @errorUnassigned.
+  /// No description provided for @errorHostUnassigned.
   ///
   /// In en, this message translates to:
-  /// **'Everyone needs a role'**
-  String get errorUnassigned;
+  /// **'You are still under “Not assigned”. Drag yourself to game master if you are not playing.'**
+  String get errorHostUnassigned;
 
   /// No description provided for @lobbyTitle.
   ///
@@ -973,12 +985,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Random teams'**
   String get lobbyAssignRandom;
-
-  /// No description provided for @lobbyTapToSwitch.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap a person to switch hunter ↔ player.'**
-  String get lobbyTapToSwitch;
 
   /// No description provided for @lobbyStart.
   ///
@@ -1340,6 +1346,18 @@ abstract class AppLocalizations {
   /// **'See once where the hunters are right now'**
   String get jokerHuntersHint;
 
+  /// No description provided for @jokerHuntersHintMany.
+  ///
+  /// In en, this message translates to:
+  /// **'See where the hunters are right now – once per joker'**
+  String get jokerHuntersHintMany;
+
+  /// No description provided for @jokersLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{left} of {total} left'**
+  String jokersLeft(int left, int total);
+
   /// No description provided for @jokerPlayersOption.
   ///
   /// In en, this message translates to:
@@ -1381,6 +1399,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You will see the hunters\' current positions once. Afterwards the joker is used up.'**
   String get jokerText;
+
+  /// No description provided for @jokerTextMany.
+  ///
+  /// In en, this message translates to:
+  /// **'You will see the hunters\' current positions once. Afterwards you have {left} of {total} hunter jokers left.'**
+  String jokerTextMany(int left, int total);
 
   /// No description provided for @jokerConfirm.
   ///

@@ -5,15 +5,29 @@ import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/teams/team_assignment.dart';
 
 void main() {
-  final members = [
-    for (var i = 0; i < 7; i++) Member(id: 'm$i', name: 'Name $i'),
+  List<Member> people(int n) => [
+    for (var i = 0; i < n; i++) Member(id: 'm$i', name: 'Name $i'),
   ];
 
+  group('hunterCountFor: 30 % hunters, 70 % players (R-LOBBY-04)', () {
+    test('rounded, at least one hunter and one player', () {
+      expect(
+        {for (var n = 2; n <= 12; n++) n: hunterCountFor(n)},
+        {2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 2, 9: 3, 10: 3, 11: 3, 12: 4},
+      );
+    });
+
+    test('needs at least two people', () {
+      expect(() => hunterCountFor(1), throwsArgumentError);
+    });
+  });
+
   group('assignRandomRoles (R-LOBBY-04)', () {
-    test('exactly hunterCount hunters, rest players', () {
-      final result = assignRandomRoles(members, 3, random: Random(1));
+    test('30/70 split, order kept', () {
+      final members = people(10);
+      final result = assignRandomRoles(members, random: Random(1));
       expect(result.where((m) => m.isHunter), hasLength(3));
-      expect(result.where((m) => m.isPlayer), hasLength(4));
+      expect(result.where((m) => m.isPlayer), hasLength(7));
       expect(result.map((m) => m.id), members.map((m) => m.id));
     });
 
@@ -21,67 +35,51 @@ void main() {
       final hunterSets = {
         for (var seed = 0; seed < 20; seed++)
           assignRandomRoles(
-            members,
-            3,
+            people(7),
             random: Random(seed),
           ).where((m) => m.isHunter).map((m) => m.id).join(','),
       };
       expect(hunterSets.length, greaterThan(1));
     });
 
-    test('rejects invalid count', () {
-      expect(() => assignRandomRoles(members, 8), throwsArgumentError);
-    });
-  });
-
-  group('swap / toggle (R-LOBBY-05)', () {
-    final assigned = [
-      const Member(id: 'a', name: 'A', role: Role.hunter),
-      const Member(id: 'b', name: 'B', role: Role.player),
-      const Member(id: 'c', name: 'C', role: Role.player),
-    ];
-
-    test('swapRoles exchanges roles', () {
-      final r = swapRoles(assigned, 'a', 'b');
-      expect(r[0].role, Role.player);
-      expect(r[1].role, Role.hunter);
-      expect(r[2].role, Role.player);
-    });
-
-    test('toggleRole flips one member', () {
-      expect(toggleRole(assigned, 'c')[2].role, Role.hunter);
-      expect(toggleRole(assigned, 'a')[0].role, Role.player);
-    });
-  });
-
-  group('game master (R-GM-02)', () {
-    final withMaster = [
-      ...members,
-      const Member(id: 'gm', name: 'GM', role: Role.gameMaster),
-    ];
-
-    test('random assignment keeps game masters and skips them', () {
+    test('rolls everybody anew, whatever their role – also game masters '
+        'and unassigned members (R-LOBBY-04, R-GM-02)', () {
+      final mixed = [
+        const Member(id: 'u', name: 'U'),
+        const Member(id: 'g', name: 'G', role: Role.gameMaster),
+        const Member(id: 'h', name: 'H', role: Role.hunter),
+        const Member(id: 'p', name: 'P', role: Role.player),
+        const Member(id: 'q', name: 'Q', role: Role.player),
+      ];
       for (var seed = 0; seed < 20; seed++) {
-        final r = assignRandomRoles(withMaster, 3, random: Random(seed));
-        expect(r.last.role, Role.gameMaster);
-        expect(r.where((m) => m.isHunter), hasLength(3));
-        expect(r.where((m) => m.isPlayer), hasLength(4));
-        expect(r.map((m) => m.id), withMaster.map((m) => m.id));
+        final r = assignRandomRoles(mixed, random: Random(seed));
+        expect(r.where((m) => m.isHunter), hasLength(2));
+        expect(r.where((m) => m.isPlayer), hasLength(3));
       }
     });
 
-    test('game masters do not count as available', () {
-      expect(() => assignRandomRoles(withMaster, 8), throwsArgumentError);
+    test('rejects fewer than two people', () {
+      expect(() => assignRandomRoles(people(1)), throwsArgumentError);
+    });
+  });
+
+  group('setRole (R-LOBBY-05, R-LOBBY-12, R-GM-02)', () {
+    test('moves one member to any of the four roles', () {
+      final members = people(3);
+      for (final role in Role.values) {
+        final r = setRole(members, 'm1', role);
+        expect(r[1].role, role);
+        expect(r[0].role, Role.unassigned);
+        expect(r[2].role, Role.unassigned);
+      }
     });
 
-    test('setRole makes a member game master', () {
-      final r = setRole(members, 'm2', Role.gameMaster);
-      expect(r[2].isGameMaster, isTrue);
-      expect(r.where((m) => m.isGameMaster), hasLength(1));
-    });
-
-    test('toggleRole turns a game master into a player', () {
-      expect(toggleRole(withMaster, 'gm').last.role, Role.player);
+    test('back to unassigned', () {
+      const hunter = Member(id: 'h', name: 'H', role: Role.hunter);
+      expect(
+        setRole([hunter], 'h', Role.unassigned).single.role,
+        Role.unassigned,
+      );
     });
   });
 }

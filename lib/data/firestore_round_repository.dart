@@ -212,11 +212,12 @@ class FirestoreRoundRepository implements RoundRepository {
   @override
   Future<Map<String, LocationFix>> useJoker(GroupSession session) async {
     // Marking the joker as used first unlocks reading hunterLocs for a short
-    // window in the security rules.
-    await _game(session)
-        .collection('members')
-        .doc(session.userId)
-        .update({'jokerUsed': true, 'jokerAt': FieldValue.serverTimestamp()});
+    // window in the security rules, which also check the number of jokers
+    // (R-SET-09).
+    await _game(session).collection('members').doc(session.userId).update({
+      'jokersUsed': FieldValue.increment(1),
+      'jokerAt': FieldValue.serverTimestamp(),
+    });
     final snap = await _game(session).collection('hunterLocs').get();
     return _decodeLocations(session, snap);
   }

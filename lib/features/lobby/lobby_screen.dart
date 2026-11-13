@@ -21,21 +21,63 @@ import 'bot_lobby_keeper.dart';
 import 'name_field.dart';
 
 /// Waiting room: code, participants, team assignment, start (R-LOBBY-02 … 06).
-class LobbyScreen extends ConsumerWidget {
+/// Unassigned members also see it while a round runs – for them no game is
+/// on (R-LOBBY-11).
+class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({super.key, required this.session, required this.game});
 
   final GroupSession session;
   final GameInfo game;
 
+  @override
+  ConsumerState<LobbyScreen> createState() => _LobbyScreenState();
+}
+
+class _LobbyScreenState extends ConsumerState<LobbyScreen> {
+  final _scroll = ScrollController();
+  final _listKey = GlobalKey();
+
+  GroupSession get session => widget.session;
+  GameInfo get game => widget.game;
   bool get _isAdmin => game.adminId == session.userId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Scrolls while a dragged person is near the top or bottom edge, so every
+  /// section can be reached (R-LOBBY-05).
+  void _autoScroll(Offset global) {
+    final box = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !_scroll.hasClients) return;
+    final y = box.globalToLocal(global).dy;
+    const edge = 72.0;
+    const step = 14.0;
+    final delta = y < edge
+        ? -step
+        : y > box.size.height - edge
+        ? step
+        : 0.0;
+    if (delta == 0) return;
+    final p = _scroll.position;
+    _scroll.jumpTo(
+      (p.pixels + delta).clamp(p.minScrollExtent, p.maxScrollExtent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final loadedMembers = ref.watch(membersProvider).value;
     final members = loadedMembers ?? const <Member>[];
     final repo = ref.read(gameRepositoryProvider);
-    final check = StartCheck(game.settings, members);
+    final check = StartCheck(game.settings, members, adminId: game.adminId);
+    // Only seen by members who sit the round out (R-LOBBY-11): nothing can
+    // be changed until it is over.
+    final running = game.status == GameStatus.running;
+    final editRoles = _isAdmin && !running;
 
     Future<void> run(Future<void> Function() action) async {
       try {
@@ -51,20 +93,14 @@ class LobbyScreen extends ConsumerWidget {
     // Computer members keep the role of their kind (R-BOT-03).
     final humans = members.where((m) => !isBot(m)).toList();
 
+    // Everybody is rolled anew, 30/70, whatever their role (R-LOBBY-04).
     void assignRandom() {
-      // Game masters keep their role (R-GM-02).
-      final playing = humans.where((m) => !m.isGameMaster).length;
-      if (playing <= game.settings.hunterCount) {
+      if (humans.length < 2) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l10n.errorNotEnoughPlayers)));
         return;
       }
-      run(
-        () => repo.setRoles(
-          session,
-          assignRandomRoles(humans, game.settings.hunterCount),
-        ),
-      );
+      run(() => repo.setRoles(session, assignRandomRoles(humans)));
     }
 
     final hunters = members.where((m) => m.isHunter).toList();
@@ -72,55 +108,99 @@ class LobbyScreen extends ConsumerWidget {
     final unassigned = members.where((m) => m.role == Role.unassigned).toList();
     final gameMasters = members.where((m) => m.isGameMaster).toList();
 
-    // Host picks who becomes game master (R-GM-02); computer members keep
-    // their kind's role.
-    Future<void> addGameMaster() async {
-      final picked = await _pickGameMaster(context, [
-        for (final m in humans)
-          if (!m.isGameMaster) m,
-      ]);
-      if (picked != null) {
-        await run(
-          () => repo.setRoles(
-            session,
-            setRole(members, picked.id, Role.gameMaster),
-          ),
-        );
-      }
+    void moveTo(Member m, Role role) {
+      if (m.role == role) return;
+      run(() => repo.setRoles(session, setRole(members, m.id, role)));
     }
 
-    Widget memberTile(Member m) => _MemberTile(
-      member: m,
-      isAdmin: m.id == game.adminId,
-      onRename: m.id == session.userId
-          ? () async {
-              final newName = await _askMyName(context, m.name);
-              if (newName != null && newName != m.name) {
-                await run(() => repo.renameMe(session, newName));
+    // Computer members keep their kind's role (R-BOT-03).
+    bool movable(Member m) => editRoles && !isBot(m);
+
+    Widget memberTile(Member m) {
+      final tile = _MemberTile(
+        member: m,
+        isAdmin: m.id == game.adminId,
+        draggable: movable(m),
+        onRename: m.id == session.userId
+            ? () async {
+                final newName = await _askMyName(context, m.name);
+                if (newName != null && newName != m.name) {
+                  await run(() => repo.renameMe(session, newName));
+                }
               }
-            }
-          : null,
-      onTap: _isAdmin && !isBot(m)
-          ? () => run(() => repo.setRoles(session, toggleRole(members, m.id)))
-          : null,
-      onRemove: _isAdmin && m.id != session.userId
-          ? () async {
-              final ok = await _confirm(
-                context,
-                l10n.lobbyRemoveMember(m.name),
-                l10n.lobbyRemove,
-              );
-              if (ok) await run(() => repo.removeMember(session, m.id));
-            }
-          : null,
+            : null,
+        // Alternative to drag and drop (R-LOBBY-05).
+        onTap: movable(m)
+            ? () async {
+                final role = await _pickRole(context, m);
+                if (role != null) moveTo(m, role);
+              }
+            : null,
+        // Not for the host themself: they must have a role (R-LOBBY-13).
+        onUnassign:
+            movable(m) && m.role != Role.unassigned && m.id != game.adminId
+            ? () => moveTo(m, Role.unassigned)
+            : null,
+        onRemove: _isAdmin && !running && m.id != session.userId
+            ? () async {
+                final ok = await _confirm(
+                  context,
+                  l10n.lobbyRemoveMember(m.name),
+                  l10n.lobbyRemove,
+                );
+                if (ok) await run(() => repo.removeMember(session, m.id));
+              }
+            : null,
+      );
+      if (!movable(m)) return tile;
+      return LongPressDraggable<Member>(
+        key: Key('drag_${m.id}'),
+        data: m,
+        onDragUpdate: (d) => _autoScroll(d.globalPosition),
+        feedback: _DragFeedback(member: m),
+        childWhenDragging: Opacity(opacity: 0.35, child: tile),
+        child: tile,
+      );
+    }
+
+    Widget section({
+      required Key key,
+      required Role role,
+      required String title,
+      required Color color,
+      required IconData icon,
+      required List<Member> list,
+      List<Widget> footer = const [],
+    }) => _RoleSection(
+      key: key,
+      title: title,
+      color: color,
+      icon: icon,
+      footer: footer,
+      onDrop: editRoles ? (m) => moveTo(m, role) : null,
+      acceptsFrom: (m) => m.role != role,
+      children: list.map(memberTile).toList(),
+    );
+
+    Widget hint(String text, {Key? key}) => Padding(
+      key: key,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Text(text, style: const TextStyle(color: AppColors.textMuted)),
     );
 
     final problems = [
       ...check.settingsErrors.map((e) => settingsErrorText(l10n, e)),
-      if (check.hasUnassigned) l10n.errorUnassigned,
-      if (!check.hasUnassigned && check.noHunter) l10n.errorHunterCountInvalid,
-      if (!check.hasUnassigned && check.noPlayer) l10n.errorNotEnoughPlayers,
+      if (check.hostUnassigned) l10n.errorHostUnassigned,
+      if (check.noHunter) l10n.errorHunterCountInvalid,
+      if (check.noPlayer) l10n.errorNotEnoughPlayers,
     ];
+
+    // The host confirms who plays before the round starts (R-LOBBY-06).
+    Future<void> start() async {
+      if (await _confirmStart(context, members)) {
+        await run(() => repo.startGame(session));
+      }
+    }
 
     final controller = ref.read(sessionControllerProvider.notifier);
     final name = game.name;
@@ -205,6 +285,8 @@ class LobbyScreen extends ConsumerWidget {
           game: game,
           members: loadedMembers,
           child: ListView(
+            key: _listKey,
+            controller: _scroll,
             padding: const EdgeInsets.all(16),
             children: [
               _CodeCard(code: session.code),
@@ -216,7 +298,9 @@ class LobbyScreen extends ConsumerWidget {
               ],
               AreaCard(
                 area: game.settings.area,
-                onChanged: (area) => run(() => repo.updateArea(session, area)),
+                onChanged: running
+                    ? null
+                    : (area) => run(() => repo.updateArea(session, area)),
               ),
               const SizedBox(height: 16),
               Row(
@@ -227,7 +311,7 @@ class LobbyScreen extends ConsumerWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  if (_isAdmin)
+                  if (editRoles)
                     TextButton.icon(
                       key: const Key('randomButton'),
                       onPressed: assignRandom,
@@ -236,66 +320,60 @@ class LobbyScreen extends ConsumerWidget {
                     ),
                 ],
               ),
-              if (_isAdmin)
+              if (editRoles)
                 Padding(
+                  key: const Key('dragHint'),
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    l10n.lobbyTapToSwitch,
+                    l10n.lobbyDragHint,
                     style: const TextStyle(color: AppColors.textMuted),
                   ),
                 ),
-              if (unassigned.isNotEmpty)
-                _RoleSection(
+              // The host always sees all four sections as drop targets;
+              // others only the filled ones of "unassigned" and "game
+              // master" (R-LOBBY-05, R-GM-02).
+              if (editRoles || unassigned.isNotEmpty)
+                section(
+                  key: const Key('unassignedSection'),
+                  role: Role.unassigned,
                   title: l10n.roleUnassigned,
                   color: AppColors.textMuted,
                   icon: Icons.help_outline,
-                  children: unassigned.map(memberTile).toList(),
+                  list: unassigned,
+                  footer: [
+                    hint(
+                      l10n.lobbyUnassignedHint,
+                      key: const Key('unassignedHint'),
+                    ),
+                  ],
                 ),
-              _RoleSection(
-                title: l10n.roleHunters,
-                color: AppColors.hunter,
-                icon: Icons.track_changes,
-                children: hunters.map(memberTile).toList(),
-              ),
-              _RoleSection(
+              section(
+                key: const Key('playerSection'),
+                role: Role.player,
                 title: l10n.rolePlayers,
                 color: AppColors.player,
                 icon: Icons.directions_run,
-                children: players.map(memberTile).toList(),
+                list: players,
               ),
-              // Optional (R-GM-01): others only see it when someone has it.
-              if (_isAdmin || gameMasters.isNotEmpty)
-                _RoleSection(
+              section(
+                key: const Key('hunterSection'),
+                role: Role.hunter,
+                title: l10n.roleHunters,
+                color: AppColors.hunter,
+                icon: Icons.track_changes,
+                list: hunters,
+              ),
+              if (editRoles || gameMasters.isNotEmpty)
+                section(
                   key: const Key('gameMasterSection'),
+                  role: Role.gameMaster,
                   title: l10n.roleGameMaster,
                   color: AppColors.gameMaster,
                   icon: Icons.visibility_outlined,
-                  footer: [
-                    if (_isAdmin) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                        child: Text(
-                          l10n.lobbyGameMasterHint,
-                          style: const TextStyle(color: AppColors.textMuted),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: TextButton.icon(
-                            key: const Key('addGameMasterButton'),
-                            onPressed: addGameMaster,
-                            icon: const Icon(Icons.add),
-                            label: Text(l10n.lobbyAddGameMaster),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                  children: gameMasters.map(memberTile).toList(),
+                  list: gameMasters,
+                  footer: [if (editRoles) hint(l10n.lobbyGameMasterHint)],
                 ),
-              if (_isAdmin && problems.isNotEmpty) ...[
+              if (editRoles && problems.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 for (final p in problems)
                   Padding(
@@ -315,7 +393,7 @@ class LobbyScreen extends ConsumerWidget {
               ],
               // Before the start the host learns that hunters will see each
               // other less often (R-QUOTA-02).
-              if (_isAdmin &&
+              if (editRoles &&
                   hunterLiveIntervalFor(game.settings, members) !=
                       hunterLiveNormal)
                 Padding(
@@ -351,9 +429,7 @@ class LobbyScreen extends ConsumerWidget {
             child: _isAdmin
                 ? FilledButton.icon(
                     key: const Key('startButton'),
-                    onPressed: check.canStart
-                        ? () => run(() => repo.startGame(session))
-                        : null,
+                    onPressed: check.canStart && !running ? start : null,
                     icon: const Icon(Icons.play_arrow_rounded),
                     label: Text(l10n.lobbyStart),
                   )
@@ -620,51 +696,152 @@ class _CodeCard extends StatelessWidget {
   }
 }
 
-/// Host chooses a member to become game master (R-GM-02). Returns null if
-/// cancelled.
-Future<Member?> _pickGameMaster(
-  BuildContext context,
-  List<Member> candidates,
-) => showModalBottomSheet<Member>(
-  context: context,
-  showDragHandle: true,
-  builder: (ctx) {
-    final l10n = AppLocalizations.of(ctx);
-    return SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              l10n.lobbyPickGameMaster,
-              style: Theme.of(ctx).textTheme.titleMedium,
-            ),
+/// Role menu of one person, the alternative to drag and drop (R-LOBBY-05).
+/// Returns null if cancelled.
+Future<Role?> _pickRole(BuildContext context, Member member) =>
+    showModalBottomSheet<Role>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  l10n.lobbyRoleMenuTitle(member.name),
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+              ),
+              for (final role in _roleOrder)
+                ListTile(
+                  key: Key('roleOption_${role.name}'),
+                  leading: Icon(_roleIcon(role), color: _roleColor(role)),
+                  title: Text(_roleTitle(l10n, role)),
+                  trailing: role == member.role
+                      ? const Icon(Icons.check, color: AppColors.textMuted)
+                      : null,
+                  onTap: () => Navigator.pop(ctx, role),
+                ),
+            ],
           ),
-          if (candidates.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                l10n.lobbyNobodyToPick,
-                style: const TextStyle(color: AppColors.textMuted),
+        );
+      },
+    );
+
+/// The order of the lobby sections (R-LOBBY-05).
+const _roleOrder = [Role.unassigned, Role.player, Role.hunter, Role.gameMaster];
+
+Color _roleColor(Role role) => switch (role) {
+  Role.hunter => AppColors.hunter,
+  Role.player => AppColors.player,
+  Role.unassigned => AppColors.textMuted,
+  Role.gameMaster => AppColors.gameMaster,
+};
+
+IconData _roleIcon(Role role) => switch (role) {
+  Role.hunter => Icons.track_changes,
+  Role.player => Icons.directions_run,
+  Role.unassigned => Icons.help_outline,
+  Role.gameMaster => Icons.visibility_outlined,
+};
+
+String _roleTitle(AppLocalizations l10n, Role role) => switch (role) {
+  Role.hunter => l10n.roleHunters,
+  Role.player => l10n.rolePlayers,
+  Role.unassigned => l10n.roleUnassigned,
+  Role.gameMaster => l10n.roleGameMaster,
+};
+
+/// Before the round starts, the host sees who plays in which role and who
+/// sits out, and confirms (R-LOBBY-06, R-LOBBY-11).
+Future<bool> _confirmStart(BuildContext context, List<Member> members) async {
+  final l10n = AppLocalizations.of(context);
+  final sitOut = members.where((m) => m.role == Role.unassigned).toList();
+  Widget group(Role role) {
+    final names = [
+      for (final m in members)
+        if (m.role == role) m.name,
+    ];
+    if (names.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      key: Key('startConfirm_${role.name}'),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_roleIcon(role), color: _roleColor(role), size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_roleTitle(l10n, role).toUpperCase()} · ${names.length}',
+                  style: TextStyle(
+                    color: _roleColor(role),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
               ),
-            ),
-          for (final m in candidates)
-            ListTile(
-              key: Key('pickGameMaster_${m.id}'),
-              leading: const Icon(
-                Icons.visibility_outlined,
-                color: AppColors.gameMaster,
-              ),
-              title: Text(m.name),
-              onTap: () => Navigator.pop(ctx, m),
-            ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(names.join(', ')),
         ],
       ),
     );
-  },
-);
+  }
 
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      key: const Key('startConfirmDialog'),
+      title: Text(l10n.lobbyStartConfirmTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            group(Role.player),
+            group(Role.hunter),
+            group(Role.gameMaster),
+            if (sitOut.isNotEmpty) ...[
+              const Divider(),
+              Text(
+                l10n.lobbyStartConfirmSitOut(sitOut.length),
+                key: const Key('startConfirmSitOut'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                sitOut.map((m) => m.name).join(', '),
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(l10n.commonCancel),
+        ),
+        FilledButton(
+          key: const Key('startConfirmButton'),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(l10n.lobbyStart),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+/// One role's card; with [onDrop] also a drop target for dragged people
+/// (R-LOBBY-05).
 class _RoleSection extends StatelessWidget {
   const _RoleSection({
     super.key,
@@ -672,6 +849,8 @@ class _RoleSection extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.children,
+    required this.acceptsFrom,
+    this.onDrop,
     this.footer = const [],
   });
 
@@ -679,41 +858,92 @@ class _RoleSection extends StatelessWidget {
   final Color color;
   final IconData icon;
   final List<Widget> children;
+  final ValueChanged<Member>? onDrop;
+  final bool Function(Member) acceptsFrom;
 
-  /// Below the members, not counted (e.g. hint and add button).
+  /// Below the members, not counted (e.g. a hint).
   final List<Widget> footer;
+
+  Widget _card({required bool highlight}) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Card(
+      shape: highlight
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: color, width: 2),
+            )
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Row(
+                children: [
+                  Icon(icon, color: color, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${title.toUpperCase()} · ${children.length}',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...children,
+            ...footer,
+          ],
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: Row(
-                  children: [
-                    Icon(icon, color: color, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${title.toUpperCase()} · ${children.length}',
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ...children,
-              ...footer,
-            ],
-          ),
+    final drop = onDrop;
+    if (drop == null) return _card(highlight: false);
+    return DragTarget<Member>(
+      onWillAcceptWithDetails: (d) => acceptsFrom(d.data),
+      onAcceptWithDetails: (d) => drop(d.data),
+      builder: (context, candidates, _) =>
+          _card(highlight: candidates.isNotEmpty),
+    );
+  }
+}
+
+/// What follows the finger while a person is dragged (R-LOBBY-05).
+class _DragFeedback extends StatelessWidget {
+  const _DragFeedback({required this.member});
+
+  final Member member;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceHigh,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.drag_indicator,
+              color: _roleColor(member.role),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              member.name,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
       ),
     );
@@ -724,17 +954,27 @@ class _MemberTile extends StatelessWidget {
   const _MemberTile({
     required this.member,
     required this.isAdmin,
+    this.draggable = false,
     this.onRename,
     this.onTap,
+    this.onUnassign,
     this.onRemove,
   });
 
   final Member member;
   final bool isAdmin;
 
+  /// Host only: can be moved to another role by drag and drop (R-LOBBY-05).
+  final bool draggable;
+
   /// Only for oneself: change the own display name (R-LOBBY-10).
   final VoidCallback? onRename;
+
+  /// Host only: opens the role menu (R-LOBBY-05).
   final VoidCallback? onTap;
+
+  /// Host only: back to "unassigned", i.e. sit out (R-LOBBY-12).
+  final VoidCallback? onUnassign;
 
   /// Host only, not for oneself: remove from the group (R-LOBBY-09).
   final VoidCallback? onRemove;
@@ -742,15 +982,9 @@ class _MemberTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final color = switch (member.role) {
-      Role.hunter => AppColors.hunter,
-      Role.player => AppColors.player,
-      Role.unassigned => AppColors.textMuted,
-      Role.gameMaster => AppColors.gameMaster,
-    };
+    final color = _roleColor(member.role);
     return ListTile(
       onTap: onTap,
-      onLongPress: onRemove,
       leading: CircleAvatar(
         backgroundColor: color.withValues(alpha: 0.18),
         foregroundColor: color,
@@ -780,10 +1014,15 @@ class _MemberTile extends StatelessWidget {
             ),
           if (isAdmin) _Badge(l10n.lobbyAdminBadge),
           // No "You" badge: the pencil marks the own name (R-LOBBY-10).
-          if (onTap != null)
-            const Padding(
-              padding: EdgeInsets.only(left: 6),
-              child: Icon(Icons.swap_horiz, color: AppColors.textMuted),
+          if (onUnassign != null)
+            IconButton(
+              key: Key('unassign_${member.id}'),
+              tooltip: l10n.lobbyUnassign,
+              onPressed: onUnassign,
+              icon: const Icon(
+                Icons.person_off_outlined,
+                color: AppColors.textMuted,
+              ),
             ),
           if (onRemove != null)
             IconButton(
@@ -794,6 +1033,11 @@ class _MemberTile extends StatelessWidget {
                 Icons.person_remove_outlined,
                 color: AppColors.textMuted,
               ),
+            ),
+          if (draggable)
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.drag_indicator, color: AppColors.textMuted),
             ),
         ],
       ),

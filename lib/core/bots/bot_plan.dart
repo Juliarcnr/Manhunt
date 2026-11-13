@@ -68,19 +68,22 @@ bool isBot(Member m) => botKindOf(m.name) != null;
 /// The phone that runs the bots of [kind]: the first human (by joining
 /// order) with that role, otherwise the first human who plays (hunter or
 /// player – their phone tracks, so the bots have a position to walk around;
-/// a game master's does not, R-GM-01), otherwise the first human at all – so
-/// the bots are there right away, also with a single phone; null only
-/// without any human (R-BOT-03, R-BOT-07).
+/// a game master's does not, R-GM-01), otherwise the first game master (an
+/// unassigned member only sees the lobby during a round, R-LOBBY-11),
+/// otherwise the first human at all – so the bots are there right away, also
+/// with a single phone; null only without any human (R-BOT-03, R-BOT-07).
 String? botCarrier(BotKind kind, List<Member> members) {
   String? playing;
+  String? gameMaster;
   String? first;
   for (final m in members) {
     if (isBot(m)) continue;
     if (m.role == kind.role) return m.id;
     if (m.isHunter || m.isPlayer) playing ??= m.id;
+    if (m.isGameMaster) gameMaster ??= m.id;
     first ??= m.id;
   }
-  return playing ?? first;
+  return playing ?? gameMaster ?? first;
 }
 
 /// What one phone has to do in the lobby so the bots match the settings.

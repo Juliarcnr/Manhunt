@@ -23,13 +23,24 @@ void main() {
       expect(s.speedhuntInterval, const Duration(minutes: 5));
     });
 
-    test('joker is on by default and can be switched off (R-SET-09)', () {
+    test('one hunter joker by default, 0 … 5 can be set (R-SET-09)', () {
+      expect(const GameSettings().hunterJokers, 1);
       expect(const GameSettings().jokerEnabled, isTrue);
-      const off = GameSettings(jokerEnabled: false);
-      expect(GameSettings.fromJson(off.toJson()).jokerEnabled, isFalse);
-      // Settings saved before the option existed keep the joker.
-      final legacy = const GameSettings().toJson()..remove('jokerEnabled');
-      expect(GameSettings.fromJson(legacy).jokerEnabled, isTrue);
+      const off = GameSettings(hunterJokers: 0);
+      expect(off.jokerEnabled, isFalse);
+      expect(GameSettings.fromJson(off.toJson()).hunterJokers, 0);
+      const three = GameSettings(hunterJokers: 3);
+      expect(GameSettings.fromJson(three.toJson()).hunterJokers, 3);
+      // Older app versions still read the switch.
+      expect(three.toJson()['jokerEnabled'], isTrue);
+      expect(off.toJson()['jokerEnabled'], isFalse);
+      // Saved before the number existed: switch on = 1, off = 0, none = 1.
+      final legacyOn = three.toJson()..remove('hunterJokers');
+      expect(GameSettings.fromJson(legacyOn).hunterJokers, 1);
+      final legacyOff = off.toJson()..remove('hunterJokers');
+      expect(GameSettings.fromJson(legacyOff).hunterJokers, 0);
+      final oldest = legacyOn..remove('jokerEnabled');
+      expect(GameSettings.fromJson(oldest).hunterJokers, 1);
     });
 
     test('player joker and earliest speedhunt (R-SET-11, R-SET-12)', () {
@@ -109,7 +120,7 @@ void main() {
       expect(s.outsideLiveLocation, isTrue);
       const off = GameSettings(outsideLiveLocation: false);
       expect(GameSettings.fromJson(off.toJson()).outsideLiveLocation, isFalse);
-      expect(off.copyWith(hunterCount: 2).outsideLiveLocation, isFalse);
+      expect(off.copyWith(sharedPings: true).outsideLiveLocation, isFalse);
       final legacy = s.toJson()..remove('outsideLiveLocation');
       expect(GameSettings.fromJson(legacy).outsideLiveLocation, isTrue);
     });
@@ -125,7 +136,7 @@ void main() {
       expect(back.speedhuntCooldown, const Duration(minutes: 45));
       expect(back.speedhuntRepeatTarget, isFalse);
       expect(back.speedhuntRepeatCooldown, const Duration(minutes: 50));
-      expect(custom.copyWith(hunterCount: 2).speedhuntRepeatTarget, isFalse);
+      expect(custom.copyWith(sharedPings: true).speedhuntRepeatTarget, isFalse);
 
       final legacy = const GameSettings().toJson()
         ..remove('speedhuntCooldownSec')
@@ -160,33 +171,35 @@ void main() {
         GameSettings.fromJson(at14.toJson()).startTime,
         const Duration(hours: 14),
       );
-      expect(at14.copyWith(hunterCount: 2).startTime, isNotNull);
+      expect(at14.copyWith(sharedPings: true).startTime, isNotNull);
       expect(at14.copyWith(startTime: null).startTime, isNull);
       final legacy = s.toJson()..remove('startTimeMin');
       expect(GameSettings.fromJson(legacy).startTime, isNull);
     });
 
     test('json roundtrip', () {
-      const s = GameSettings(hunterCount: 3, area: square);
+      const s = GameSettings(speedhuntCount: 3, area: square);
       final back = GameSettings.fromJson(s.toJson());
       expect(back.toJson(), s.toJson());
     });
 
-    test('validate', () {
+    test('no hunter count any more; older app versions still find one '
+        '(R-SET-07, R-LOBBY-04)', () {
+      final json = const GameSettings().toJson();
+      expect(json['hunterCount'], 1);
+      final fromOld = {...json, 'hunterCount': 3};
+      expect(GameSettings.fromJson(fromOld).toJson()['hunterCount'], 1);
       expect(
-        const GameSettings(area: square).validate(memberCount: 7),
-        isEmpty,
+        GameSettings.fromJson(json..remove('hunterCount')).duration,
+        const GameSettings().duration,
       );
+    });
+
+    test('validate', () {
+      expect(const GameSettings(area: square).validate(), isEmpty);
       expect(
         const GameSettings().validate(),
         contains(SettingsError.areaMissing),
-      );
-      expect(
-        const GameSettings(
-          hunterCount: 7,
-          area: square,
-        ).validate(memberCount: 7),
-        contains(SettingsError.notEnoughPlayers),
       );
       expect(
         const GameSettings(
@@ -199,7 +212,13 @@ void main() {
   });
 
   test('Member json roundtrip', () {
-    const m = Member(id: 'x', name: 'Xa', role: Role.player, caught: true);
+    const m = Member(
+      id: 'x',
+      name: 'Xa',
+      role: Role.player,
+      caught: true,
+      jokersUsed: 2,
+    );
     final back = Member.fromJson(m.toJson());
     expect(back.toJson(), m.toJson());
   });

@@ -13,6 +13,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   collection,
   query,
   where,
@@ -414,7 +415,66 @@ describe('running round (phase 5)', () => {
       await assertFails(getDocs(collection(as('kim'), 'games', GID, 'hunterLocs')));
     });
 
-    test('joker: once, then hunter positions are readable for a moment', async () => {
+    // As FirestoreRoundRepository.useJoker: count up, then read the hunters.
+    const useJoker = async (uid) => {
+      await updateDoc(doc(as(uid), 'games', GID, 'members', uid), {
+        jokersUsed: increment(1), jokerAt: serverTimestamp(),
+      });
+      await getDocs(collection(as(uid), 'games', GID, 'hunterLocs'));
+    };
+    const setHunterJokers = (n) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID), { hunterJokers: n }),
+      );
+
+    test('without the setting (older groups): one joker per player (R-SET-09)', async () => {
+      await assertSucceeds(useJoker('kim'));
+      await assertFails(useJoker('kim'));
+      await assertSucceeds(useJoker('sam'));
+    });
+
+    test('as many jokers as set, each opening the hunter positions (R-SET-09)', async () => {
+      await setHunterJokers(3);
+      for (let i = 0; i < 3; i++) await assertSucceeds(useJoker('kim'));
+      await assertFails(useJoker('kim'));
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const kim = (await getDoc(doc(ctx.firestore(), 'games', GID, 'members', 'kim'))).data();
+        assert.equal(kim.jokersUsed, 3);
+      });
+    });
+
+    test('no hunter joker when set to 0 – also not via the old flag (R-SET-09)', async () => {
+      await setHunterJokers(0);
+      await assertFails(useJoker('kim'));
+      await assertFails(
+        updateDoc(doc(as('kim'), 'games', GID, 'members', 'kim'), {
+          jokerUsed: true, jokerAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    test('jokers count one at a time, only by the player themself, never by hunters', async () => {
+      await setHunterJokers(3);
+      const kim = doc(as('kim'), 'games', GID, 'members', 'kim');
+      await assertFails(updateDoc(kim, { jokersUsed: 2, jokerAt: serverTimestamp() }));
+      await assertFails(updateDoc(kim, { jokersUsed: -1, jokerAt: serverTimestamp() }));
+      await assertFails(updateDoc(kim, { jokersUsed: increment(1), jokerAt: inDays(1) }));
+      await assertFails(
+        updateDoc(doc(as('admin'), 'games', GID, 'members', 'kim'), {
+          jokersUsed: increment(1), jokerAt: serverTimestamp(),
+        }),
+      );
+      await assertFails(useJoker('admin'));
+    });
+
+    test('no hunter joker in the lobby', async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID), { status: 'lobby' }),
+      );
+      await assertFails(useJoker('kim'));
+    });
+
+    test('older app versions: joker once, then hunter positions are readable for a moment', async () => {
       const me = doc(as('kim'), 'games', GID, 'members', 'kim');
       await assertSucceeds(updateDoc(me, { jokerUsed: true, jokerAt: serverTimestamp() }));
       await assertSucceeds(getDocs(collection(as('kim'), 'games', GID, 'hunterLocs')));
@@ -1026,6 +1086,37 @@ describe('regular pings to all players (R-SET-15, R-PLAY-05)', () => {
   });
 });
 
+describe('number of hunter jokers (R-SET-09)', () => {
+  // Like FirestoreGameRepository.updateSettings in the lobby.
+  const saveSettings = (hunterJokers) =>
+    updateDoc(doc(as('admin'), 'games', GID), {
+      settings: 'enc2', sharedPings: false, durationSec: 3600, hunterJokers, expiresAt: inDays(180),
+    });
+
+  test('create with the number; it must be an int', async () => {
+    const game = {
+      adminUid: 'x', status: 'lobby', settings: 'enc', sharedPings: false, durationSec: 3600,
+      hunterJokers: 3, startAt: null, createdAt: serverTimestamp(), expiresAt: new Date(),
+    };
+    await assertSucceeds(setDoc(doc(as('x'), 'games', 'g2'), game));
+    await assertFails(setDoc(doc(as('x'), 'games', 'g3'), { ...game, hunterJokers: 'three' }));
+  });
+
+  test('host saves it as hunter, player or unassigned; members cannot', async () => {
+    for (const role of ['unassigned', 'hunter', 'player']) {
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), 'games', GID, 'members', 'admin'), { role }),
+      );
+      await assertSucceeds(saveSettings(3));
+      await assertSucceeds(saveSettings(0));
+    }
+    await assertFails(saveSettings('three'));
+    await assertFails(
+      updateDoc(doc(as('kim'), 'games', GID), { hunterJokers: 5, expiresAt: inDays(180) }),
+    );
+  });
+});
+
 describe('player joker (R-PLAY-03)', () => {
   beforeEach(startRound);
 
@@ -1498,7 +1589,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
         ...(confirmedMinutesAgo == null ? {} : { confirmedAt: minutesAgo(confirmedMinutesAgo) }),
       });
       await updateDoc(doc(db, 'games', GID, 'members', 'admin'), { role: hostRole });
-      await updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true, jokerUsed: true });
+      await updateDoc(doc(db, 'games', GID, 'members', 'kim'), { caught: true, jokerUsed: true, jokersUsed: 2 });
       await setDoc(doc(db, 'games', GID, 'members', 'lou'), {
         name: 'enc', role: 'hunter', caught: false, jokerUsed: false, joinedAt: new Date(),
       });
@@ -1535,7 +1626,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
     const members = await getDocs(collection(db, 'games', GID, 'members'));
     const batch = writeBatch(db);
     for (const m of members.docs) {
-      batch.update(m.ref, { caught: false, jokerUsed: false, playerJokerUsed: false });
+      batch.update(m.ref, { caught: false, jokerUsed: false, jokersUsed: 0, playerJokerUsed: false });
     }
     batch.update(doc(db, 'games', GID), {
       status: 'lobby',
@@ -1570,6 +1661,7 @@ describe('automatic end 15 s after the round is over, with history map (R-GAME-1
       const kim = (await getDoc(doc(db, 'games', GID, 'members', 'kim'))).data();
       assert.equal(kim.caught, false);
       assert.equal(kim.jokerUsed, false);
+      assert.equal(kim.jokersUsed, 0);
       assert.equal((await getDocs(collection(db, 'games', GID, 'history'))).size, 1);
       assert.equal((await getDocs(collection(db, 'games', GID, 'historyMaps'))).size, 1);
     });
@@ -1941,7 +2033,7 @@ describe('history map (R-HIST-04, R-HIST-06)', () => {
     await setDoc(summary, entry);
     const batch = writeBatch(db);
     for (const m of members.docs) {
-      batch.update(m.ref, { caught: false, jokerUsed: false, playerJokerUsed: false });
+      batch.update(m.ref, { caught: false, jokerUsed: false, jokersUsed: 0, playerJokerUsed: false });
     }
     batch.update(doc(db, 'games', GID), {
       status: 'lobby',

@@ -76,7 +76,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
   var _lifecycle = AppLifecycleState.resumed;
   ({String title, String? body})? _banner;
   Timer? _bannerTimer;
-  ({DateTime at, Map<String, LocationFix> positions})? _jokerReveal;
+
+  /// Results of the own hunter jokers, oldest first (R-PLAY-04, R-SET-09).
+  List<HunterReveal> _jokerReveals = const [];
   ({DateTime at, String requestId})? _playerReveal;
   var _filters = const MapFilters();
 
@@ -905,15 +907,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final settings = widget.game.settings;
     final kind = await showJokerSheet(
       context,
-      huntersEnabled: settings.jokerEnabled,
-      huntersUsed: me.jokerUsed,
+      hunterJokers: settings.hunterJokers,
+      hunterJokersUsed: me.jokersUsed,
       playersEnabled: settings.playerJokerAvailable,
       playersUsed: me.playerJokerUsed,
     );
     if (!mounted) return;
     switch (kind) {
       case JokerKind.hunters:
-        await _useHunterJoker();
+        await _useHunterJoker(me);
       case JokerKind.players:
         await _usePlayerJoker();
       case null:
@@ -932,7 +934,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           widget.session.groupId,
           SavedJokers(
             roundStart: startAt,
-            hunters: _jokerReveal,
+            hunters: _jokerReveals,
             players: _playerReveal,
             speedhuntPings: _engine?.speedhuntSnapshots.value ?? const {},
             liveViewAccepted: _liveViewAccepted,
@@ -951,7 +953,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     setState(() {
       _jokersLoaded = true;
       if (saved == null) return;
-      _jokerReveal ??= saved.hunters;
+      if (_jokerReveals.isEmpty) _jokerReveals = saved.hunters;
       _playerReveal ??= saved.players;
       _liveViewAccepted |= saved.liveViewAccepted;
     });
@@ -1007,17 +1009,21 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   bool _jokersLeft(Member me) {
     final s = widget.game.settings;
-    return (s.jokerEnabled && !me.jokerUsed) ||
+    return me.jokersUsed < s.hunterJokers ||
         (s.playerJokerAvailable && !me.playerJokerUsed);
   }
 
-  /// R-PLAY-02: see the hunters once.
-  Future<void> _useHunterJoker() async {
+  /// R-PLAY-02: see the hunters once per joker (R-SET-09).
+  Future<void> _useHunterJoker(Member me) async {
     final l10n = AppLocalizations.of(context);
+    final total = widget.game.settings.hunterJokers;
     if (!await showJokerConfirm(
       context,
       title: l10n.jokerTitle,
-      text: l10n.jokerText,
+      // A single joker reads as before; with several, how many are left.
+      text: total > 1
+          ? l10n.jokerTextMany(total - me.jokersUsed - 1, total)
+          : l10n.jokerText,
     )) {
       return;
     }
@@ -1028,8 +1034,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
       if (!mounted) return;
       if (positions.isEmpty) _snack(l10n.jokerNoHunters);
       setState(() {
-        _jokerReveal = (at: widget.now(), positions: positions);
-        _filters = _filters.copyWith(hunterJoker: true);
+        // A new chip is on right away (R-PLAY-04).
+        _jokerReveals = [
+          ..._jokerReveals,
+          (at: widget.now(), positions: positions),
+        ];
       });
       unawaited(_saveJokers());
     });
@@ -1509,8 +1518,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
           names: names,
         ),
       );
-      final reveal = _jokerReveal;
-      if (reveal != null && filters.hunterJoker) {
+      final reveals = _jokerReveals;
+      for (final (i, reveal) in reveals.indexed) {
+        if (filters.hiddenHunterJokers.contains(i)) continue;
         layers.add(
           huntersLayer(
             positions: reveal.positions,
@@ -1549,14 +1559,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
             selected: filters.sharedPings,
             onChanged: (v) => set(filters.copyWith(sharedPings: v)),
           ),
-        if (reveal != null)
+        // One chip per hunter joker (R-PLAY-04, R-SET-09).
+        for (final (i, reveal) in reveals.indexed)
           FilterItem(
-            id: 'hunterJoker',
+            id: i == 0 ? 'hunterJoker' : 'hunterJoker_$i',
             label: l10n.filterHunterJoker(timeFmt.format(reveal.at.toLocal())),
             icon: Icons.visibility_outlined,
             color: AppColors.hunter,
-            selected: filters.hunterJoker,
-            onChanged: (v) => set(filters.copyWith(hunterJoker: v)),
+            selected: !filters.hiddenHunterJokers.contains(i),
+            onChanged: (_) => set(filters.toggleHunterJoker(i)),
           ),
         if (playerReveal != null)
           FilterItem(

@@ -66,13 +66,22 @@ class _SessionGateState extends ConsumerState<SessionGate> {
           ),
           data: (game) {
             if (game == null) return const _GroupGone();
-            if (_wasRemoved(ref.watch(membersProvider), session.userId)) {
+            final members = ref.watch(membersProvider);
+            if (_wasRemoved(members, session.userId)) {
               return const _GroupGone(removed: true);
             }
-            return switch (game.status) {
-              GameStatus.lobby => LobbyScreen(session: session, game: game),
-              GameStatus.running => GameScreen(session: session, game: game),
-            };
+            if (game.status == GameStatus.lobby) {
+              return LobbyScreen(session: session, game: game);
+            }
+            // Unassigned members do not play: for them no round is running
+            // (R-LOBBY-11). Wait for the roles so their phone never starts
+            // tracking.
+            final list = members.value;
+            if (list == null) return const _Loading();
+            final me = list.where((m) => m.id == session.userId).firstOrNull;
+            return me?.role == Role.unassigned
+                ? LobbyScreen(session: session, game: game)
+                : GameScreen(session: session, game: game);
           },
         );
       },

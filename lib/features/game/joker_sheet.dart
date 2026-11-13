@@ -6,11 +6,12 @@ import '../../theme/app_theme.dart';
 enum JokerKind { hunters, players }
 
 /// Lets a player pick one of the jokers enabled in the settings
-/// (R-PLAY-02, R-PLAY-03). Used jokers are shown but disabled.
+/// (R-PLAY-02, R-PLAY-03). Used jokers are shown but disabled. With several
+/// hunter jokers the sheet shows how many are left (R-SET-09).
 Future<JokerKind?> showJokerSheet(
   BuildContext context, {
-  required bool huntersEnabled,
-  required bool huntersUsed,
+  required int hunterJokers,
+  required int hunterJokersUsed,
   required bool playersEnabled,
   required bool playersUsed,
 }) {
@@ -20,15 +21,28 @@ Future<JokerKind?> showJokerSheet(
     IconData icon,
     String title,
     String hint,
-    bool used,
-  ) => ListTile(
+    bool used, {
+    String? left,
+  }) => ListTile(
     key: Key('joker_${kind.name}'),
     enabled: !used,
     leading: Icon(icon, color: used ? AppColors.textMuted : AppColors.player),
     title: Text(title),
     subtitle: Text(used ? l10n.jokerAlreadyUsed : hint),
+    trailing: left == null
+        ? null
+        : Text(
+            left,
+            key: Key('jokerLeft_${kind.name}'),
+            style: TextStyle(
+              color: used ? AppColors.textMuted : AppColors.player,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
     onTap: () => Navigator.pop(context, kind),
   );
+
+  final huntersLeft = hunterJokers - hunterJokersUsed;
 
   return showModalBottomSheet<JokerKind>(
     context: context,
@@ -37,13 +51,22 @@ Future<JokerKind?> showJokerSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (huntersEnabled)
+          if (hunterJokers > 0)
             option(
               JokerKind.hunters,
               Icons.track_changes,
               l10n.jokerHuntersOption,
-              l10n.jokerHuntersHint,
-              huntersUsed,
+              hunterJokers > 1
+                  ? l10n.jokerHuntersHintMany
+                  : l10n.jokerHuntersHint,
+              huntersLeft <= 0,
+              // A single joker looks as before.
+              left: hunterJokers > 1
+                  ? l10n.jokersLeft(
+                      huntersLeft.clamp(0, hunterJokers),
+                      hunterJokers,
+                    )
+                  : null,
             ),
           if (playersEnabled)
             option(

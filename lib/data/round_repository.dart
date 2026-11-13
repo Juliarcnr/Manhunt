@@ -65,8 +65,8 @@ abstract interface class RoundRepository {
     Duration every = const Duration(seconds: 15),
   });
 
-  /// Player uses their single joker (R-PLAY-02) and gets the hunters'
-  /// current positions once.
+  /// Player uses one of their hunter jokers (R-PLAY-02, R-SET-09) and gets
+  /// the hunters' current positions once.
   Future<Map<String, LocationFix>> useJoker(GroupSession session);
 
   /// Player uses their joker "player positions" (R-PLAY-03): marks it as used

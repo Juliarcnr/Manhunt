@@ -9,7 +9,7 @@ class Member {
     required this.name,
     this.role = Role.unassigned,
     this.caught = false,
-    this.jokerUsed = false,
+    this.jokersUsed = 0,
     this.playerJokerUsed = false,
   });
 
@@ -18,8 +18,9 @@ class Member {
   final Role role;
   final bool caught;
 
-  /// Joker "hunter positions" used this round (R-PLAY-02).
-  final bool jokerUsed;
+  /// How often the joker "hunter positions" was used this round
+  /// (R-PLAY-02, R-SET-09).
+  final int jokersUsed;
 
   /// Joker "player positions" used this round (R-PLAY-03).
   final bool playerJokerUsed;
@@ -32,14 +33,14 @@ class Member {
     String? name,
     Role? role,
     bool? caught,
-    bool? jokerUsed,
+    int? jokersUsed,
     bool? playerJokerUsed,
   }) => Member(
     id: id,
     name: name ?? this.name,
     role: role ?? this.role,
     caught: caught ?? this.caught,
-    jokerUsed: jokerUsed ?? this.jokerUsed,
+    jokersUsed: jokersUsed ?? this.jokersUsed,
     playerJokerUsed: playerJokerUsed ?? this.playerJokerUsed,
   );
 
@@ -48,7 +49,7 @@ class Member {
     'name': name,
     'role': role.name,
     'caught': caught,
-    'jokerUsed': jokerUsed,
+    'jokersUsed': jokersUsed,
     'playerJokerUsed': playerJokerUsed,
   };
 
@@ -57,7 +58,7 @@ class Member {
     name: json['name']! as String,
     role: Role.values.byName(json['role']! as String),
     caught: json['caught'] as bool? ?? false,
-    jokerUsed: json['jokerUsed'] as bool? ?? false,
+    jokersUsed: json['jokersUsed'] as int? ?? 0,
     playerJokerUsed: json['playerJokerUsed'] as bool? ?? false,
   );
 }

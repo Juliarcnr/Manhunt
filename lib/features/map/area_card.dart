@@ -15,13 +15,19 @@ class AreaCard extends StatelessWidget {
   const AreaCard({super.key, required this.area, required this.onChanged});
 
   final List<GeoPoint> area;
-  final ValueChanged<List<GeoPoint>> onChanged;
 
-  Future<void> _edit(BuildContext context) async {
+  /// Null: not editable now, e.g. while a round runs that this member sits
+  /// out (R-SET-10, R-LOBBY-11).
+  final ValueChanged<List<GeoPoint>>? onChanged;
+
+  Future<void> _edit(
+    BuildContext context,
+    ValueChanged<List<GeoPoint>> done,
+  ) async {
     final result = await Navigator.of(context).push<List<GeoPoint>>(
       MaterialPageRoute(builder: (_) => AreaEditorScreen(initial: area)),
     );
-    if (result != null) onChanged(result);
+    if (result != null) done(result);
   }
 
   @override
@@ -70,7 +76,10 @@ class AreaCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: FilledButton.tonalIcon(
               key: const Key('editAreaButton'),
-              onPressed: () => _edit(context),
+              onPressed: switch (onChanged) {
+                final done? => () => _edit(context, done),
+                null => null,
+              },
               icon: Icon(hasArea ? Icons.edit_location_alt : Icons.draw),
               label: Text(hasArea ? l10n.areaEdit : l10n.areaDraw),
             ),

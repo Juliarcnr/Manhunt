@@ -38,7 +38,7 @@ void main() {
   Future<void> createDefault() => repo.createGame(
     admin,
     name: 'Julia',
-    settings: const GameSettings(hunterCount: 2),
+    settings: const GameSettings(speedhuntCount: 4),
   );
 
   DocumentReference<Map<String, dynamic>> gameDoc() =>
@@ -70,7 +70,7 @@ void main() {
       final game = await repo.watchGame(admin).first;
       expect(game!.adminId, 'admin');
       expect(game.status, GameStatus.lobby);
-      expect(game.settings.hunterCount, 2);
+      expect(game.settings.speedhuntCount, 4);
       final members = await repo.watchMembers(admin).first;
       expect(members.single.name, 'Julia');
       expect(members.single.role, Role.unassigned);
@@ -126,6 +126,25 @@ void main() {
       await repo.updateSettings(admin, const GameSettings(sharedPings: true));
       expect((await gameDoc().get()).data()!['sharedPings'], isTrue);
       expect((await repo.watchGame(admin).first)!.settings.sharedPings, isTrue);
+    });
+
+    test('the number of hunter jokers is also stored in plain text for the '
+        'rules (R-SET-09)', () async {
+      await createDefault();
+      expect((await gameDoc().get()).data()!['hunterJokers'], 1);
+      await repo.updateSettings(admin, const GameSettings(hunterJokers: 3));
+      expect((await gameDoc().get()).data()!['hunterJokers'], 3);
+      expect((await repo.watchGame(admin).first)!.settings.hunterJokers, 3);
+    });
+
+    test('members of older app versions: the joker flag counts as one '
+        '(R-SET-09)', () async {
+      await createDefault();
+      await gameDoc().collection('members').doc('admin').update({
+        'jokerUsed': true,
+      });
+      final me = (await repo.watchMembers(admin).first).single;
+      expect(me.jokersUsed, 1);
     });
 
     test('any member can edit the play area (R-SET-10)', () async {
@@ -430,12 +449,12 @@ void main() {
       await gameDoc().collection('members').doc('admin').update({
         'role': 'player',
         'caught': true,
-        'jokerUsed': true,
+        'jokersUsed': 2,
       });
       await repo.endRound(admin);
       final me = (await repo.watchMembers(admin).first).single;
       expect(me.caught, isFalse);
-      expect(me.jokerUsed, isFalse);
+      expect(me.jokersUsed, 0);
       expect(me.role, Role.player);
     });
   });
@@ -479,7 +498,7 @@ void main() {
         CatchRecord(playerId: 'guest', at: start.add(const Duration(hours: 1))),
       );
       await gameDoc().collection('members').doc('guest').update({
-        'jokerUsed': true,
+        'jokersUsed': 3,
       });
       now = start.add(const Duration(hours: 9));
 
@@ -493,7 +512,7 @@ void main() {
         (m) => m.id == 'guest',
       );
       expect(kim.caught, isFalse);
-      expect(kim.jokerUsed, isFalse);
+      expect(kim.jokersUsed, 0);
       expect(kim.role, Role.player);
       final round = (await repo.watchHistory(admin).first).single;
       // The normal way to end a round now: not marked.

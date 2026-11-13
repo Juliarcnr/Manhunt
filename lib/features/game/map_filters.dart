@@ -23,7 +23,7 @@ class MapFilters {
     this.hiddenLivePlayers = const {},
     this.myPings = true,
     this.sharedPings = true,
-    this.hunterJoker = true,
+    this.hiddenHunterJokers = const {},
     this.playerJoker = true,
   });
 
@@ -53,7 +53,10 @@ class MapFilters {
 
   /// "Last players' pings" when the regular pings go to everyone (R-PLAY-05).
   final bool sharedPings;
-  final bool hunterJoker;
+
+  /// Hunter jokers (index of use) switched off; one chip each, a new one is
+  /// shown right away (R-PLAY-04, R-SET-09).
+  final Set<int> hiddenHunterJokers;
   final bool playerJoker;
 
   HistoryMode historyOf(String playerId) =>
@@ -68,7 +71,7 @@ class MapFilters {
     Set<String>? hiddenLivePlayers,
     bool? myPings,
     bool? sharedPings,
-    bool? hunterJoker,
+    Set<int>? hiddenHunterJokers,
     bool? playerJoker,
   }) => MapFilters(
     hunters: hunters ?? this.hunters,
@@ -79,7 +82,7 @@ class MapFilters {
     hiddenLivePlayers: hiddenLivePlayers ?? this.hiddenLivePlayers,
     myPings: myPings ?? this.myPings,
     sharedPings: sharedPings ?? this.sharedPings,
-    hunterJoker: hunterJoker ?? this.hunterJoker,
+    hiddenHunterJokers: hiddenHunterJokers ?? this.hiddenHunterJokers,
     playerJoker: playerJoker ?? this.playerJoker,
   );
 
@@ -97,6 +100,12 @@ class MapFilters {
     hiddenSpeedhunts: hiddenSpeedhunts.contains(id)
         ? ({...hiddenSpeedhunts}..remove(id))
         : {...hiddenSpeedhunts, id},
+  );
+
+  MapFilters toggleHunterJoker(int index) => copyWith(
+    hiddenHunterJokers: hiddenHunterJokers.contains(index)
+        ? ({...hiddenHunterJokers}..remove(index))
+        : {...hiddenHunterJokers, index},
   );
 
   MapFilters toggleLivePlayer(String id) => copyWith(

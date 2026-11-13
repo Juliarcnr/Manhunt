@@ -116,6 +116,50 @@ void main() {
       expect(current().speedhuntRepeatCooldown, const Duration(minutes: 35));
     });
 
+    testWidgets('number of hunter jokers: 1 by default, 0 … 5 (R-SET-09)', (
+      tester,
+    ) async {
+      final current = await pumpEditable(tester);
+      const tile = 'hunterJokersStepper';
+      expect(
+        find.descendant(
+          of: find.byKey(const Key(tile)),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('0 = aus'), findsOneWidget);
+      await tap(tester, button(tile, '−'));
+      expect(current().hunterJokers, 0);
+      expect(current().jokerEnabled, isFalse);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: button(tile, '−'),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      for (var i = 0; i < GameSettings.maxHunterJokers; i++) {
+        await tap(tester, button(tile, '+'));
+      }
+      expect(current().hunterJokers, 5);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: button(tile, '+'),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+    });
+
     testWidgets('without repeats there is no per-player pause', (tester) async {
       final current = await pumpEditable(tester);
       await tap(tester, find.byKey(const Key('speedhuntRepeatSwitch')));
@@ -146,11 +190,7 @@ void main() {
       );
       expect(find.byType(IconButton), findsNothing);
       expect(find.text('20 min'), findsOneWidget);
-      for (final key in [
-        'jokerSwitch',
-        'playerJokerSwitch',
-        'sharedPingsSwitch',
-      ]) {
+      for (final key in ['playerJokerSwitch', 'sharedPingsSwitch']) {
         final tile = tester.widget<SwitchListTile>(find.byKey(Key(key)));
         expect(tile.onChanged, isNull);
       }

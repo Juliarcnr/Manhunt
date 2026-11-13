@@ -141,6 +141,15 @@ void main() {
       expect(botCarrier(BotKind.player, [gm, unassigned]), 'g');
     });
 
+    test('an unassigned phone carries bots only if nobody else can: it sees '
+        'the lobby during a round (R-LOBBY-11)', () {
+      const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);
+      const unassigned = Member(id: 'u', name: 'Uli');
+      expect(botCarrier(BotKind.player, [unassigned, gm]), 'g');
+      expect(botCarrier(BotKind.hunter, [unassigned, kim]), 'k');
+      expect(botCarrier(BotKind.hunter, [unassigned]), 'u');
+    });
+
     test('making the first phone game master moves its bots to the playing '
         'phone (R-BOT-07)', () {
       const gm = Member(id: 'g', name: 'Gil', role: Role.gameMaster);

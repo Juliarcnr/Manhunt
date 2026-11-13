@@ -15,20 +15,33 @@ void main() {
       expect(StartCheck(ready, [hunter, player]).canStart, isTrue);
     });
 
-    test('blocked while someone is unassigned', () {
+    test('unassigned members simply sit out (R-LOBBY-11)', () {
       final c = StartCheck(ready, [
         hunter,
         player,
         const Member(id: 'u', name: 'U'),
-      ]);
-      expect(c.hasUnassigned, isTrue);
+      ], adminId: 'h');
+      expect(c.hostUnassigned, isFalse);
+      expect(c.canStart, isTrue);
+    });
+
+    test('blocked while the host is unassigned (R-LOBBY-13)', () {
+      final c = StartCheck(ready, [
+        hunter,
+        player,
+        const Member(id: 'u', name: 'U'),
+      ], adminId: 'u');
+      expect(c.hostUnassigned, isTrue);
       expect(c.canStart, isFalse);
     });
 
     test('a game master counts as assigned, not as hunter or player '
         '(R-GM-01)', () {
       const gm = Member(id: 'g', name: 'G', role: Role.gameMaster);
-      expect(StartCheck(ready, [hunter, player, gm]).canStart, isTrue);
+      expect(
+        StartCheck(ready, [hunter, player, gm], adminId: 'g').canStart,
+        isTrue,
+      );
       expect(StartCheck(ready, [hunter, gm]).noPlayer, isTrue);
       expect(StartCheck(ready, [player, gm]).noHunter, isTrue);
     });
@@ -36,6 +49,10 @@ void main() {
     test('needs at least one hunter and one player', () {
       expect(StartCheck(ready, [hunter]).noPlayer, isTrue);
       expect(StartCheck(ready, [player]).noHunter, isTrue);
+      const u = Member(id: 'u', name: 'U');
+      final onlyUnassigned = StartCheck(ready, [u, u]);
+      expect(onlyUnassigned.noHunter && onlyUnassigned.noPlayer, isTrue);
+      expect(onlyUnassigned.canStart, isFalse);
     });
 
     test('blocked without play area', () {
@@ -43,13 +60,5 @@ void main() {
       expect(c.settingsErrors, [SettingsError.areaMissing]);
       expect(c.canStart, isFalse);
     });
-
-    test(
-      'manual swaps count, not the configured hunter number (R-LOBBY-05)',
-      () {
-        const twoHunters = GameSettings(area: area, hunterCount: 2);
-        expect(StartCheck(twoHunters, [hunter, player]).canStart, isTrue);
-      },
-    );
   });
 }

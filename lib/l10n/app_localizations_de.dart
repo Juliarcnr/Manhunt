@@ -83,7 +83,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get rolePlayers => 'Spieler:innen';
 
   @override
-  String get roleUnassigned => 'Noch nicht eingeteilt';
+  String get roleUnassigned => 'Nicht zugewiesen';
+
+  @override
+  String get lobbyUnassignedHint => 'Wer hier steht, spielt nicht mit.';
+
+  @override
+  String get lobbyUnassign => 'Nicht mitspielen lassen';
+
+  @override
+  String lobbyRoleMenuTitle(String name) {
+    return 'Rolle von $name';
+  }
+
+  @override
+  String get lobbyDragHint =>
+      'Halte eine Person gedrückt und zieh sie in einen anderen Bereich, um ihre Rolle zu ändern – oder tippe sie an.';
+
+  @override
+  String get lobbyStartConfirmTitle => 'Wer spielt mit?';
+
+  @override
+  String lobbyStartConfirmSitOut(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Personen spielen nicht mit',
+      one: '1 Person spielt nicht mit',
+    );
+    return '$_temp0';
+  }
 
   @override
   String overviewYouAreGameMaster(int seconds) {
@@ -100,16 +129,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get lobbyGameMasterHint =>
-      'Optional – spielt nicht mit und sieht alle Hunter:innen und Spieler:innen live. Wird nicht mit ausgewürfelt.';
-
-  @override
-  String get lobbyAddGameMaster => 'Spielleitung hinzufügen';
-
-  @override
-  String get lobbyPickGameMaster => 'Wer übernimmt die Spielleitung?';
-
-  @override
-  String get lobbyNobodyToPick => 'Alle sind schon Spielleitung.';
+      'Spielt nicht mit und sieht alle Hunter:innen und Spieler:innen live.';
 
   @override
   String gameMasterInfo(int seconds) {
@@ -345,14 +365,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Pause für dieselbe Person kann nicht kürzer sein als die Pause zwischen Speedhunts. Verkürze zuerst diese.';
 
   @override
-  String get settingsHunterCount => 'Anzahl Hunter:innen';
-
-  @override
   String get settingsJoker => 'Joker: Hunter:innen-Standorte';
 
   @override
   String get settingsJokerHint =>
-      'Jede:r Spieler:in darf einmal sehen, wo die Hunter:innen gerade sind.';
+      'Wie oft jede:r Spieler:in sehen darf, wo die Hunter:innen gerade sind (0 = aus).';
 
   @override
   String get settingsPlayerJoker => 'Joker: Spieler:innen-Standorte';
@@ -488,7 +505,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get errorAreaMissing => 'Zuerst das Spielfeld einzeichnen';
 
   @override
-  String get errorUnassigned => 'Alle brauchen eine Rolle';
+  String get errorHostUnassigned =>
+      'Du stehst noch unter „Nicht zugewiesen“. Zieh dich zur Spielleitung, wenn du nicht mitspielst.';
 
   @override
   String get lobbyTitle => 'Lobby';
@@ -515,10 +533,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get lobbyAssignRandom => 'Zufällig einteilen';
-
-  @override
-  String get lobbyTapToSwitch =>
-      'Tippe auf eine Person, um Hunter:in ↔ Spieler:in zu tauschen.';
 
   @override
   String get lobbyStart => 'Spiel starten';
@@ -744,6 +758,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einmalig sehen, wo die Hunter:innen gerade sind';
 
   @override
+  String get jokerHuntersHintMany =>
+      'Sehen, wo die Hunter:innen gerade sind – einmal pro Joker';
+
+  @override
+  String jokersLeft(int left, int total) {
+    return 'Noch $left von $total';
+  }
+
+  @override
   String get jokerPlayersOption => 'Spieler:innen-Standorte';
 
   @override
@@ -766,6 +789,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get jokerText =>
       'Du siehst einmalig die aktuellen Standorte der Hunter:innen. Danach ist der Joker verbraucht.';
+
+  @override
+  String jokerTextMany(int left, int total) {
+    return 'Du siehst einmalig die aktuellen Standorte der Hunter:innen. Danach hast du noch $left von $total Hunter:innen-Jokern.';
+  }
 
   @override
   String get jokerConfirm => 'Joker einsetzen';

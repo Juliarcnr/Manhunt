@@ -44,6 +44,8 @@ Dauert 2–3 Minuten.
   Hunter oder Spieler im Spiel. Wer gefangen wird, bestätigt vorher mit „OK“: **Nichts davon an Spieler oder Hunter
   weitergeben, die noch im Spiel sind!** Mit Spielende wird nichts mehr live geteilt.
 - Handy verloren oder neu installiert? Mit dem Gruppencode neu beitreten; der Host teilt die Rolle neu zu.
+- **„Nicht zugewiesen“ heißt: du spielst nicht mit.** Dein Handy trackt dann nicht, und während einer Runde siehst du
+  nur die Lobby. Wenn du mitspielen willst, sag dem Host Bescheid.
 
 ## 3. Für den Host
 
@@ -52,9 +54,12 @@ Dauert 2–3 Minuten.
   oder statt des Spieler-Jokers „Reguläre Pings an alle Spieler“.
 - [ ] Optional eine **Startzeit** einstellen (z.B. 14:00). Nach „Spiel starten“ läuft bei allen ein Countdown bis dahin –
   1 Minute, wenn sie schon vorbei ist. Erst danach zählen Vorlauf und Pings. Ohne Startzeit: 1 Minute Countdown.
-- [ ] Optional eine **Spielleitung** bestimmen (Lobby → „Spielleitung hinzufügen“): spielt nicht mit, sieht alle
-  live und wird beim Würfeln nicht mit eingeteilt.
-- [ ] Alle beigetreten? Dann **zufällig einteilen**, ggf. tauschen, **Spiel starten**.
+- [ ] Alle beigetreten? Dann **zufällig einteilen** (würfelt alle neu: 30 % Hunter, 70 % Spieler). Danach
+  Personen per **Drag & Drop** (lange drücken, ziehen) oder durch **Antippen** umsetzen. Wer nicht mitspielt,
+  kommt mit dem Knopf neben dem Namen zurück unter „Nicht zugewiesen“.
+- [ ] Optional eine **Spielleitung**: Person in den Abschnitt „Spielleitung“ ziehen. Sie spielt nicht mit und sieht
+  alle live. Spielst du als Host nicht mit, zieh dich selbst dorthin (unter „Nicht zugewiesen“ kannst du nicht starten).
+- [ ] **Spiel starten** → in der Liste prüfen, wer in welcher Rolle mitspielt und wer nicht → bestätigen.
 - [ ] Ist die Zeit abgelaufen, fragt die App alle Hunter und alle noch freien Spieler, **ob noch jemand gefangen wurde**
   (Häkchen setzen oder „Niemand wurde mehr gefangen“). **Eine Person reicht** – danach sehen alle, wer gewonnen hat.
   Bestätigt 10 Minuten lang niemand, gilt: niemand mehr gefangen.

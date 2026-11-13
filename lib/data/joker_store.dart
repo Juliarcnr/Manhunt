@@ -4,6 +4,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/round/ping_schedule.dart';
 
+/// One use of the hunter joker: when and where the hunters were (R-PLAY-02).
+typedef HunterReveal = ({DateTime at, Map<String, LocationFix> positions});
+
 /// Joker results and own ⚡ pings of the current round, kept on this device so
 /// they can be shown again any time – also after an app restart (R-PLAY-04,
 /// R-SPEED-09). Also whether the caught player accepted the live view
@@ -11,7 +14,7 @@ import '../core/round/ping_schedule.dart';
 class SavedJokers {
   const SavedJokers({
     required this.roundStart,
-    this.hunters,
+    this.hunters = const [],
     this.players,
     this.speedhuntPings = const {},
     this.liveViewAccepted = false,
@@ -20,9 +23,10 @@ class SavedJokers {
   /// Results belong to one round; another round start means "nothing saved".
   final DateTime roundStart;
 
-  /// Hunter joker: the positions themselves – the hunters' live positions are
-  /// readable only for 2 minutes after using it (security rules).
-  final ({DateTime at, Map<String, LocationFix> positions})? hunters;
+  /// Hunter jokers, oldest first (several per round, R-SET-09): the positions
+  /// themselves – the hunters' live positions are readable only for 2 minutes
+  /// after using one (security rules).
+  final List<HunterReveal> hunters;
 
   /// Player joker: the request id – the answers stay readable for the asking
   /// player until the round ends.
@@ -36,7 +40,7 @@ class SavedJokers {
   final bool liveViewAccepted;
 
   SavedJokers copyWith({
-    ({DateTime at, Map<String, LocationFix> positions})? hunters,
+    List<HunterReveal>? hunters,
     ({DateTime at, String requestId})? players,
     Map<String, LocationFix>? speedhuntPings,
     bool? liveViewAccepted,
@@ -50,13 +54,8 @@ class SavedJokers {
 
   Map<String, Object?> toJson() => {
     'roundStart': roundStart.toUtc().toIso8601String(),
-    if (hunters case final h?)
-      'hunters': {
-        'at': h.at.toUtc().toIso8601String(),
-        'positions': {
-          for (final e in h.positions.entries) e.key: e.value.toJson(),
-        },
-      },
+    if (hunters.isNotEmpty)
+      'hunterReveals': [for (final h in hunters) _revealToJson(h)],
     if (players case final p?)
       'players': {
         'at': p.at.toUtc().toIso8601String(),
@@ -70,7 +69,9 @@ class SavedJokers {
   };
 
   factory SavedJokers.fromJson(Map<String, Object?> json) {
-    final h = json['hunters'] as Map<String, Object?>?;
+    // Saved before several hunter jokers existed: a single one.
+    final legacy = json['hunters'] as Map<String, Object?>?;
+    final h = json['hunterReveals'] as List<Object?>? ?? [?legacy];
     final p = json['players'] as Map<String, Object?>?;
     final s = json['speedhuntPings'] as Map<String, Object?>? ?? const {};
     return SavedJokers(
@@ -80,16 +81,7 @@ class SavedJokers {
       },
       roundStart: DateTime.parse(json['roundStart']! as String),
       liveViewAccepted: json['liveViewAccepted'] as bool? ?? false,
-      hunters: h == null
-          ? null
-          : (
-              at: DateTime.parse(h['at']! as String),
-              positions: {
-                for (final e
-                    in (h['positions']! as Map<String, Object?>).entries)
-                  e.key: LocationFix.fromJson(e.value! as Map<String, Object?>),
-              },
-            ),
+      hunters: [for (final r in h) _revealFromJson(r! as Map<String, Object?>)],
       players: p == null
           ? null
           : (
@@ -98,6 +90,19 @@ class SavedJokers {
             ),
     );
   }
+
+  static Map<String, Object?> _revealToJson(HunterReveal r) => {
+    'at': r.at.toUtc().toIso8601String(),
+    'positions': {for (final e in r.positions.entries) e.key: e.value.toJson()},
+  };
+
+  static HunterReveal _revealFromJson(Map<String, Object?> json) => (
+    at: DateTime.parse(json['at']! as String),
+    positions: {
+      for (final e in (json['positions']! as Map<String, Object?>).entries)
+        e.key: LocationFix.fromJson(e.value! as Map<String, Object?>),
+    },
+  );
 }
 
 abstract interface class JokerStore {

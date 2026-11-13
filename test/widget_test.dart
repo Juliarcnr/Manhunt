@@ -1,10 +1,12 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manhunt/app.dart';
 import 'package:manhunt/core/groups/group_list.dart';
+import 'package:manhunt/core/models/geo_point.dart';
 import 'package:manhunt/core/models/member.dart';
 import 'package:manhunt/core/teams/team_assignment.dart';
 import 'package:manhunt/data/game_repository.dart';
@@ -294,67 +296,213 @@ void main() {
     expect(find.text('Kim'), findsNothing);
   });
 
-  testWidgets('host picks a game master; random assignment leaves them out; '
-      'tapping makes them a player again (R-GM-01, R-GM-02)', (tester) async {
-    final db = FakeFirebaseFirestore();
-    final me = await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me'));
-    final ids = ['kim', 'sam', 'lou'];
-    await tester.runAsync(() async {
-      await deviceRepo(db)
-          .createGame(me!, name: 'Julia', settings: defaultSettings);
-      for (final id in ids) {
-        await deviceRepo(db).joinGame(
-          await testSession('ABCDE-FGHJK', id),
-          name: id.toUpperCase(),
-        );
-      }
-    });
-    await pumpAppWithSession(tester, db: db, userId: 'me');
+  group('roles in the lobby (R-LOBBY-04, R-LOBBY-05, R-LOBBY-06, '
+      'R-LOBBY-11, R-LOBBY-12, R-LOBBY-13, R-GM-02)', () {
+    const square = [GeoPoint(52, 13), GeoPoint(52, 13.1), GeoPoint(52.1, 13.1)];
+    late FakeFirebaseFirestore db;
+    late GroupSession host;
 
-    Future<String?> role(String id) async =>
+    /// Host "me" and KIM, SAM, LOU – everyone unassigned after joining.
+    Future<void> setUpGroup(WidgetTester tester) async {
+      db = FakeFirebaseFirestore();
+      host = (await tester.runAsync(() => testSession('ABCDE-FGHJK', 'me')))!;
+      await tester.runAsync(() async {
+        await deviceRepo(db).createGame(
+          host,
+          name: 'Julia',
+          settings: defaultSettings.copyWith(area: square),
+        );
+        for (final id in ['kim', 'sam', 'lou']) {
+          await deviceRepo(db).joinGame(
+            await testSession('ABCDE-FGHJK', id),
+            name: id.toUpperCase(),
+          );
+        }
+      });
+    }
+
+    Future<String?> role(WidgetTester tester, String id) async =>
         (await tester.runAsync(
               () => db
                   .collection('games')
-                  .doc(me!.groupId)
+                  .doc(host.groupId)
                   .collection('members')
                   .doc(id)
                   .get(),
             ))!.data()?['role']
             as String?;
 
-    // The section is the last one, right above the start button.
-    Future<void> toBottom() async {
-      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+    Future<void> assign(WidgetTester tester, Map<String, Role> roles) =>
+        tester.runAsync(() async {
+          final members = await deviceRepo(db).watchMembers(host).first;
+          await deviceRepo(db).setRoles(host, [
+            for (final m in members) m.copyWith(role: roles[m.id] ?? m.role),
+          ]);
+        });
+
+    Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
     }
 
-    await toBottom();
-    await tester.tap(find.byKey(const Key('addGameMasterButton')));
-    await tester.pumpAndSettle();
-    expect(find.text('Who will be game master?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pickGameMaster_kim')));
-    await settleAsync(tester);
-    expect(await role('kim'), 'gameMaster');
+    testWidgets('newcomers are unassigned; the hint says they do not play; '
+        'four sections and the drag hint for the host, no add button', (
+      tester,
+    ) async {
+      await setUpGroup(tester);
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      await scrollTo(tester, find.byKey(const Key('dragHint')));
+      expect(find.byKey(const Key('dragHint')), findsOneWidget);
+      for (final key in [
+        'unassignedSection',
+        'playerSection',
+        'hunterSection',
+        'gameMasterSection',
+      ]) {
+        await scrollTo(tester, find.byKey(Key(key)));
+        expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      }
+      await scrollTo(tester, find.byKey(const Key('unassignedHint')));
+      expect(find.text('Anyone here does not play.'), findsOneWidget);
+      expect(find.byKey(const Key('addGameMasterButton')), findsNothing);
+      expect(await role(tester, 'kim'), 'unassigned');
+    });
 
-    // Random assignment: Kim stays game master, everyone else gets a role.
-    await tester.drag(find.byType(ListView), const Offset(0, 3000));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('randomButton')));
-    await settleAsync(tester);
-    expect(await role('kim'), 'gameMaster');
-    for (final id in ['me', 'sam', 'lou']) {
-      expect(await role(id), isIn(['hunter', 'player']), reason: id);
-    }
+    testWidgets('tapping a person opens the role menu', (tester) async {
+      await setUpGroup(tester);
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      await scrollTo(tester, find.text('KIM'));
+      await tester.tap(find.text('KIM'));
+      await tester.pumpAndSettle();
+      expect(find.text('Role of KIM'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('roleOption_gameMaster')));
+      await settleAsync(tester);
+      expect(await role(tester, 'kim'), 'gameMaster');
+    });
 
-    // Kim's tile in the game master section: a tap makes Kim a player.
-    final kim = find.descendant(
-      of: find.byKey(const Key('gameMasterSection')),
-      matching: find.text('KIM'),
-    );
-    await toBottom();
-    await tester.tap(kim);
-    await settleAsync(tester);
-    expect(await role('kim'), 'player');
+    testWidgets('a person is dragged into another section', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'me': Role.hunter, 'kim': Role.player});
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      await scrollTo(tester, find.byKey(const Key('hunterSection')));
+      final from = tester.getCenter(find.byKey(const Key('drag_kim')));
+      final to = tester.getCenter(find.byKey(const Key('hunterSection')));
+      final gesture = await tester.startGesture(from);
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      await gesture.moveTo(to);
+      await tester.pump();
+      await gesture.up();
+      await settleAsync(tester);
+      expect(await role(tester, 'kim'), 'hunter');
+    });
+
+    testWidgets('the sit-out button sends a person back to unassigned; not '
+        'for the host themself', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'me': Role.hunter, 'kim': Role.player});
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      expect(find.byKey(const Key('unassign_me')), findsNothing);
+      // Already unassigned: no button.
+      expect(find.byKey(const Key('unassign_sam')), findsNothing);
+      await scrollTo(tester, find.byKey(const Key('unassign_kim')));
+      await tester.tap(find.byKey(const Key('unassign_kim')));
+      await settleAsync(tester);
+      expect(await role(tester, 'kim'), 'unassigned');
+    });
+
+    testWidgets('dice rolls everybody, also game masters and unassigned '
+        'members, 30/70', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'me': Role.gameMaster, 'kim': Role.hunter});
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      await scrollTo(tester, find.byKey(const Key('randomButton')));
+      await tester.tap(find.byKey(const Key('randomButton')));
+      await settleAsync(tester);
+      final roles = [
+        for (final id in ['me', 'kim', 'sam', 'lou']) await role(tester, id),
+      ];
+      expect(roles.where((r) => r == 'hunter'), hasLength(1));
+      expect(roles.where((r) => r == 'player'), hasLength(3));
+    });
+
+    testWidgets('an unassigned host cannot start', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'kim': Role.hunter, 'sam': Role.player});
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      final start = tester.widget<ButtonStyleButton>(
+        find.byKey(const Key('startButton')),
+      );
+      expect(start.onPressed, isNull);
+      await scrollTo(tester, find.textContaining('You are still under'));
+      expect(find.textContaining('You are still under'), findsOneWidget);
+    });
+
+    testWidgets('start shows who plays and who sits out; only the '
+        'confirmation starts the round', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {
+        'me': Role.gameMaster,
+        'kim': Role.hunter,
+        'sam': Role.player,
+      });
+      await pumpAppWithSession(tester, db: db, userId: 'me');
+      Future<String?> status() async =>
+          (await tester.runAsync(
+                () => db.collection('games').doc(host.groupId).get(),
+              ))!.data()?['status']
+              as String?;
+
+      await tester.tap(find.byKey(const Key('startButton')));
+      await tester.pumpAndSettle();
+      final dialog = find.byKey(const Key('startConfirmDialog'));
+      expect(dialog, findsOneWidget);
+      for (final (key, name) in [
+        ('startConfirm_player', 'SAM'),
+        ('startConfirm_hunter', 'KIM'),
+        ('startConfirm_gameMaster', 'Julia'),
+      ]) {
+        expect(
+          find.descendant(of: find.byKey(Key(key)), matching: find.text(name)),
+          findsOneWidget,
+          reason: key,
+        );
+      }
+      expect(find.text('1 person does not play'), findsOneWidget);
+      expect(
+        find.descendant(of: dialog, matching: find.text('LOU')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await settleAsync(tester);
+      expect(await status(), 'lobby');
+
+      await tester.tap(find.byKey(const Key('startButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('startConfirmButton')));
+      await settleAsync(tester);
+      expect(await status(), 'running');
+    });
+
+    testWidgets('during a round, unassigned members see the lobby as if no '
+        'game were on (R-LOBBY-11)', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'me': Role.hunter, 'kim': Role.player});
+      await tester.runAsync(() => deviceRepo(db).startGame(host));
+      await pumpAppWithSession(tester, db: db, userId: 'lou');
+      expect(find.text('Lobby'), findsOneWidget);
+      expect(find.text('Waiting for the host to start…'), findsOneWidget);
+      // Nothing to change until the round is over.
+      final edit = tester.widget<ButtonStyleButton>(
+        find.byKey(const Key('editAreaButton')),
+      );
+      expect(edit.onPressed, isNull);
+      expect(find.byKey(const Key('endRoundButton')), findsNothing);
+    });
   });
 
   testWidgets('host is told before the start when hunters will see each '
@@ -430,7 +578,9 @@ void main() {
     await settleAsync(tester);
     await toBottom();
     expect(find.byKey(const Key('gameMasterSection')), findsOneWidget);
-    expect(find.byKey(const Key('addGameMasterButton')), findsNothing);
+    // Guests cannot move anyone (R-LOBBY-05).
+    expect(find.byKey(const Key('dragHint')), findsNothing);
+    expect(find.byKey(const Key('drag_guest')), findsNothing);
   });
 
   testWidgets('members change their own name in the lobby (R-LOBBY-10)', (
@@ -743,7 +893,7 @@ void main() {
       expect(find.byIcon(Icons.add_circle_outline), findsNothing);
       expect(find.byIcon(Icons.remove_circle_outline), findsNothing);
       final joker = tester.widget<SwitchListTile>(
-        find.byKey(const Key('jokerSwitch')),
+        find.byKey(const Key('playerJokerSwitch')),
       );
       expect(joker.onChanged, isNull);
       expect(find.text('20 min'), findsOneWidget);

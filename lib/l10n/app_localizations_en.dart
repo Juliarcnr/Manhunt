@@ -83,7 +83,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rolePlayers => 'Players';
 
   @override
-  String get roleUnassigned => 'Not assigned yet';
+  String get roleUnassigned => 'Not assigned';
+
+  @override
+  String get lobbyUnassignedHint => 'Anyone here does not play.';
+
+  @override
+  String get lobbyUnassign => 'Sit out';
+
+  @override
+  String lobbyRoleMenuTitle(String name) {
+    return 'Role of $name';
+  }
+
+  @override
+  String get lobbyDragHint =>
+      'Press and hold a person and drag them to another section to change their role – or tap them.';
+
+  @override
+  String get lobbyStartConfirmTitle => 'Who is playing?';
+
+  @override
+  String lobbyStartConfirmSitOut(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people do not play',
+      one: '1 person does not play',
+    );
+    return '$_temp0';
+  }
 
   @override
   String overviewYouAreGameMaster(int seconds) {
@@ -100,16 +129,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lobbyGameMasterHint =>
-      'Optional – doesn\'t play and sees all hunters and players live. Not included when assigning randomly.';
-
-  @override
-  String get lobbyAddGameMaster => 'Add game master';
-
-  @override
-  String get lobbyPickGameMaster => 'Who will be game master?';
-
-  @override
-  String get lobbyNobodyToPick => 'Everyone is game master already.';
+      'Does not play and sees all hunters and players live.';
 
   @override
   String gameMasterInfo(int seconds) {
@@ -344,14 +364,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'The pause for the same player cannot be shorter than the pause between speedhunts. Shorten that one first.';
 
   @override
-  String get settingsHunterCount => 'Number of hunters';
-
-  @override
   String get settingsJoker => 'Joker: hunter positions';
 
   @override
   String get settingsJokerHint =>
-      'Each player may see where the hunters are once.';
+      'How often each player may see where the hunters are (0 = off).';
 
   @override
   String get settingsPlayerJoker => 'Joker: player positions';
@@ -484,7 +501,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorAreaMissing => 'Draw the play area first';
 
   @override
-  String get errorUnassigned => 'Everyone needs a role';
+  String get errorHostUnassigned =>
+      'You are still under “Not assigned”. Drag yourself to game master if you are not playing.';
 
   @override
   String get lobbyTitle => 'Lobby';
@@ -511,9 +529,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lobbyAssignRandom => 'Random teams';
-
-  @override
-  String get lobbyTapToSwitch => 'Tap a person to switch hunter ↔ player.';
 
   @override
   String get lobbyStart => 'Start game';
@@ -736,6 +751,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jokerHuntersHint => 'See once where the hunters are right now';
 
   @override
+  String get jokerHuntersHintMany =>
+      'See where the hunters are right now – once per joker';
+
+  @override
+  String jokersLeft(int left, int total) {
+    return '$left of $total left';
+  }
+
+  @override
   String get jokerPlayersOption => 'Player positions';
 
   @override
@@ -758,6 +782,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get jokerText =>
       'You will see the hunters\' current positions once. Afterwards the joker is used up.';
+
+  @override
+  String jokerTextMany(int left, int total) {
+    return 'You will see the hunters\' current positions once. Afterwards you have $left of $total hunter jokers left.';
+  }
 
   @override
   String get jokerConfirm => 'Use joker';

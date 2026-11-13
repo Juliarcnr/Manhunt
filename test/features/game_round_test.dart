@@ -844,14 +844,89 @@ void main() {
         isTrue,
       );
 
-      // Used up: still listed, but disabled.
+      // Used up: still listed, but disabled. A single joker shows no counter
+      // (R-SET-09).
       await tester.tap(find.byKey(const Key('jokerButton')));
       await tester.pumpAndSettle();
       expect(find.text('Already used'), findsOneWidget);
+      expect(find.byKey(const Key('jokerLeft_hunters')), findsNothing);
       final option = tester.widget<ListTile>(
         find.byKey(const Key('joker_hunters')),
       );
       expect(option.enabled, isFalse);
+    });
+
+    testWidgets('several hunter jokers: the sheet shows how many are left, '
+        'one chip per use (R-SET-09, R-PLAY-04)', (tester) async {
+      await seed(tester);
+      await tester.runAsync(
+        () async => FirestoreRoundRepository(db).updateHunterLocation(
+          await testSession(code, 'alex'),
+          LocationFix(point: const GeoPoint(52.506, 13.406), at: now),
+        ),
+      );
+      await pumpAs(
+        tester,
+        'kim',
+        gameSettings: settings.copyWith(hunterJokers: 2),
+      );
+      String left() =>
+          tester.widget<Text>(find.byKey(const Key('jokerLeft_hunters'))).data!;
+      Future<void> useHunterJoker({required String confirmText}) async {
+        await tester.tap(find.byKey(const Key('jokerButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('joker_hunters')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining(confirmText), findsOneWidget);
+        await tester.tap(find.byKey(const Key('confirmJoker')));
+        await settle(tester);
+      }
+
+      await tester.tap(find.byKey(const Key('jokerButton')));
+      await tester.pumpAndSettle();
+      expect(left(), '2 of 2 left');
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      await useHunterJoker(confirmText: '1 of 2 hunter jokers left');
+      expect(find.byKey(const Key('filter_hunterJoker')), findsOneWidget);
+      expect(find.byKey(const Key('filter_hunterJoker_1')), findsNothing);
+
+      // Still one left: the option stays usable.
+      await tester.tap(find.byKey(const Key('jokerButton')));
+      await tester.pumpAndSettle();
+      expect(left(), '1 of 2 left');
+      expect(
+        tester.widget<ListTile>(find.byKey(const Key('joker_hunters'))).enabled,
+        isTrue,
+      );
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      await useHunterJoker(confirmText: '0 of 2 hunter jokers left');
+      // One chip per use, both on (R-PLAY-04); they switch separately.
+      expect(find.byKey(const Key('filter_hunterJoker_1')), findsOneWidget);
+      expect(find.byKey(const Key('hunter_alex')), findsNWidgets(2));
+      await tester.ensureVisible(find.byKey(const Key('filter_hunterJoker')));
+      await tester.tap(find.byKey(const Key('filter_hunterJoker')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('hunter_alex')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilterChip>(find.byKey(const Key('filter_hunterJoker_1')))
+            .selected,
+        isTrue,
+      );
+
+      // Used up: listed with 0 left, disabled. The player joker is still
+      // there, so the button stays.
+      await tester.tap(find.byKey(const Key('jokerButton')));
+      await tester.pumpAndSettle();
+      expect(left(), '0 of 2 left');
+      expect(
+        tester.widget<ListTile>(find.byKey(const Key('joker_hunters'))).enabled,
+        isFalse,
+      );
     });
 
     testWidgets('player joker shows the answers of other players '
@@ -890,7 +965,7 @@ void main() {
       await pumpAs(
         tester,
         'kim',
-        gameSettings: settings.copyWith(jokerEnabled: false),
+        gameSettings: settings.copyWith(hunterJokers: 0),
       );
       await tester.tap(find.byKey(const Key('jokerButton')));
       await tester.pumpAndSettle();
@@ -904,7 +979,7 @@ void main() {
         tester,
         'kim',
         gameSettings: settings.copyWith(
-          jokerEnabled: false,
+          hunterJokers: 0,
           playerJokerEnabled: false,
         ),
       );

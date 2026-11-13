@@ -225,15 +225,22 @@ void main() {
       expect(locs['hunter']!.point.lat, 52.41);
     });
 
-    test('joker reveals hunters once and is marked as used', () async {
-      await rounds.updateHunterLocation(hunter, fix(52.4));
-      final revealed = await rounds.useJoker(kim);
-      expect(revealed['hunter']!.point.lat, 52.4);
-      final me = (await games.watchMembers(kim).first).firstWhere(
-        (m) => m.id == 'kim',
-      );
-      expect(me.jokerUsed, isTrue);
-    });
+    test(
+      'joker reveals hunters once and is counted (R-PLAY-02, R-SET-09)',
+      () async {
+        await rounds.updateHunterLocation(hunter, fix(52.4));
+        final revealed = await rounds.useJoker(kim);
+        expect(revealed['hunter']!.point.lat, 52.4);
+        Future<int> used() async => (await games.watchMembers(kim).first)
+            .firstWhere((m) => m.id == 'kim')
+            .jokersUsed;
+        expect(await used(), 1);
+        await rounds.updateHunterLocation(hunter, fix(52.41, 1));
+        final again = await rounds.useJoker(kim);
+        expect(again['hunter']!.point.lat, 52.41);
+        expect(await used(), 2);
+      },
+    );
   });
 
   group('player joker (R-PLAY-03)', () {

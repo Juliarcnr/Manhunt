@@ -1,6 +1,6 @@
 import 'geo_point.dart';
 
-/// All configurable rules of a game (R-SET-02 … R-SET-07, R-SET-09, R-SET-11,
+/// All configurable rules of a game (R-SET-02 … R-SET-06, R-SET-09, R-SET-11,
 /// R-SET-12, R-SET-13, R-SET-15, R-SET-16, R-SET-17, R-SET-18, R-SET-19,
 /// R-SET-21, R-BOT-02, R-BOT-09).
 class GameSettings {
@@ -16,8 +16,7 @@ class GameSettings {
     this.speedhuntCooldown = const Duration(minutes: 30),
     this.speedhuntRepeatTarget = true,
     this.speedhuntRepeatCooldown = const Duration(minutes: 30),
-    this.hunterCount = 1,
-    this.jokerEnabled = true,
+    this.hunterJokers = 1,
     this.playerJokerEnabled = true,
     this.sharedPings = false,
     this.anonymousPlayers = true,
@@ -54,11 +53,15 @@ class GameSettings {
   /// player before the next one on them; never below [speedhuntCooldown]
   /// (R-SET-19).
   final Duration speedhuntRepeatCooldown;
-  final int hunterCount;
 
-  /// Joker "hunter positions": each player may see the hunters once
-  /// (R-PLAY-02, R-SET-09).
-  final bool jokerEnabled;
+  /// Joker "hunter positions": how often each player may see the hunters
+  /// per round; 0 = no such joker (R-PLAY-02, R-SET-09).
+  final int hunterJokers;
+
+  /// Upper limit offered in the settings (R-SET-09).
+  static const maxHunterJokers = 5;
+
+  bool get jokerEnabled => hunterJokers > 0;
 
   /// Joker "player positions": each player may see all other players once
   /// (R-PLAY-03, R-SET-12).
@@ -96,7 +99,7 @@ class GameSettings {
   final List<GeoPoint> area;
 
   /// Human-readable problems; empty when the settings are playable.
-  List<SettingsError> validate({int? memberCount}) {
+  List<SettingsError> validate() {
     final errors = <SettingsError>[];
     if (duration <= Duration.zero) errors.add(SettingsError.durationTooShort);
     if (headStart < Duration.zero || headStart >= duration) {
@@ -120,10 +123,6 @@ class GameSettings {
     if (speedhuntInterval < const Duration(minutes: 1)) {
       errors.add(SettingsError.speedhuntIntervalTooShort);
     }
-    if (hunterCount < 1) errors.add(SettingsError.hunterCountInvalid);
-    if (memberCount != null && hunterCount >= memberCount) {
-      errors.add(SettingsError.notEnoughPlayers);
-    }
     if (area.length < 3) errors.add(SettingsError.areaMissing);
     return errors;
   }
@@ -140,8 +139,7 @@ class GameSettings {
     Duration? speedhuntCooldown,
     bool? speedhuntRepeatTarget,
     Duration? speedhuntRepeatCooldown,
-    int? hunterCount,
-    bool? jokerEnabled,
+    int? hunterJokers,
     bool? playerJokerEnabled,
     bool? sharedPings,
     bool? anonymousPlayers,
@@ -164,8 +162,7 @@ class GameSettings {
     speedhuntRepeatTarget: speedhuntRepeatTarget ?? this.speedhuntRepeatTarget,
     speedhuntRepeatCooldown:
         speedhuntRepeatCooldown ?? this.speedhuntRepeatCooldown,
-    hunterCount: hunterCount ?? this.hunterCount,
-    jokerEnabled: jokerEnabled ?? this.jokerEnabled,
+    hunterJokers: hunterJokers ?? this.hunterJokers,
     playerJokerEnabled: playerJokerEnabled ?? this.playerJokerEnabled,
     sharedPings: sharedPings ?? this.sharedPings,
     anonymousPlayers: anonymousPlayers ?? this.anonymousPlayers,
@@ -192,7 +189,11 @@ class GameSettings {
     'speedhuntCooldownSec': speedhuntCooldown.inSeconds,
     'speedhuntRepeatTarget': speedhuntRepeatTarget,
     'speedhuntRepeatCooldownSec': speedhuntRepeatCooldown.inSeconds,
-    'hunterCount': hunterCount,
+    // The roles are set in the lobby now (R-LOBBY-04); older app versions
+    // still require the key when reading the settings.
+    'hunterCount': 1,
+    'hunterJokers': hunterJokers,
+    // Older app versions only know the switch.
     'jokerEnabled': jokerEnabled,
     'playerJokerEnabled': playerJokerEnabled,
     'sharedPings': sharedPings,
@@ -225,8 +226,9 @@ class GameSettings {
     speedhuntRepeatCooldown: Duration(
       seconds: json['speedhuntRepeatCooldownSec'] as int? ?? 1800,
     ),
-    hunterCount: json['hunterCount']! as int,
-    jokerEnabled: json['jokerEnabled'] as bool? ?? true,
+    hunterJokers:
+        json['hunterJokers'] as int? ??
+        (json['jokerEnabled'] as bool? ?? true ? 1 : 0),
     playerJokerEnabled: json['playerJokerEnabled'] as bool? ?? true,
     sharedPings: json['sharedPings'] as bool? ?? false,
     anonymousPlayers: json['anonymousPlayers'] as bool? ?? true,
@@ -253,7 +255,5 @@ enum SettingsError {
   speedhuntPingsInvalid,
   speedhuntIntervalTooShort,
   speedhuntRepeatCooldownTooShort,
-  hunterCountInvalid,
-  notEnoughPlayers,
   areaMissing,
 }
