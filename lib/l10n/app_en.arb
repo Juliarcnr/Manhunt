@@ -251,7 +251,7 @@
   "jokerButton": "Joker",
   "jokerHuntersOption": "Hunter positions",
   "jokerHuntersHint": "See once where the hunters are right now",
-  "jokerHuntersHintMany": "See where the hunters are right now – once per joker",
+  "jokerHuntersHintMany": "See where the hunters are right now",
   "jokersLeft": "{left} of {total} left",
   "@jokersLeft": {"placeholders": {"left": {"type": "int"}, "total": {"type": "int"}}},
   "jokerPlayersOption": "Player positions",

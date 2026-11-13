@@ -48,6 +48,27 @@ class _SessionGateState extends ConsumerState<SessionGate> {
         ref.read(sessionControllerProvider.notifier).rememberInfo(game);
       }
     });
+    final screen = _screen();
+    _closeGameOverlaysWhenLeaving(screen is GameScreen);
+    return screen;
+  }
+
+  /// Whether the last build showed the game screen.
+  var _inGame = false;
+
+  /// Leaving the game (round over, back in the lobby, group gone): close
+  /// everything the game opened on top of it – joker sheet, dialogs,
+  /// overview – so nothing of the round stays over the lobby (R-GAME-12).
+  void _closeGameOverlaysWhenLeaving(bool inGame) {
+    final left = _inGame && !inGame;
+    _inGame = inGame;
+    if (!left) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    });
+  }
+
+  Widget _screen() {
     final session = ref.watch(sessionControllerProvider);
     return session.when(
       loading: () => const _Loading(),

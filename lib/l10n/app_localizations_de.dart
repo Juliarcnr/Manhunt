@@ -752,8 +752,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einmalig sehen, wo die Hunter:innen gerade sind';
 
   @override
-  String get jokerHuntersHintMany =>
-      'Sehen, wo die Hunter:innen gerade sind – einmal pro Joker';
+  String get jokerHuntersHintMany => 'Sehen, wo die Hunter:innen gerade sind';
 
   @override
   String jokersLeft(int left, int total) {

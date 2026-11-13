@@ -221,7 +221,7 @@
   "jokerButton": "Joker",
   "jokerHuntersOption": "Hunter:innen-Standorte",
   "jokerHuntersHint": "Einmalig sehen, wo die Hunter:innen gerade sind",
-  "jokerHuntersHintMany": "Sehen, wo die Hunter:innen gerade sind – einmal pro Joker",
+  "jokerHuntersHintMany": "Sehen, wo die Hunter:innen gerade sind",
   "jokersLeft": "Noch {left} von {total}",
   "jokerPlayersOption": "Spieler:innen-Standorte",
   "jokerPlayersHint": "Einmalig sehen, wo alle anderen Spieler:innen gerade sind",

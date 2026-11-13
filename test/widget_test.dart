@@ -505,6 +505,22 @@ void main() {
       expect(edit.onPressed, isNull);
       expect(find.byKey(const Key('endRoundButton')), findsNothing);
     });
+
+    testWidgets('when the round ends, windows opened in the game close: '
+        'nothing of it stays over the lobby (R-GAME-12)', (tester) async {
+      await setUpGroup(tester);
+      await assign(tester, {'me': Role.hunter, 'kim': Role.player});
+      await tester.runAsync(() => deviceRepo(db).startGame(host));
+      await pumpAppWithSession(tester, db: db, userId: 'kim');
+      await tester.tap(find.byKey(const Key('overviewButton')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+
+      await tester.runAsync(() => deviceRepo(db).endRound(host));
+      await settleAsync(tester);
+      expect(find.text('Lobby'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+    });
   });
 
   testWidgets('host is told before the start when hunters will see each '

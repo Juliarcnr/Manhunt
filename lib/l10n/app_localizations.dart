@@ -1337,7 +1337,7 @@ abstract class AppLocalizations {
   /// No description provided for @jokerHuntersHintMany.
   ///
   /// In en, this message translates to:
-  /// **'See where the hunters are right now – once per joker'**
+  /// **'See where the hunters are right now'**
   String get jokerHuntersHintMany;
 
   /// No description provided for @jokersLeft.

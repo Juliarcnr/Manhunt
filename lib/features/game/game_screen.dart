@@ -1016,7 +1016,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         (s.playerJokerAvailable && !me.playerJokerUsed);
   }
 
-  /// R-PLAY-02: see the hunters once per joker (R-SET-09).
+  /// R-PLAY-02: see the hunters, as often as there are jokers (R-SET-09).
   Future<void> _useHunterJoker(Member me) async {
     final l10n = AppLocalizations.of(context);
     final total = widget.game.settings.hunterJokers;

@@ -745,8 +745,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jokerHuntersHint => 'See once where the hunters are right now';
 
   @override
-  String get jokerHuntersHintMany =>
-      'See where the hunters are right now – once per joker';
+  String get jokerHuntersHintMany => 'See where the hunters are right now';
 
   @override
   String jokersLeft(int left, int total) {
