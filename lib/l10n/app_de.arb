@@ -160,7 +160,7 @@
   "lobbyWaitingForAdmin": "Warte darauf, dass das Spiel gestartet wird…",
   "lobbyAdminBadge": "Host",
   "lobbyYouBadge": "Du",
-  "lobbyRemoveMember": "{name} entfernen?",
+  "lobbyRemoveMember": "{name} aus der Gruppe entfernen?",
   "lobbyRemove": "Entfernen",
   "removeMemberText": "Die Person wird aus der Gruppe entfernt. Mit dem Code kann sie wieder beitreten.",
   "removedTitle": "Du wurdest vom Host aus der Gruppe entfernt.",

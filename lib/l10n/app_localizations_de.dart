@@ -543,7 +543,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String lobbyRemoveMember(String name) {
-    return '$name entfernen?';
+    return '$name aus der Gruppe entfernen?';
   }
 
   @override

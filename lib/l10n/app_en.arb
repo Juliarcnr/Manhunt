@@ -178,7 +178,7 @@
   "lobbyWaitingForAdmin": "Waiting for the host to start…",
   "lobbyAdminBadge": "Host",
   "lobbyYouBadge": "You",
-  "lobbyRemoveMember": "Remove {name}?",
+  "lobbyRemoveMember": "Remove {name} from the group?",
   "@lobbyRemoveMember": {"placeholders": {"name": {"type": "String"}}},
   "lobbyRemove": "Remove",
   "removeMemberText": "They will be removed from the group. With the code they can join again.",

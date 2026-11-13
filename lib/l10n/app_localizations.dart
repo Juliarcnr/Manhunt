@@ -1001,7 +1001,7 @@ abstract class AppLocalizations {
   /// No description provided for @lobbyRemoveMember.
   ///
   /// In en, this message translates to:
-  /// **'Remove {name}?'**
+  /// **'Remove {name} from the group?'**
   String lobbyRemoveMember(String name);
 
   /// No description provided for @lobbyRemove.

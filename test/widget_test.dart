@@ -290,7 +290,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('remove_guest')));
     await tester.pumpAndSettle();
-    expect(find.text('Remove Kim?'), findsOneWidget);
+    expect(find.text('Remove Kim from the group?'), findsOneWidget);
     await tester.tap(find.text('Remove'));
     await settleAsync(tester);
     expect(find.text('Kim'), findsNothing);
