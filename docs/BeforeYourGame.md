@@ -56,7 +56,7 @@ Dauert 2–3 Minuten.
   1 Minute, wenn sie schon vorbei ist. Erst danach zählen Vorlauf und Pings. Ohne Startzeit: 1 Minute Countdown.
 - [ ] Alle beigetreten? Dann **zufällig einteilen** (würfelt alle neu: 30 % Hunter, 70 % Spieler). Danach
   Personen per **Drag & Drop** (lange drücken, ziehen) oder durch **Antippen** umsetzen. Wer nicht mitspielt,
-  kommt mit dem Knopf neben dem Namen zurück unter „Nicht zugewiesen“.
+  kommt per Antippen → „Nicht zugewiesen“ (oder Ziehen) dorthin zurück.
 - [ ] Optional eine **Spielleitung**: Person in den Abschnitt „Spielleitung“ ziehen. Sie spielt nicht mit und sieht
   alle live. Spielst du als Host nicht mit, zieh dich selbst dorthin (unter „Nicht zugewiesen“ kannst du nicht starten).
 - [ ] **Spiel starten** → in der Liste prüfen, wer in welcher Rolle mitspielt und wer nicht → bestätigen.

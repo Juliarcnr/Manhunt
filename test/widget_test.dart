@@ -400,16 +400,18 @@ void main() {
       expect(await role(tester, 'kim'), 'hunter');
     });
 
-    testWidgets('the sit-out button sends a person back to unassigned; not '
-        'for the host themself', (tester) async {
+    testWidgets('back to unassigned via the role menu; no extra button in '
+        'the row (R-LOBBY-12)', (tester) async {
       await setUpGroup(tester);
       await assign(tester, {'me': Role.hunter, 'kim': Role.player});
       await pumpAppWithSession(tester, db: db, userId: 'me');
-      expect(find.byKey(const Key('unassign_me')), findsNothing);
-      // Already unassigned: no button.
-      expect(find.byKey(const Key('unassign_sam')), findsNothing);
-      await scrollTo(tester, find.byKey(const Key('unassign_kim')));
-      await tester.tap(find.byKey(const Key('unassign_kim')));
+      expect(find.byKey(const Key('unassign_kim')), findsNothing);
+      await scrollTo(tester, find.text('KIM'));
+      await tester.ensureVisible(find.text('KIM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('KIM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('roleOption_unassigned')));
       await settleAsync(tester);
       expect(await role(tester, 'kim'), 'unassigned');
     });

@@ -242,12 +242,6 @@ abstract class AppLocalizations {
   /// **'Anyone here does not play.'**
   String get lobbyUnassignedHint;
 
-  /// No description provided for @lobbyUnassign.
-  ///
-  /// In en, this message translates to:
-  /// **'Sit out'**
-  String get lobbyUnassign;
-
   /// No description provided for @lobbyRoleMenuTitle.
   ///
   /// In en, this message translates to:
@@ -293,7 +287,7 @@ abstract class AppLocalizations {
   /// No description provided for @lobbyGameMasterHint.
   ///
   /// In en, this message translates to:
-  /// **'Does not play and sees all hunters and players live.'**
+  /// **'Silent observer of the game. Sees all hunters and players live.'**
   String get lobbyGameMasterHint;
 
   /// No description provided for @gameMasterInfo.

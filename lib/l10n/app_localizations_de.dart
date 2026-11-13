@@ -89,9 +89,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lobbyUnassignedHint => 'Wer hier steht, spielt nicht mit.';
 
   @override
-  String get lobbyUnassign => 'Nicht mitspielen lassen';
-
-  @override
   String lobbyRoleMenuTitle(String name) {
     return 'Rolle von $name';
   }
@@ -129,7 +126,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get lobbyGameMasterHint =>
-      'Spielt nicht mit und sieht alle Hunter:innen und Spieler:innen live.';
+      'Stille Beobachtung des Spiels. Sieht alle Hunter:innen und Spieler:innen live.';
 
   @override
   String gameMasterInfo(int seconds) {

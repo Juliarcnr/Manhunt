@@ -144,11 +144,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                 if (role != null) moveTo(m, role);
               }
             : null,
-        // Not for the host themself: they must have a role (R-LOBBY-13).
-        onUnassign:
-            editRoles && m.role != Role.unassigned && m.id != game.adminId
-            ? () => moveTo(m, Role.unassigned)
-            : null,
         onRemove: _isAdmin && !running && m.id != session.userId
             ? () async {
                 final ok = await _confirm(
@@ -967,7 +962,6 @@ class _MemberTile extends StatelessWidget {
     required this.isAdmin,
     this.onRename,
     this.onTap,
-    this.onUnassign,
     this.onRemove,
   });
 
@@ -979,9 +973,6 @@ class _MemberTile extends StatelessWidget {
 
   /// Host only: opens the role menu (R-LOBBY-05).
   final VoidCallback? onTap;
-
-  /// Host only: back to "unassigned", i.e. sit out (R-LOBBY-12).
-  final VoidCallback? onUnassign;
 
   /// Host only, not for oneself: remove from the group (R-LOBBY-09).
   final VoidCallback? onRemove;
@@ -1021,16 +1012,6 @@ class _MemberTile extends StatelessWidget {
             ),
           if (isAdmin) _Badge(l10n.lobbyAdminBadge),
           // No "You" badge: the pencil marks the own name (R-LOBBY-10).
-          if (onUnassign != null)
-            IconButton(
-              key: Key('unassign_${member.id}'),
-              tooltip: l10n.lobbyUnassign,
-              onPressed: onUnassign,
-              icon: const Icon(
-                Icons.person_off_outlined,
-                color: AppColors.textMuted,
-              ),
-            ),
           if (onRemove != null)
             IconButton(
               key: Key('remove_${member.id}'),

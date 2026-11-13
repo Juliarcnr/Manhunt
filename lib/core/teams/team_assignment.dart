@@ -34,8 +34,8 @@ List<Member> changedRoles(List<Member> before, List<Member> after) {
   ];
 }
 
-/// Gives one member [role]: drag and drop, the role menu and the button back
-/// to "unassigned" (R-LOBBY-05, R-LOBBY-12, R-GM-02).
+/// Gives one member [role]: drag and drop and the role menu (R-LOBBY-05,
+/// R-GM-02).
 List<Member> setRole(List<Member> members, String id, Role role) => [
   for (final m in members)
     if (m.id == id) m.copyWith(role: role) else m,
